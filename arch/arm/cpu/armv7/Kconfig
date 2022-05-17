@@ -59,4 +59,3 @@ config ARMV7_LPAE
 	required if U-Boot runs in HYP mode.
 
 endif
-

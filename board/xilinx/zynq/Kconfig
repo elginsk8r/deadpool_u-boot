@@ -31,4 +31,3 @@ config CMD_ZYNQ_RSA
 	  BOOT.BIN using Xilinx bootgen tool.
 
 endif
-

@@ -22,4 +22,3 @@ config HWSPINLOCK_STM32
 	  various processors on the SoC.
 
 endmenu
-

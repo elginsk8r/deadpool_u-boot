@@ -24,4 +24,3 @@ endchoice
 source "board/freescale/imx8qxp_mek/Kconfig"
 
 endif
-

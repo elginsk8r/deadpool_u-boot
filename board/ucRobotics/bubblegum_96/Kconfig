@@ -13,4 +13,3 @@ config SYS_CONFIG_NAME
 	default "bubblegum_96"
 
 endif
-

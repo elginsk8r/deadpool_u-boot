@@ -61,4 +61,3 @@ config SYS_CONFIG_NAME
         default "etamin"
 
 endif
-

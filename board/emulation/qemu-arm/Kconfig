@@ -11,4 +11,3 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	imply VIRTIO_BLK
 
 endif
-

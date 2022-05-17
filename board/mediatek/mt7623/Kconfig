@@ -11,4 +11,3 @@ config MTK_BROM_HEADER_INFO
 	default "lk=1"
 
 endif
-

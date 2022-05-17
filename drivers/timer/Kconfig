@@ -175,4 +175,3 @@ config MTK_TIMER
 	  MediaTek devices.
 
 endmenu
-

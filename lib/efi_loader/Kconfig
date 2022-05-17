@@ -33,4 +33,3 @@ config EFI_LOADER_BOUNCE_BUFFER
 	  Some hardware does not support DMA to full 64bit addresses. For this
 	  hardware we can create a bounce buffer so that payloads don't have to
 	  worry about platform details.
-

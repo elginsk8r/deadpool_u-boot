@@ -7,4 +7,3 @@ config SYS_CONFIG_NAME
 	default "espt"
 
 endif
-

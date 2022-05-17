@@ -1,13 +1,10 @@
-/* usb pcd driver */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * (C) Copyright 2010 Amlogic, Inc
- *
- * Victor Wan, victor.wan@amlogic.com,
- * 2010-03-24 @ Shanghai
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
+
 #include "../v2_burning_i.h"
-#include "platform.h"
+#include "../../platform.h"
 #include "usb_ch9.h"
 #include "dwc_pcd.h"
 #include "dwc_pcd_irq.h"
@@ -226,7 +223,7 @@ static unsigned int time_out_wait_sof;
 static unsigned int _sofintr_not_occur;
 #if (defined CONFIG_USB_DEVICE_V2)
 static unsigned int _sofintr;
-unsigned curTime_sof;
+extern unsigned curTime_sof;
 #endif
 
 void usb_parameter_init(int time_out)

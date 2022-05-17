@@ -113,4 +113,3 @@ config PCIE_INTEL_FPGA
 	  FPGA, example Stratix 10.
 
 endif
-

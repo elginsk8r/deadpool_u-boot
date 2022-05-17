@@ -12,4 +12,3 @@ config CHOICE_C
 	bool "Choice C"
 
 endchoice
-

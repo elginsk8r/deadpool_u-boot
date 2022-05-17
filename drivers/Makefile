@@ -8,6 +8,7 @@ obj-$(CONFIG_$(SPL_TPL_)I2C_SUPPORT) += i2c/
 obj-$(CONFIG_$(SPL_TPL_)INPUT) += input/
 obj-$(CONFIG_$(SPL_TPL_)LED) += led/
 obj-$(CONFIG_$(SPL_TPL_)MMC_SUPPORT) += mmc/
+obj-$(CONFIG_$(SPL_TPL_)CMD_JTAG) += jtag/
 obj-$(CONFIG_$(SPL_TPL_)NAND_SUPPORT) += mtd/nand/raw/
 obj-$(CONFIG_$(SPL_TPL_)PCH_SUPPORT) += pch/
 obj-$(CONFIG_$(SPL_TPL_)PCI) += pci/
@@ -24,10 +25,13 @@ obj-$(CONFIG_$(SPL_)DM_MAILBOX) += mailbox/
 obj-$(CONFIG_$(SPL_)REMOTEPROC) += remoteproc/
 obj-$(CONFIG_$(SPL_TPL_)TPM) += tpm/
 obj-$(CONFIG_AML_V2_FACTORY_BURN)       += usb/gadget/v2_burning/
+obj-$(CONFIG_AML_V3_FACTORY_BURN)       += usb/gadget/v3_burning/
 obj-$(CONFIG_AML_NAND) += nand/
 obj-$(CONFIG_AML_DRIVER) += amlogic/
 obj-$(CONFIG_SPI_NAND) += mtd/nand/spi-nand/
-obj-$(CONFIG_MESON_NFC) += mtd/nand/aml_nand/
+obj-$(CONFIG_MESON_NFC) += mtd/nand/raw/aml_nand/
+obj-$(CONFIG_TYPEC) += usb/typec/
+obj-$(CONFIG_USB_ROLE_SWITCH) += usb/roles/
 
 ifndef CONFIG_TPL_BUILD
 ifdef CONFIG_SPL_BUILD

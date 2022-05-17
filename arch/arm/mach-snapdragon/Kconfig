@@ -41,4 +41,3 @@ source "board/qualcomm/dragonboard410c/Kconfig"
 source "board/qualcomm/dragonboard820c/Kconfig"
 
 endif
-

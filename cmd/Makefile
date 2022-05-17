@@ -10,6 +10,7 @@ obj-$(CONFIG_CMD_BOOTM) += bootm.o
 obj-y += help.o
 obj-y += version.o
 obj-$(CONFIG_CMD_MMC) += aml_mmc.o
+obj-$(CONFIG_SPI_NAND) += spi_nand.o
 
 # command
 obj-$(CONFIG_CMD_AES) += aes.o
@@ -33,6 +34,7 @@ obj-$(CONFIG_CMD_BTRFS) += btrfs.o
 obj-$(CONFIG_CMD_CACHE) += cache.o
 obj-$(CONFIG_CMD_CBFS) += cbfs.o
 obj-$(CONFIG_CMD_CLK) += clk.o
+obj-$(CONFIG_CMD_CLKMSR)+= clkmsr.o
 obj-$(CONFIG_CMD_CLS) += cls.o
 obj-$(CONFIG_CMD_CONFIG) += config.o
 obj-$(CONFIG_CMD_CONITRACE) += conitrace.o
@@ -71,10 +73,14 @@ obj-$(CONFIG_CMD_GPIO) += gpio.o
 obj-$(CONFIG_CMD_HVC) += smccc.o
 obj-$(CONFIG_CMD_I2C) += i2c.o
 obj-$(CONFIG_CMD_WATCHDOG) += watchdog.o
+obj-$(CONFIG_CMD_JTAG) += jtag.o
 obj-$(CONFIG_CMD_IOTRACE) += iotrace.o
 obj-$(CONFIG_CMD_HASH) += hash.o
 obj-$(CONFIG_CMD_IDE) += ide.o disk.o
 obj-$(CONFIG_CMD_INI) += ini.o
+ifdef CONFIG_CMD_INI
+obj-y += amlogic/ini/model.o amlogic/ini/model_data_check.o amlogic/ini/ini_proxy.o amlogic/ini/UnifyKey.o amlogic/ini/ini_platform.o amlogic/ini/ini_io.o amlogic/ini/ini_handler.o amlogic/ini/ini_core.o amlogic/ini/ini_log.o
+endif
 obj-$(CONFIG_CMD_IRQ) += irq.o
 obj-$(CONFIG_CMD_ITEST) += itest.o
 obj-$(CONFIG_CMD_JFFS2) += jffs2.o
@@ -100,6 +106,7 @@ obj-$(CONFIG_MP) += mp.o
 obj-$(CONFIG_CMD_MTD) += mtd.o
 obj-$(CONFIG_CMD_MTDPARTS) += mtdparts.o
 obj-$(CONFIG_CMD_NAND) += nand.o
+obj-$(CONFIG_AML_STORAGE) += storage.o
 obj-$(CONFIG_CMD_NET) += net.o
 obj-$(CONFIG_CMD_ONENAND) += onenand.o
 obj-$(CONFIG_CMD_OSD) += osd.o
@@ -164,6 +171,9 @@ obj-$(CONFIG_CMD_GPT) += gpt.o
 obj-$(CONFIG_CMD_ETHSW) += ethsw.o
 obj-$(CONFIG_CMD_AXI) += axi.o
 obj-$(CONFIG_CMD_SARADC) += saradc.o
+obj-$(CONFIG_CMD_STARTDSP) += cmd_startdsp.o
+obj-$(CONFIG_CMD_IR) += irkey.o
+obj-$(CONFIG_CMD_TCPC) += tcpc.o
 
 # Power
 obj-$(CONFIG_CMD_PMIC) += pmic.o
@@ -179,11 +189,18 @@ obj-$(CONFIG_X86) += x86/
 obj-$(CONFIG_ARCH_MVEBU) += mvebu/
 endif # !CONFIG_SPL_BUILD
 
+obj-$(CONFIG_CMD_DSPRUN) += cmd_dsprun.o
+obj-$(CONFIG_CMD_DSPSET) += cmd_dspset.o
+
 # core command
 obj-y += nvedit.o
 
 obj-$(CONFIG_TI_COMMON_CMD_OPTIONS) += ti/
-obj-$(CONFIG_AML_CMD) += amlogic/
+obj-$(CONFIG_AML_DRIVER) += amlogic/
+
+obj-$(CONFIG_AML_TSENSOR) += amlogic/cmd_tsensor.o
+obj-$(CONFIG_AML_OSCRING) += amlogic/cmd_ringmsr.o
+
 
 filechk_data_gz = (echo "static const char data_gz[] ="; cat $< | scripts/bin2c; echo ";")
 

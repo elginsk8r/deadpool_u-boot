@@ -25,4 +25,3 @@ config SYS_ICACHE_LINE_SIZE
 	default 32
 
 endif
-

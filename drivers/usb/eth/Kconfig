@@ -63,4 +63,3 @@ config USB_ETHER_SMSC95XX
 	  Ethernet Devices.
 
 endif
-

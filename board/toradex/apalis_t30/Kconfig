@@ -37,4 +37,3 @@ config APALIS_T30_PCIE_EVALBOARD_INIT
 source "board/toradex/common/Kconfig"
 
 endif
-

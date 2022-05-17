@@ -33,4 +33,3 @@ config SYS_CONFIG_NAME
 source "board/freescale/common/Kconfig"
 
 endif
-

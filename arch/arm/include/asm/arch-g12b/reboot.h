@@ -1,23 +1,7 @@
-
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/include/asm/reboot.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #ifndef __REBOOT_H
 #define __REBOOT_H
@@ -35,7 +19,7 @@ Reboot reason AND corresponding env setting:
 8:  Shutdown reboot           shutdown_reboot
 9:  RPMBP reboot              rpmbp
 10: quiescent reboot          quiescent reboot
-11:  Crash dump               crash_dump
+11 : rescueparty               rollback in AB mode
 12:  Kernel panic             kernel_panic
 13:  Watchdog reboot          watchdog_reboot
 14: quiescent recovery reboot   quiescent recovery
@@ -52,7 +36,7 @@ Reboot reason AND corresponding env setting:
 #define AMLOGIC_SHUTDOWN_REBOOT                 8
 #define AMLOGIC_RPMBP_REBOOT			9
 #define AMLOGIC_QUIESCENT_REBOOT		10
-#define	AMLOGIC_CRASH_REBOOT			11
+#define	AMLOGIC_RESCUEPARTY_REBOOT		11
 #define AMLOGIC_KERNEL_PANIC			12
 #define AMLOGIC_WATCHDOG_REBOOT			13
 #define AMLOGIC_RECOVERY_QUIESCENT_REBOOT	14

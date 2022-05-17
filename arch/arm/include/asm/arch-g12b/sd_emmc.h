@@ -1,12 +1,11 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * (C) Copyright 2016 Carlo Caione <carlo@caione.org>
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef __SD_EMMC_H__
 #define __SD_EMMC_H__
 
-#include <clk.h>
 #include <mmc.h>
 
 #define SDIO_PORT_A			0
@@ -68,57 +67,57 @@
 #define Cfg_adj_init	23
 
 #define MESON_SD_EMMC_START		0x40
-#define CFG_DESC_INIT			BIT(0)
-#define CFG_DESC_BUSY			BIT(1)
-#define CFG_DESC_ADDR			2
+#define   CFG_DESC_INIT			BIT(0)
+#define   CFG_DESC_BUSY			BIT(1)
+#define   CFG_DESC_ADDR			2
 
 #define MESON_SD_EMMC_CFG		0x44
-#define CFG_BUS_WIDTH_MASK		GENMASK(1, 0)
-#define CFG_BUS_WIDTH_1		0
-#define CFG_BUS_WIDTH_4		1
-#define CFG_BUS_WIDTH_8		2
-#define CFG_DDR				BIT(2)
-#define CFG_BL_LEN_MASK		GENMASK(7, 4)
-#define CFG_BL_LEN_SHIFT		4
-#define CFG_BL_LEN_512		(9 << 4)
-#define CFG_RESP_TIMEOUT_MASK		GENMASK(11, 8)
-#define CFG_RESP_TIMEOUT_256		(8 << 8)
-#define CFG_RC_CC_MASK		GENMASK(15, 12)
-#define CFG_RC_CC_16			(4 << 12)
-#define CFG_SDCLK_ALWAYS_ON		BIT(18)
-#define CFG_AUTO_CLK			BIT(23)
+#define   CFG_BUS_WIDTH_MASK		GENMASK(1, 0)
+#define   CFG_BUS_WIDTH_1		0
+#define   CFG_BUS_WIDTH_4		1
+#define   CFG_BUS_WIDTH_8		2
+#define   CFG_DDR				BIT(2)
+#define   CFG_BL_LEN_MASK		GENMASK(7, 4)
+#define   CFG_BL_LEN_SHIFT		4
+#define   CFG_BL_LEN_512		(9 << 4)
+#define   CFG_RESP_TIMEOUT_MASK		GENMASK(11, 8)
+#define   CFG_RESP_TIMEOUT_256		(8 << 8)
+#define   CFG_RC_CC_MASK		GENMASK(15, 12)
+#define   CFG_RC_CC_16			(4 << 12)
+#define   CFG_SDCLK_ALWAYS_ON		BIT(18)
+#define   CFG_AUTO_CLK			BIT(23)
 
 #define MESON_SD_EMMC_STATUS		0x48
-#define STATUS_MASK			GENMASK(15, 0)
-#define STATUS_ERR_MASK		GENMASK(12, 0)
-#define STATUS_RXD_ERR_MASK		GENMASK(7, 0)
-#define STATUS_TXD_ERR		BIT(8)
-#define STATUS_DESC_ERR		BIT(9)
-#define STATUS_RESP_ERR		BIT(10)
-#define STATUS_RESP_TIMEOUT		BIT(11)
-#define STATUS_DESC_TIMEOUT		BIT(12)
-#define STATUS_END_OF_CHAIN		BIT(13)
+#define   STATUS_MASK			GENMASK(15, 0)
+#define   STATUS_ERR_MASK		GENMASK(12, 0)
+#define   STATUS_RXD_ERR_MASK		GENMASK(7, 0)
+#define   STATUS_TXD_ERR		BIT(8)
+#define   STATUS_DESC_ERR		BIT(9)
+#define   STATUS_RESP_ERR		BIT(10)
+#define   STATUS_RESP_TIMEOUT		BIT(11)
+#define   STATUS_DESC_TIMEOUT		BIT(12)
+#define   STATUS_END_OF_CHAIN		BIT(13)
 
 #define MESON_SD_EMMC_IRQ_EN		0x4c
 
 #define MESON_SD_EMMC_CMD_CFG		0x50
-#define CMD_CFG_LENGTH_MASK		GENMASK(8, 0)
-#define CMD_CFG_BLOCK_MODE		BIT(9)
-#define CMD_CFG_R1B			BIT(10)
-#define CMD_CFG_END_OF_CHAIN		BIT(11)
-#define CMD_CFG_TIMEOUT_4S		(12 << 12)
-#define CMD_CFG_NO_RESP		BIT(16)
-#define CMD_CFG_NO_CMD		BIT(17)
-#define CMD_CFG_DATA_IO		BIT(18)
-#define CMD_CFG_DATA_WR		BIT(19)
-#define CMD_CFG_RESP_NOCRC		BIT(20)
-#define CMD_CFG_RESP_128		BIT(21)
-#define CMD_CFG_RESP_NUM		BIT(22)
-#define CMD_CFG_DATA_NUM		BIT(23)
-#define CMD_CFG_CMD_INDEX_MASK	GENMASK(29, 24)
-#define CMD_CFG_CMD_INDEX_SHIFT	24
-#define CMD_CFG_ERR			BIT(30)
-#define CMD_CFG_OWNER			BIT(31)
+#define   CMD_CFG_LENGTH_MASK		GENMASK(8, 0)
+#define   CMD_CFG_BLOCK_MODE		BIT(9)
+#define   CMD_CFG_R1B			BIT(10)
+#define   CMD_CFG_END_OF_CHAIN		BIT(11)
+#define   CMD_CFG_TIMEOUT_4S		(12 << 12)
+#define   CMD_CFG_NO_RESP		BIT(16)
+#define   CMD_CFG_NO_CMD		BIT(17)
+#define   CMD_CFG_DATA_IO		BIT(18)
+#define   CMD_CFG_DATA_WR		BIT(19)
+#define   CMD_CFG_RESP_NOCRC		BIT(20)
+#define   CMD_CFG_RESP_128		BIT(21)
+#define   CMD_CFG_RESP_NUM		BIT(22)
+#define   CMD_CFG_DATA_NUM		BIT(23)
+#define   CMD_CFG_CMD_INDEX_MASK	GENMASK(29, 24)
+#define   CMD_CFG_CMD_INDEX_SHIFT	24
+#define   CMD_CFG_ERR			BIT(30)
+#define   CMD_CFG_OWNER			BIT(31)
 
 #define MESON_SD_EMMC_CMD_ARG		0x54
 #define MESON_SD_EMMC_CMD_DAT		0x58
@@ -133,28 +132,5 @@
 #define SD_EMMC_RESP_CRC_ERROR          (1 << 3)
 #define SD_EMMC_RESP_TIMEOUT_ERROR      (1 << 4)
 #define SD_EMMC_DESC_TIMEOUT_ERROR      (1 << 5)
-
-struct meson_host {
-	struct mmc *mmc;
-	uint is_in;
-	uint is_tuning;
-	struct clk core;
-	struct clk xtal;
-	struct clk div2;
-	struct clk mux;
-	struct clk div;
-	struct clk gate;
-	struct gpio_desc gpio_cd;
-	struct gpio_desc gpio_reset;
-	char *blk_test;
-	char* desc_buf;
-};
-
-struct meson_mmc_platdata {
-	struct mmc_config cfg;
-	struct mmc mmc;
-	void *regbase;
-	void *w_buf;
-};
 
 #endif

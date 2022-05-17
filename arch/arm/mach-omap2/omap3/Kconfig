@@ -221,4 +221,3 @@ source "board/quipos/cairo/Kconfig"
 source "board/lg/sniper/Kconfig"
 
 endif
-

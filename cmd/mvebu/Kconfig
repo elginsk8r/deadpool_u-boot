@@ -50,4 +50,3 @@ config MVEBU_UBOOT_DFLT_NAME
 	  MVEBU "bubt" command if the source file name is omitted
 
 endmenu
-

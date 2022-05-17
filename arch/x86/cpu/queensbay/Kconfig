@@ -65,4 +65,3 @@ config DISABLE_IGD
 	  card's VGA BIOS and use that card for the graphics console.
 
 endif
-

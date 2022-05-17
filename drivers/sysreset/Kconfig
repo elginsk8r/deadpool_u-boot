@@ -70,4 +70,3 @@ config SYSRESET_MCP83XX
 	  Reboot support for NXP MPC83xx SoCs.
 
 endmenu
-

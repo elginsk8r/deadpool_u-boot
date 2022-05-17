@@ -38,4 +38,3 @@ endchoice
 source "board/dfi/dfi-bt700/Kconfig"
 
 endif
-

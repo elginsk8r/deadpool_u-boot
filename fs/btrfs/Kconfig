@@ -7,4 +7,3 @@ config FS_BTRFS
 	  This provides a single-device read-only BTRFS support. BTRFS is a
 	  next-generation Linux file system based on the copy-on-write
 	  principle.
-

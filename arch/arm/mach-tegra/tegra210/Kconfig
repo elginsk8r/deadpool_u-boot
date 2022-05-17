@@ -49,4 +49,3 @@ source "board/nvidia/p2371-2180/Kconfig"
 source "board/nvidia/p2571/Kconfig"
 
 endif
-

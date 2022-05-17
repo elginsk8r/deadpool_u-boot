@@ -39,4 +39,3 @@ config XILINX_MICROBLAZE0_HW_VER
 	default "7.10.d"
 
 endif
-

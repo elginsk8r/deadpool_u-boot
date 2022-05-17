@@ -13,4 +13,3 @@ config SYS_CONFIG_NAME
 	default "astro_mcf5373l"
 
 endif
-

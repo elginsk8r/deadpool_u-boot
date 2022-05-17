@@ -69,7 +69,7 @@
 
 	meson-fb {
 		status = "okay";
-		logo_addr = "0x76800000";
+		logo_addr = "0x7f800000";
 	};
 };
 
@@ -145,7 +145,7 @@
 				groups = "i2c_ao_sck",
 					"i2c_ao_sda";
 				function = "i2c_ao";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -154,7 +154,7 @@
 				groups = "i2c_ao_sck_e",
 					"i2c_ao_sda_e";
 				function = "i2c_ao";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -323,19 +323,18 @@
 				function = "sdcard";
 				input-enable;
 				bias-pull-up;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 			mux1 {
 				groups = "sdcard_clk_c";
 				function = "sdcard";
 				bias-pull-up;
 				output-high;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 		};
 
 		sd_all_pins:sd_all_pins {
-			/*
 			mux {
 				groups = "sdcard_d0_c",
 					   "sdcard_d1_c",
@@ -345,16 +344,15 @@
 				function = "sdcard";
 				input-enable;
 				bias-pull-up;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 			mux1 {
 				groups = "sdcard_clk_c";
 				function = "sdcard";
 				bias-pull-up;
 				output-high;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
-			*/
 		};
 
 		sd_1bit_pins:sd_1bit_pins {
@@ -364,14 +362,14 @@
 				function = "sdcard";
 				input-enable;
 				bias-pull-up;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 			mux1 {
 				groups = "sdcard_clk_c";
 				function = "sdcard";
 				bias-pull-up;
 				output-high;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 		};
 
@@ -421,7 +419,7 @@
 				function = "sdio";
 				input-enable;
 				bias-pull-up;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 		};
 
@@ -436,7 +434,7 @@
 				function = "sdio";
 				input-enable;
 				bias-pull-up;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 		};
 
@@ -446,14 +444,14 @@
 				function = "gpio_periphs";
 				input-enable;
 				bias-pull-up;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 			mux1 {
 				groups = "GPIOX_4";
 				function = "gpio_periphs";
 				bias-pull-up;
 				output-high;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 		};
 
@@ -467,14 +465,14 @@
 				function = "gpio_periphs";
 				input-enable;
 				bias-pull-up;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 			mux1 {
 				groups = "GPIOX_4";
 				function = "gpio_periphs";
 				bias-pull-up;
 				output-high;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 		};
 
@@ -534,7 +532,7 @@
 				groups = "i2c0_sda_c",
 					"i2c0_sck_c";
 				function = "i2c0";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -543,7 +541,7 @@
 				groups = "i2c0_sda_z0",
 					"i2c0_sck_z1";
 				function = "i2c0";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -552,7 +550,7 @@
 				groups = "i2c0_sda_z7",
 					"i2c0_sck_z8";
 				function = "i2c0";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -561,7 +559,7 @@
 				groups = "i2c1_sda_x",
 					"i2c1_sck_x";
 				function = "i2c1";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -570,7 +568,7 @@
 				groups = "i2c1_sda_h2",
 					"i2c1_sck_h3";
 				function = "i2c1";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -579,7 +577,7 @@
 				groups = "i2c1_sda_h6",
 					"i2c1_sck_h7";
 				function = "i2c1";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -588,7 +586,7 @@
 				groups = "i2c2_sda_x",
 					"i2c2_sck_x";
 				function = "i2c2";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -597,7 +595,7 @@
 				groups = "i2c2_sda_z",
 					"i2c2_sck_z";
 				function = "i2c2";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -606,7 +604,7 @@
 				groups = "i2c3_sda_h",
 					"i2c3_sck_h";
 				function = "i2c3";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -615,7 +613,7 @@
 				groups = "i2c3_sda_a",
 					"i2c3_sck_a";
 				function = "i2c3";
-				drive-strength = <2>;
+				drive-strength = <3>;
 			};
 		};
 
@@ -712,7 +710,7 @@
 					 "spi0_miso_c",
 					 "spi0_clk_c";
 				function = "spi0";
-				drive-strength = <1>;
+				drive-strength = <2>;
 			};
 		};
 
@@ -722,7 +720,7 @@
 					 "spi1_miso",
 					 "spi1_clk";
 				function = "spi1";
-				drive-strength = <1>;
+				drive-strength = <2>;
 			};
 		};
 
@@ -734,7 +732,7 @@
 					 "nor_hold",
 					 "nor_wp";
 				function = "nor";
-				drive-strength = <1>;
+				drive-strength = <2>;
 			};
 		};
 
@@ -786,7 +784,7 @@
 					"hdmitx_sck";
 				function = "hdmitx";
 				bias-disable;
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 		};
 
@@ -839,7 +837,7 @@
 				"eth_txd2_rgmii",
 				"eth_txd3_rgmii";
 				function = "eth";
-				drive-strength = <3>;
+				drive-strength = <4>;
 			};
 		};
 	};
@@ -912,34 +910,27 @@
 
 };
 
-/*
 &spicc0 {
-	clocks = <&clkc CLKID_SPICC0>,
-		 <&clkc CLKID_SPICC0_COMP>;
-	clock-names = "core", "comp";
+	clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_SPICC0>,
+		 <&clkc CLKID_SPICC0_DIV>, <&clkc CLKID_SPICC0_GATE>;
+	clock-names = "core", "core-gate", "async", "async-gate";
+	assigned-clocks = <&clkc CLKID_SPICC0_MUX>, <&clkc CLKID_SPICC0_DIV>;
+	assigned-clock-parents = <&clkc CLKID_FCLK_DIV2>;
+	assigned-clock-rates = <0>, <200000000>;
 };
 
 &spicc1 {
-	clocks = <&clkc CLKID_SPICC1>,
-		 <&clkc CLKID_SPICC1_COMP>;
-	clock-names = "core", "comp";
- };
-*/
+	clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_SPICC1>,
+		 <&clkc CLKID_SPICC1_DIV>, <&clkc CLKID_SPICC1_GATE>;
+	clock-names = "core", "core-gate", "async", "async-gate";
+	assigned-clocks = <&clkc CLKID_SPICC1_MUX>, <&clkc CLKID_SPICC1_DIV>;
+	assigned-clock-parents = <&clkc CLKID_FCLK_DIV2>;
+	assigned-clock-rates = <0>, <200000000>;
+};
+
 /*
 &spifc {
 	clocks = <&clkc CLKID_CLK81>;
 	clock-names = "core";
 };
 */
-&usb2_phy_v2 {
-	pll-setting-1 = <0x09400414>;
-	pll-setting-2 = <0x927E0000>;
-	pll-setting-3 = <0xac5f69e5>;
-	pll-setting-4 = <0xfe18>;
-	pll-setting-5 = <0xfff>;
-	pll-setting-6 = <0x78000>;
-	pll-setting-7 = <0xe0004>;
-	pll-setting-8 = <0xe000c>;
-	disconnect-threshold = <0x3c>;
-};
-

@@ -17,8 +17,10 @@
 #include <asm/cache.h>
 #include <part.h>
 
-#define HEHE_DEBUG(x...)   printf(x)
-//#define HEHE_DEBUG(x...)
+struct usb_string {
+	u8 id;
+	const char *s;
+};
 
 /* get from ch9.h fix compile error. start */
 struct usb_ss_ep_comp_descriptor {
@@ -1113,5 +1115,6 @@ int usb_hub_port_reset(struct usb_device *dev, int port,
 			      unsigned short *portstat);
 
 int usb_tuning_port(struct usb_device *udev, int port);
+int usb_aml_detect_operation(int argc, char * const argv[]);
 
 #endif /*_USB_H_ */

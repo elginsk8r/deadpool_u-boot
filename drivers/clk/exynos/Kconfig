@@ -16,4 +16,3 @@ config CLK_EXYNOS7420
 	  on Samsung Exynos7420 SoC.
 
 endmenu
-

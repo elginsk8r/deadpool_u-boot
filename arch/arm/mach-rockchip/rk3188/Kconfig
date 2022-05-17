@@ -33,4 +33,3 @@ config TPL_LIBGENERIC_SUPPORT
 source "board/radxa/rock/Kconfig"
 
 endif
-

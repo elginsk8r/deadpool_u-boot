@@ -26,4 +26,3 @@ config UT_UNICODE
 source "test/dm/Kconfig"
 source "test/env/Kconfig"
 source "test/overlay/Kconfig"
-

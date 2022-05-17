@@ -69,4 +69,3 @@ config USB_DWC3_PHY_SAMSUNG
 endmenu
 
 endif
-

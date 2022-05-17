@@ -38,4 +38,3 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	imply RTL8169
 
 endif
-

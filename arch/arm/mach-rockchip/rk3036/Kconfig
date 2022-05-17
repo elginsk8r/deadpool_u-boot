@@ -21,4 +21,3 @@ source "board/rockchip/evb_rk3036/Kconfig"
 source "board/rockchip/kylin_rk3036/Kconfig"
 
 endif
-

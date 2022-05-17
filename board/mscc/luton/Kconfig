@@ -12,4 +12,3 @@ config SYS_CONFIG_NAME
 	default "luton"
 
 endif
-

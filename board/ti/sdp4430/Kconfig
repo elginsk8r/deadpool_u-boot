@@ -13,4 +13,3 @@ config CMD_BAT
 	bool "Enable board-specific battery command"
 
 endif
-

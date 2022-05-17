@@ -35,4 +35,3 @@ config CHOICE_F
 	  This is a new symbol, so should be asked.
 
 endchoice
-

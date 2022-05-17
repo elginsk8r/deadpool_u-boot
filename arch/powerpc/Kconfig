@@ -45,4 +45,3 @@ source "arch/powerpc/cpu/mpc86xx/Kconfig"
 source "arch/powerpc/cpu/mpc8xx/Kconfig"
 
 endmenu
-

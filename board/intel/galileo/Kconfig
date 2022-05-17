@@ -34,4 +34,3 @@ config SMBIOS_PRODUCT_NAME
 	  This can be "Galileo" for GEN1 Galileo board.
 
 endif
-

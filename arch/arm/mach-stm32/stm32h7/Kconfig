@@ -10,4 +10,3 @@ source "board/st/stm32h743-eval/Kconfig"
 source "board/st/stm32h743-disco/Kconfig"
 
 endif
-

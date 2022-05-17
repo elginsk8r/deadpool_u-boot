@@ -16,4 +16,3 @@ config TI_AEMIF
 	  time via four chip selects with 64M byte access per chip select.
 
 endmenu
-

@@ -41,4 +41,3 @@ config BCMSTB_SDHCI_INDEX
 	default 1
 
 endif
-

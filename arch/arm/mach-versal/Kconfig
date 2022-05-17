@@ -42,4 +42,3 @@ config VERSAL_OF_BOARD_DTB_ADDR
 	depends on OF_BOARD
 
 endif
-

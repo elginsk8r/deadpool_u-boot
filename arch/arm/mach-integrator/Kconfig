@@ -57,4 +57,3 @@ config SYS_MALLOC_F_LEN
 	default 0x2000
 
 endmenu
-

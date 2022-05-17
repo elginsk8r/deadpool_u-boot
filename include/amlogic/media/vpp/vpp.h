@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #ifndef _VPP_INC_H_
 #define _VPP_INC_H_
 
@@ -15,8 +20,12 @@ enum vpp_gamma_sel_e {
 };
 
 extern void vpp_load_gamma_table(unsigned short *data, unsigned int len, enum vpp_gamma_sel_e flag);
-extern void vpp_init_lcd_gamma_table(void);
+extern void vpp_init_lcd_gamma_table(int index);
+void vpp_enable_lcd_gamma_table(int index);
+void vpp_disable_lcd_gamma_table(int index);
 
 extern void vpp_matrix_update(int type);
+extern void vpp_viu2_matrix_update(int type);
+extern void hdr_tx_pkt_cb(void);
 
 #endif

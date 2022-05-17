@@ -40,4 +40,3 @@ config DEBUG_UART
 	select DEBUG_UART_BOARD_INIT
 
 endif
-

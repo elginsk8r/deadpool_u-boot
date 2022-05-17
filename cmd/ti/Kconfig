@@ -8,4 +8,3 @@ config CMD_DDR3
 	   verification if supported.
 
 endmenu
-

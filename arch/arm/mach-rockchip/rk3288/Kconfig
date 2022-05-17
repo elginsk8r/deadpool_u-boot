@@ -175,4 +175,3 @@ source "board/rockchip/fennec_rk3288/Kconfig"
 source "board/rockchip/tinker_rk3288/Kconfig"
 
 endif
-

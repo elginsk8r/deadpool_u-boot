@@ -111,4 +111,3 @@ config RTC_M41T62
 	  It is a serial (I2C) real-time clock (RTC) with alarm.
 
 endmenu
-

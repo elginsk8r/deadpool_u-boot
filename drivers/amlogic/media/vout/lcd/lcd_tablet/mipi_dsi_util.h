@@ -1,18 +1,6 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/display/lcd/lcd_tablet/mipi_dsi_util.h
- *
- * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef MIPI_DSI_UTIL_H
@@ -455,8 +443,6 @@ enum tv_enc_lcd_type_e {
 #define DCS_CMD_CODE_SOFT_RESET           0xc
 
 /* DPHY standard timing */
-/* unit: MHz */
-#define MIPI_PHY_CLK_MAX            1000
 
 /* **** DPHY timing parameter       Value (unit: 0.01ns) **** */
 /* >100ns (4M) */
@@ -538,13 +524,5 @@ struct dsi_vid_s {
 
 #define DSI_CMD_SIZE_MAX		3000
 #define DSI_CMD_READ_VALID
-
-extern void mipi_dsi_print_info(struct lcd_config_s *pconf);
-extern void lcd_mipi_dsi_config_set(struct lcd_config_s *pConf);
-extern void mipi_dsi_link_off(struct lcd_config_s *pConf);
-extern void lcd_mipi_control_set(struct lcd_config_s *pConf, int status);
-extern int lcd_mipi_dsi_init_table_detect(const void *dt_blob, int child_offset,
-		struct dsi_config_s *dconf, int flag);
-extern int lcd_mipi_dsi_init_table_check_bsp(struct dsi_config_s *dconf, int flag);
 
 #endif

@@ -330,14 +330,10 @@
 				status = "disabled";
 					spi-flash@0 {
 						compatible = "spi-flash";
-						#address-cells = <1>;
-						#size-cells = <0>;
 						status = "disabled";
 					};
 					spi-nand@1 {
 						compatible = "spi-nand";
-						#address-cells = <1>;
-						#size-cells = <0>;
 						status = "disabled";
 					};
 			};
@@ -391,12 +387,12 @@
 			};
 		};
 
-		aobus: aobus@ff800000 {
+		aobus: aobus@fe000000 {
 			compatible = "simple-bus";
-			reg = <0x0 0xff800000 0x0 0x100000>;
+			reg = <0x0 0xfe000000 0x0 0x100000>;
 			#address-cells = <2>;
 			#size-cells = <2>;
-			ranges = <0x0 0x0 0x0 0xff800000 0x0 0x100000>;
+			ranges = <0x0 0x0 0x0 0xfe000000 0x0 0x100000>;
 
 			clkc_AO: clock-controller@0 {
 				compatible = "amlogic,g12a-aoclkc";
@@ -404,9 +400,9 @@
 				#clock-cells = <1>;
 			};
 
-			uart_AO: serial@3000 {
+			uart_AO: serial@1c00 {
 				compatible = "amlogic,meson-uart";
-				reg = <0x0 0x3000 0x0 0x14>;
+				reg = <0x0 0x1c00 0x0 0x14>;
 				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
 				clocks = <&xtal>;
 				status = "disabled";
@@ -507,7 +503,7 @@
 		};
 
 		nand: nfc@ffe07800 {
-			compatible = "amlogic,meson-g12a-nfc";
+			compatible = "amlogic,meson-nfc";
 			reg = <0x0 0xFFE07800 0x0 0x200>;
 			interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
 			status = "disabled";
@@ -521,21 +517,21 @@
 			#size-cells = <2>;
 			ranges = <0x0 0x0 0x0 0xffe01000 0x0 0x7f000>;
 
-			sd_emmc_a: mmc@2000 {
+			sd_emmc_a: sdio {
 				compatible = "";
 				reg = <0x0 0x2000 0x0 0x800>;
 				interrupts = <GIC_SPI 189 IRQ_TYPE_EDGE_RISING>;
 				status = "disabled";
 			};
 
-			sd_emmc_b: mmc@4000 {
+			sd_emmc_b: sd {
 				compatible = "amlogic,meson-gx-mmc", "amlogic,meson-gxbb-mmc";
 				reg = <0x0 0x4000 0x0 0x800>;
 				interrupts = <GIC_SPI 190 IRQ_TYPE_EDGE_RISING>;
 				status = "disabled";
 			};
 
-			sd_emmc_c: mmc@6000 {
+			sd_emmc_c: emmc {
 				compatible = "amlogic,meson-gx-mmc", "amlogic,meson-gxbb-mmc";
 				reg = <0x0 0x6000 0x0 0x800>;
 				interrupts = <GIC_SPI 191 IRQ_TYPE_EDGE_RISING>;

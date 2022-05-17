@@ -137,4 +137,3 @@ config PHYS_TO_BUS
 	  functions in your platform's support code.
 
 endmenu
-

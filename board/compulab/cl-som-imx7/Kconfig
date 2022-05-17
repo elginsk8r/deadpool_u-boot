@@ -26,4 +26,3 @@ config SYS_USB_IMG_LOAD_PART
 	default 1
 
 endif
-

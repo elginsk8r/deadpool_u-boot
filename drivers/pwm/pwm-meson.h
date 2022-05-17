@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #ifndef PWM_MESON_H
 #define PWM_MESON_H
 
@@ -17,6 +22,10 @@ struct meson_pwm_reg {
 	u32 da2r;/* A2/C2/E2 Duty Register */
 	u32 db2r;/* B2/D2/F2 Duty Register */
 	u32 br;/*Blink Register*/
+};
+
+struct meson_pwm_data {
+	u8 extern_clk; /* use external clktree */
 };
 
 enum pwm_polarity {

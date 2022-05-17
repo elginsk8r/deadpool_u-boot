@@ -18,4 +18,3 @@ source "board/timll/devkit3250/Kconfig"
 source "board/work-microwave/work_92105/Kconfig"
 
 endif
-

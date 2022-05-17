@@ -14,4 +14,3 @@ config SYS_TEXT_BASE
 	default 0x9d004000
 
 endif
-

@@ -67,4 +67,3 @@ source "board/sbc8641d/Kconfig"
 source "board/xes/xpedite517x/Kconfig"
 
 endmenu
-

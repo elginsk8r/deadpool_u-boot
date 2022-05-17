@@ -15,4 +15,3 @@ config PINCTRL_ARMADA_8K
 	   Marvell's Armada-8K SoC.
 
 endif
-

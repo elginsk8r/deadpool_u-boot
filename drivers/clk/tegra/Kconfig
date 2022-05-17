@@ -11,4 +11,3 @@ config TEGRA186_CLOCK
 	help
 	  Enable support for manipulating Tegra's on-SoC clocks via IPC
 	  requests to the BPMP (Boot and Power Management Processor).
-

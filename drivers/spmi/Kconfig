@@ -21,4 +21,3 @@ config SPMI_SANDBOX
 	  Demo SPMI bus implementation. Emulates part of PM8916 as single
           slave (0) on bus. It has 4 GPIO peripherals, pid 0xC0-0xC3.
 endmenu
-

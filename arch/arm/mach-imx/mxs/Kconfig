@@ -72,4 +72,3 @@ source "board/schulercontrol/sc_sps_1/Kconfig"
 source "board/technologic/ts4600/Kconfig"
 
 endif
-

@@ -40,4 +40,3 @@ config W1_EEPROM_SANDBOX
 endif
 
 endmenu
-

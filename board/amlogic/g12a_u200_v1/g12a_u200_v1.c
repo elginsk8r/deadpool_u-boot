@@ -1,23 +1,7 @@
-
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * board/amlogic/txl_skt_v1/txl_skt_v1.c
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #include <common.h>
 #include <malloc.h>
@@ -25,7 +9,7 @@
 #include <environment.h>
 #include <fdt_support.h>
 #include <linux/libfdt.h>
-#include <asm/arch/cpu_id.h>
+#include <amlogic/cpu_id.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/pinctrl_init.h>
 #ifdef CONFIG_AML_VPU
@@ -618,11 +602,6 @@ static struct mm_region bd_mem_map[] = {
 
 struct mm_region *mem_map = bd_mem_map;
 
-void board_nand_init(void) {
-	printf("board_nand_init\n");
-	return;
-}
-
 int print_cpuinfo(void) {
 	printf("print_cpuinfo\n");
 	return 0;
@@ -637,4 +616,39 @@ int ft_board_setup(void *blob, bd_t *bd)
 {
 	/* eg: bl31/32 rsv */
 	return 0;
+}
+
+static const struct mtd_partition spinand_partitions[] = {
+	{
+		.name = "logo",
+		.offset = 0,
+		.size = 2 * SZ_1M,
+	},
+	{
+		.name = "boot",
+		.offset = 0,
+		.size = 16 * SZ_1M,
+	},
+	{
+		.name = "dspA",
+		.offset = 0,
+		.size = 16 * SZ_1M,
+	},
+	{
+		.name = "dspB",
+		.offset = 0,
+		.size = 64 * SZ_1M,
+	},
+	/* last partition get the rest capacity */
+	{
+		.name = "data",
+		.offset = MTDPART_OFS_APPEND,
+		.size = MTDPART_SIZ_FULL,
+	}
+};
+
+const struct mtd_partition *get_spinand_partition_table(int *partitions)
+{
+	*partitions = ARRAY_SIZE(spinand_partitions);
+	return spinand_partitions;
 }

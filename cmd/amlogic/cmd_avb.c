@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * (C) Copyright 2018 Amlogic, Inc
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
+
+#include <board_variant.h>
 #include <common.h>
 #include <command.h>
 #include <environment.h>
@@ -19,12 +21,31 @@
 #endif
 
 #define AVB_USE_TESTKEY
-#define MAX_DTB_SIZE (256 * 1024)
+#define MAX_DTB_SIZE (AML_DTB_IMG_MAX_SZ + 512)
+#define DTB_PARTITION_SIZE 258048
+#define AVB_NUM_SLOT (4)
+#define MAX_AVBKEY_LEN (8 + 1024)
 
-#ifdef AVB_USE_TESTKEY
-extern const char testkey2048[520];
-extern const int testkey2048_length;
+#define CONFIG_AVB2_KPUB_EMBEDDED
+
+#if defined(CONFIG_AVB2_KPUB_VENDOR_MULTIPLE) && defined(CONFIG_AVB2_KPUB_DEFAULT)
+#pragma message("Warning: both vendor keys and default key are used\n")
 #endif
+
+#ifdef CONFIG_AVB2_KPUB_VENDOR_MULTIPLE
+extern const uint8_t *avb2_kpub_vendor[];
+extern const size_t avb2_kpub_vendor_len[];
+extern const size_t avb2_kpub_vendor_num;
+extern const uint8_t *avb2_kpub_vendor_external[];
+extern const size_t avb2_kpub_vendor_external_len[];
+extern const size_t avb2_kpub_vendor_external_num;
+#endif
+
+#ifdef CONFIG_AVB2_KPUB_DEFAULT
+extern const uint8_t avb2_kpub_default[];
+extern const size_t avb2_kpub_default_len;
+#endif /* CONFIG_AVB_KPUB_VENDOR_MULTIPLE */
+
 AvbOps avb_ops_;
 
 static AvbIOResult read_from_partition(AvbOps* ops, const char* partition, int64_t offset,
@@ -40,7 +61,7 @@ static AvbIOResult read_from_partition(AvbOps* ops, const char* partition, int64
         return AVB_IO_RESULT_ERROR_RANGE_OUTSIDE_PARTITION;
 
     *out_num_read = 0;
-    if (!memcmp(partition, "dtb", strlen("dtb"))) {
+    if (!avb_strcmp(partition, "dt")) {
         char *dtb_buf = malloc(MAX_DTB_SIZE);
 
         if (!dtb_buf)
@@ -59,7 +80,7 @@ static AvbIOResult read_from_partition(AvbOps* ops, const char* partition, int64
             return AVB_IO_RESULT_OK;
         }
     } else {
-        rc = store_read((unsigned char *)partition, offset, num_bytes, buffer);
+        rc = store_read(partition, offset, num_bytes, buffer);
         if (rc) {
             printf("Failed to read %zdB from part[%s] at offset %lld\n", num_bytes, partition, offset);
             return AVB_IO_RESULT_ERROR_IO;
@@ -82,7 +103,7 @@ static AvbIOResult write_to_partition(AvbOps* ops, const char* partition,
     if (part_bytes < offset)
         return AVB_IO_RESULT_ERROR_RANGE_OUTSIDE_PARTITION;
 
-    if (!memcmp(partition, "dtb", strlen("dtb"))) {
+    if (!avb_strcmp(partition, "dt")) {
         if (offset)
             return AVB_IO_RESULT_ERROR_IO;
         /* rc = store_dtb_rw((void *)buffer, num_bytes, 1); */
@@ -94,7 +115,7 @@ static AvbIOResult write_to_partition(AvbOps* ops, const char* partition,
             return AVB_IO_RESULT_OK;
         }
     } else {
-        rc = store_write((unsigned char *)partition, offset, num_bytes, (unsigned char *)buffer);
+        rc = store_write(partition, offset, num_bytes, (unsigned char *)buffer);
         if (rc) {
             printf("Failed to write %zdB from part[%s] at offset %lld\n", num_bytes, partition, offset);
             return AVB_IO_RESULT_ERROR_IO;
@@ -111,10 +132,14 @@ static AvbIOResult get_unique_guid_for_partition(AvbOps* ops, const char* partit
     int ret;
     char part_name[128];
     memset(guid_buf, 0, guid_buf_size);
-    run_command("get_valid_slot;", 0);
-    s1 = env_get("active_slot");
-    printf("active_slot is %s\n", s1);
-    if (!memcmp(partition, "system", strlen("system"))) {
+
+	s1 = env_get("active_slot");
+	if (!s1) {
+		run_command("get_valid_slot;", 0);
+		s1 = env_get("active_slot");
+	}
+    //printf("active_slot is %s\n", s1);
+    if (!avb_strcmp(partition, "system")) {
         if (strcmp(s1, "_a") == 0) {
             ret = get_partition_num_by_name("system_a");
             sprintf(part_name, "/dev/mmcblk0p%d", ret+1);
@@ -128,7 +153,7 @@ static AvbIOResult get_unique_guid_for_partition(AvbOps* ops, const char* partit
             sprintf(part_name, "/dev/mmcblk0p%d", ret+1);
             strncpy(guid_buf, part_name, guid_buf_size);
         }
-    } else if (!memcmp(partition, "vbmeta", strlen("vbmeta")))
+    } else if (!avb_strcmp(partition, "vbmeta"))
         strncpy(guid_buf, "/dev/block/vbmeta", guid_buf_size);
     return AVB_IO_RESULT_OK;
 }
@@ -138,43 +163,73 @@ static AvbIOResult get_size_of_partition(AvbOps* ops, const char* partition,
 {
     int rc = 0;
 
-	if (!memcmp(partition, "dtb", strlen("dtb"))) {
-		*out_size_num_bytes = MAX_DTB_SIZE;
+    if (!avb_strcmp(partition, "dt")) {
+        *out_size_num_bytes = DTB_PARTITION_SIZE;
     } else {
         /* rc = store_get_partititon_size((unsigned char *)partition, out_size_num_bytes); */
-        rc = store_part_size((unsigned char *)partition);
+        rc = store_part_size(partition);
         if (1 == rc) {
             printf("Failed to get partition[%s] size\n", partition);
             return AVB_IO_RESULT_ERROR_NO_SUCH_PARTITION;
         }
         *out_size_num_bytes = rc;
-        *out_size_num_bytes *= 512;
     }
 
     return AVB_IO_RESULT_OK;
 }
 
+static inline bool _validate_key(const uint8_t* key1, size_t key1_len,
+        const uint8_t* key2, size_t key2_len)
+{
+    return key1_len == key2_len && avb_safe_memcmp(key1, key2, key1_len) == 0;
+}
+
+/**
+ * AVB custom key should not be supported.
+ */
 static AvbIOResult validate_vbmeta_public_key(AvbOps* ops, const uint8_t* public_key_data,
         size_t public_key_length, const uint8_t* public_key_metadata, size_t public_key_metadata_length,
         bool* out_is_trusted)
 {
-#ifdef AVB_USE_TESTKEY
-    printf("Verified using testkey\n");
-    if (testkey2048_length != public_key_length) {
-        *out_is_trusted = false;
-        return AVB_IO_RESULT_OK;
+    *out_is_trusted = false;
+
+#ifdef CONFIG_AVB2_KPUB_VENDOR_MULTIPLE
+    if (env_get_yesno("use_external_avb_key") == 1) {
+        for (size_t i = 0; i < avb2_kpub_vendor_external_num && !(*out_is_trusted); i++) {
+            printf("Verifying with vendor external key[%zu]\n", i);
+            if (_validate_key(avb2_kpub_vendor_external[i], avb2_kpub_vendor_external_len[i],
+                              public_key_data, public_key_length)) {
+                *out_is_trusted = true;
+            }
+        }
+    } else {
+        for (size_t i = 0; i < avb2_kpub_vendor_num && !(*out_is_trusted); i++) {
+            printf("Verifying with vendor key[%zu]\n", i);
+            if (_validate_key(avb2_kpub_vendor[i], avb2_kpub_vendor_len[i],
+                              public_key_data, public_key_length)) {
+                *out_is_trusted = true;
+            }
+        }
     }
-    if (!avb_safe_memcmp(public_key_data, testkey2048, testkey2048_length))
-        *out_is_trusted = true;
-    else
-        *out_is_trusted = false;
-#else
-    unsigned long bl31_addr = get_sharemem_info(GET_SHARE_MEM_INPUT_BASE);
-    memcpy((void *)bl31_addr, public_key_data, public_key_length);
-    flush_cache(bl31_addr, public_key_length);
-    *out_is_trusted = aml_sec_boot_check(AML_D_P_AVB_PUBKEY_VERIFY,
-            bl31_addr, public_key_length, 0);
 #endif
+
+#ifdef CONFIG_AVB2_KPUB_DEFAULT
+    if (!(*out_is_trusted)) {
+        if (get_board_variant() != BOARD_VARIANT_DEV) {
+            printf("The default key is disabled\n");
+        } else {
+            printf("Verifying with the default key\n");
+            if (_validate_key(avb2_kpub_default, avb2_kpub_default_len,
+                              public_key_data, public_key_length)) {
+                *out_is_trusted = true;
+            }
+        }
+    }
+#endif
+
+    if (!(*out_is_trusted))
+        printf("AVB2 key in bootloader does not match with the key in vbmeta\n");
+
     return AVB_IO_RESULT_OK;
 }
 
@@ -212,6 +267,12 @@ static AvbIOResult write_rollback_index(AvbOps* ops, size_t rollback_index_locat
 
 static AvbIOResult read_is_device_unlocked(AvbOps* ops, bool* out_is_unlocked)
 {
+    if (get_board_variant() != BOARD_VARIANT_DEV) {
+        printf("The device is force locked\n");
+        *out_is_unlocked = false;
+        return AVB_IO_RESULT_OK;
+    }
+
 #ifdef CONFIG_AML_ANTIROLLBACK
     uint32_t lock_state;
     char *lock_s;
@@ -288,14 +349,31 @@ int is_device_unlocked(void)
 
 int avb_verify(AvbSlotVerifyData** out_data)
 {
-    const char * const requested_partitions[5] = {"boot", "recovery", "dtb", NULL};
+    const char * requested_partitions_ab[AVB_NUM_SLOT + 1] = {
+        "boot", "dtbo", "vendor_boot", NULL, NULL};
+    const char * requested_partitions[AVB_NUM_SLOT + 1] = {
+        "boot", "dt", "dtbo", NULL, NULL};
     AvbSlotVerifyResult result = AVB_SLOT_VERIFY_RESULT_OK;
-    char *s1;
-    char *ab_suffix;
-    run_command("get_valid_slot;", 0);
+    char *s1 = NULL;
+    char *ab_suffix = NULL;
+    uint32_t i = 0;
+
     s1 = env_get("active_slot");
-    printf("active_slot is %s\n", s1);
-    if (strcmp(s1, "normal") == 0) {
+    if (!s1) {
+      run_command("get_valid_slot;", 0);
+      s1 = env_get("active_slot");
+    }
+
+    if (s1 != NULL) {
+        printf("active_slot is %s\n", s1);
+        if (strcmp(s1, "normal") == 0) {
+            ab_suffix = "";
+        } else {
+            ab_suffix = env_get("active_slot");
+        }
+    }
+
+    if (ab_suffix == NULL) {
         ab_suffix = "";
     } else {
         ab_suffix = env_get("active_slot");
@@ -312,7 +390,25 @@ int avb_verify(AvbSlotVerifyData** out_data)
     if (is_device_unlocked() || !strcmp(upgradestep, "3"))
         flags |= AVB_SLOT_VERIFY_FLAGS_ALLOW_VERIFICATION_ERROR;
 
-    result = avb_slot_verify(&avb_ops_, requested_partitions, ab_suffix,
+    if (!strcmp(ab_suffix, "")) {
+        for (i = 0; i < AVB_NUM_SLOT; i++) {
+            if (requested_partitions[i] == NULL) {
+                requested_partitions[i] = "recovery";
+                break;
+            }
+        }
+        if (i == AVB_NUM_SLOT) {
+            printf("ERROR: failed to find an empty slot for recovery");
+            return AVB_SLOT_VERIFY_RESULT_ERROR_INVALID_ARGUMENT;
+        }
+    }
+
+    if (!strcmp(ab_suffix, ""))
+        result = avb_slot_verify(&avb_ops_, requested_partitions, ab_suffix,
+            flags,
+            AVB_HASHTREE_ERROR_MODE_RESTART_AND_INVALIDATE, out_data);
+    else
+        result = avb_slot_verify(&avb_ops_, requested_partitions_ab, ab_suffix,
             flags,
             AVB_HASHTREE_ERROR_MODE_RESTART_AND_INVALIDATE, out_data);
 
@@ -325,7 +421,7 @@ int avb_verify(AvbSlotVerifyData** out_data)
 static int do_avb_verify(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
     AvbSlotVerifyResult result = AVB_SLOT_VERIFY_RESULT_OK;
-    AvbSlotVerifyData* out_data;
+    AvbSlotVerifyData* out_data = NULL;
     uint32_t i = 0;
 
     result = avb_verify(&out_data);
@@ -358,6 +454,9 @@ static int do_avb_verify(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
             printf("rpmb lock state: %u\n", lock_state);
 #endif
 
+    }
+
+    if (out_data != NULL) {
         avb_slot_verify_data_free(out_data);
     }
 
@@ -386,10 +485,9 @@ static int do_avb_ops(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
     }
 }
 
-#if defined(CONFIG_CMD_AVB)
+
 U_BOOT_CMD(
         avb, 2, 0, do_avb_ops,
         "avb",
         "\nThis command will trigger related avb operations\n"
         );
-#endif

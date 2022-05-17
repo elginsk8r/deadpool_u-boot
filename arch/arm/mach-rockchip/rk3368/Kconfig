@@ -54,4 +54,3 @@ config SPL_LDSCRIPT
 	default "arch/arm/cpu/armv8/u-boot-spl.lds"
 
 endif
-

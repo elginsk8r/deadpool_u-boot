@@ -45,4 +45,3 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	def_bool y
 
 endif
-

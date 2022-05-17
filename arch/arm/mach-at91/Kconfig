@@ -299,4 +299,3 @@ config SPL_LDSCRIPT
 	default "arch/arm/mach-at91/armv7/u-boot-spl.lds" if CPU_V7A
 
 endif
-

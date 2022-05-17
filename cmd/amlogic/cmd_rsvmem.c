@@ -1,19 +1,7 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * common/cmd_rsvmem.c
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #include <common.h>
 #include <command.h>
@@ -21,6 +9,16 @@
 #include <asm/arch/secure_apb.h>
 
 #ifdef CONFIG_CMD_RSVMEM
+
+#if defined(P_AO_SEC_GP_CFG3)
+#define REG_RSVMEM_SIZE        P_AO_SEC_GP_CFG3
+#define REG_RSVMEM_BL32_START  P_AO_SEC_GP_CFG4
+#define REG_RSVMEM_BL31_START  P_AO_SEC_GP_CFG5
+#elif defined(SYSCTRL_SEC_STATUS_REG15)
+#define REG_RSVMEM_SIZE        SYSCTRL_SEC_STATUS_REG15
+#define REG_RSVMEM_BL32_START  SYSCTRL_SEC_STATUS_REG16
+#define REG_RSVMEM_BL31_START  SYSCTRL_SEC_STATUS_REG17
+#endif
 
 //#define RSVMEM_DEBUG_ENABLE
 #ifdef RSVMEM_DEBUG_ENABLE
@@ -36,7 +34,9 @@
 #define RSVMEM_RESERVED	0
 #define RSVMEM_CMA	1
 #define BL31_SHARE_MEM_SIZE  0x100000
+#ifndef BL32_SHARE_MEM_SIZE
 #define BL32_SHARE_MEM_SIZE  0x400000
+#endif
 
 static int do_rsvmem_check(cmd_tbl_t *cmdtp, int flag, int argc,
 		char *const argv[])
@@ -54,11 +54,17 @@ static int do_rsvmem_check(cmd_tbl_t *cmdtp, int flag, int argc,
 	unsigned int aarch32 = 0;
 
 	rsvmem_dbg("reserved memory check!\n");
-	data = readl(P_AO_SEC_GP_CFG3);
-	bl31_rsvmem_size =  ((data & 0xffff0000) >> 16) << 10;
-	bl32_rsvmem_size =  (data & 0x0000ffff) << 10;
-	bl31_rsvmem_start = readl(P_AO_SEC_GP_CFG5);
-	bl32_rsvmem_start = readl(P_AO_SEC_GP_CFG4);
+	data = readl(REG_RSVMEM_SIZE);
+	/* workaround for bl3x size */
+	if ((data >> 16) & 0xf0) {
+		bl31_rsvmem_size =  ((data & 0xffff0000) >> 16) << 16;
+		bl32_rsvmem_size =  (data & 0x0000ffff) << 16;
+	} else {
+		bl31_rsvmem_size =  ((data & 0xffff0000) >> 16) << 10;
+		bl32_rsvmem_size =  (data & 0x0000ffff) << 10;
+	}
+	bl31_rsvmem_start = readl(REG_RSVMEM_BL31_START);
+	bl32_rsvmem_start = readl(REG_RSVMEM_BL32_START);
 
 	fdtaddr = env_get("fdtaddr");
 	if (fdtaddr == NULL) {
@@ -231,6 +237,27 @@ static int do_rsvmem_check(cmd_tbl_t *cmdtp, int flag, int argc,
 				}
 
 				memset(cmdbuf, 0, sizeof(cmdbuf));
+				sprintf(cmdbuf, "fdt get value ramoops_reg /reserved-memory/ramoops reg;");
+				if (run_command(cmdbuf, 0) == 0) {
+					memset(cmdbuf, 0, sizeof(cmdbuf));
+					if (aarch32)
+						sprintf(cmdbuf, "fdt set /reserved-memory/ramoops reg <0x%x 0x%x>;",
+								((bl31_rsvmem_start + bl31_rsvmem_size + bl32_rsvmem_size + 0x400000 - 1) / 0x400000)*0x400000,
+								0x100000);
+					else
+						sprintf(cmdbuf, "fdt set /reserved-memory/ramoops reg <0x0 0x%x 0x0 0x%x>;",
+								((bl31_rsvmem_start + bl31_rsvmem_size + bl32_rsvmem_size + 0x400000 - 1) / 0x400000)*0x400000,
+								0x100000);
+
+					rsvmem_dbg("CMD: %s\n", cmdbuf);
+					ret = run_command(cmdbuf, 0);
+					if (ret != 0 ) {
+						rsvmem_err("fdt set /reserved-memory/ramoops reg  error.\n");
+						return -3;
+					}
+				}
+
+				memset(cmdbuf, 0, sizeof(cmdbuf));
 				sprintf(cmdbuf, "fdt get value secmon_clear_range /secmon clear_range;");
 				if (run_command(cmdbuf, 0) == 0) {
 					memset(cmdbuf, 0, sizeof(cmdbuf));
@@ -260,11 +287,17 @@ static int do_rsvmem_dump(cmd_tbl_t *cmdtp, int flag, int argc,
 	unsigned int bl32_rsvmem_start = 0;
 
 	rsvmem_info("reserved memory:\n");
-	data = readl(P_AO_SEC_GP_CFG3);
-	bl31_rsvmem_size =  ((data & 0xffff0000) >> 16) << 10;
-	bl32_rsvmem_size =  (data & 0x0000ffff) << 10;
-	bl31_rsvmem_start = readl(P_AO_SEC_GP_CFG5);
-	bl32_rsvmem_start = readl(P_AO_SEC_GP_CFG4);
+	data = readl(REG_RSVMEM_SIZE);
+	/* workaround for bl3x size */
+	if ((data >> 16) & 0xf0) {
+		bl31_rsvmem_size =  ((data & 0xffff0000) >> 16) << 16;
+		bl32_rsvmem_size =  (data & 0x0000ffff) << 16;
+	} else {
+		bl31_rsvmem_size =  ((data & 0xffff0000) >> 16) << 10;
+		bl32_rsvmem_size =  (data & 0x0000ffff) << 10;
+	}
+	bl31_rsvmem_start = readl(REG_RSVMEM_BL31_START);
+	bl32_rsvmem_start = readl(REG_RSVMEM_BL32_START);
 
 	rsvmem_info("bl31 reserved memory start: 0x%08x\n", bl31_rsvmem_start);
 	rsvmem_info("bl31 reserved memory size:  0x%08x\n", bl31_rsvmem_size);

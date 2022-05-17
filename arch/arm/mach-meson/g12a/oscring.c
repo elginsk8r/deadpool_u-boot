@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #include <config.h>
 #include <common.h>
 #include <asm/arch/io.h>
@@ -5,7 +10,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/mailbox.h>
 #include <asm/arch/oscring.h>
-#include <asm/arch/cpu_id.h>
+#include <amlogic/cpu_id.h>
 
 void ring_powerinit(void)
 {
@@ -95,7 +100,7 @@ int ring_msr_g12a(int index)
 	}
 
 	printf("osc efuse info:\n");
-	for (i = 0; i <= 11; i++)
+	for (i = 0; i < sizeof(efuseinfo) / sizeof(uint8_t); i++)
 		printf("0x%x, ", efuseinfo[i]);
 	printf("\n");
 

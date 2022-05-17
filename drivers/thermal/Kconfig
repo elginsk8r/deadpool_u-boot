@@ -24,4 +24,3 @@ config TI_DRA7_THERMAL
 	 The driver supports reading CPU temperature.
 
 endif # if DM_THERMAL
-

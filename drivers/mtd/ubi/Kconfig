@@ -105,4 +105,3 @@ config MTD_UBI_FM_DEBUG
 
 endif # MTD_UBI
 endmenu # "Enable UBI - Unsorted block images"
-

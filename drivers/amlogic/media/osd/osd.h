@@ -1,21 +1,7 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/amlogic/media/osd/osd.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * Author: Platform-BJ @platform.bj@amlogic.com
- *
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #ifndef _OSD_H_
 #define _OSD_H_
@@ -56,7 +42,7 @@
 #define KEYCOLOR_FLAG_ONHOLD  2
 #define KEYCOLOR_FLAG_CURRENT 4
 
-#define HW_OSD_COUNT 2
+#define HW_OSD_COUNT 3
 /* OSD block definition */
 #define HW_OSD_BLOCK_COUNT 4
 #define HW_OSD_BLOCK_REG_COUNT (HW_OSD_BLOCK_COUNT*2)
@@ -85,11 +71,6 @@
 extern int int_rdma;
 
 #define OSD_MAX_BUF_NUM 3  /* fence relative */
-
-enum osd_index_e {
-	OSD1 = 0,
-	OSD2
-};
 
 enum osd_enable_e {
 	DISABLE = 0,
@@ -270,6 +251,8 @@ struct hw_para_s {
 	u32 clone[HW_OSD_COUNT];
 	u32 bot_type;
 	u32 osd_ver;
+	u32 shift_line;
+	u32 mif_linear;
 };
 
 #endif /* _OSD_H_ */

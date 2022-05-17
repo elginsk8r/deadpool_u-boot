@@ -13,4 +13,3 @@ config SYS_CONFIG_NAME
 	default "M5485EVB"
 
 endif
-

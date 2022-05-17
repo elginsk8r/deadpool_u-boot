@@ -10,4 +10,3 @@ config U_QE
 		|| (TARGET_LS1043ARDB && !SPL_NO_QE && !NAND_BOOT && !QSPI_BOOT)
 	help
 	  Choose this option to add support for U QUICC Engine.
-

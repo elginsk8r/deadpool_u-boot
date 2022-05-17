@@ -16,4 +16,3 @@ config SYS_SOC
 source "board/nvidia/dalmore/Kconfig"
 
 endif
-

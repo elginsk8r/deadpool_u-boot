@@ -28,4 +28,3 @@ config DM_DEMO_SHAPE
 	  works.
 
 endmenu
-

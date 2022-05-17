@@ -1,23 +1,7 @@
-
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/include/asm/arch-txl/io.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #ifndef __MACH_MESSON_REGS_IO_H
 #define __MACH_MESSON_REGS_IO_H
@@ -25,12 +9,14 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/io.h>
-#define IO_CBUS_BASE                    (0xFFD00000L)
-#define IO_AXI_BUS_BASE                 (0xFFB00000L) /* gpv */
-#define IO_AHB_BUS_BASE                 (0xFF500000L) /* usb0 */
-#define IO_APB_BUS_BASE                 (0xFFFC0000L) /* AHB SRAM, sec/sys ahb? txlx_mem_map.xlsx */
-#define IO_APB_HDMI_BUS_BASE            (0xFFE00000L) /*  */
-#define IO_VPU_BUS_BASE                 (0xFF900000L) /* VPU */
+#include <asm/arch/register.h>
+
+//#define IO_CBUS_BASE                    (0xFFD00000L)
+//#define IO_AXI_BUS_BASE                 (0xFFB00000L) /* gpv */
+//#define IO_AHB_BUS_BASE                 (0xFF500000L) /* usb0 */
+//#define IO_APB_BUS_BASE                 (0xFFFC0000L) /* AHB SRAM, sec/sys ahb? txlx_mem_map.xlsx */
+//#define IO_APB_HDMI_BUS_BASE            (0xFFE00000L) /*  */
+//#define IO_VPU_BUS_BASE                 (0xFF900000L) /* VPU */
 
 #define CBUS_REG_OFFSET(reg) ((reg) << 2)
 #define CBUS_REG_ADDR(reg)	 (IO_CBUS_BASE + CBUS_REG_OFFSET(reg))

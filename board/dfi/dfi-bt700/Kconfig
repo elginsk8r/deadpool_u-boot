@@ -28,4 +28,3 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 
 config PCIE_ECAM_BASE
 	default 0xe0000000
-

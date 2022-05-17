@@ -28,4 +28,3 @@ endchoice
 source "board/emulation/qemu-x86/Kconfig"
 
 endif
-

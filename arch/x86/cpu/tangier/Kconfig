@@ -32,4 +32,3 @@ config SYS_USB_OTG_BASE
 	default 0xf9100000
 
 endif
-

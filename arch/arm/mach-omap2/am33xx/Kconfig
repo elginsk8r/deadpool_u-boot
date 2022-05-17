@@ -304,4 +304,3 @@ config PUB_ROM_DATA_SIZE
 	  image, this area is no longer used, and can be reclaimed
 	  for run time use by the boot image.
 endif
-

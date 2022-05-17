@@ -29,4 +29,3 @@ endchoice
 source "board/st/stih410-b2260/Kconfig"
 
 endif
-

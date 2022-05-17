@@ -31,4 +31,3 @@ config FSP_ADDR
 	default 0xfff20000
 
 endif
-

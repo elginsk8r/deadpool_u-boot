@@ -24,4 +24,3 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	select SPI_FLASH_SST
 
 endif
-

@@ -214,11 +214,18 @@ int image_check_hcrc(const image_header_t *hdr)
 
 int image_check_dcrc(const image_header_t *hdr)
 {
+
+#ifdef CONFIG_PXP_EMULATOR
+	puts("PXP skip CRC...");
+	return 1;
+#else
 	ulong data = image_get_data(hdr);
 	ulong len = image_get_data_size(hdr);
 	ulong dcrc = crc32_wd(0, (unsigned char *)data, len, CHUNKSZ_CRC32);
 
 	return (dcrc == image_get_dcrc(hdr));
+#endif
+
 }
 
 /**
@@ -881,10 +888,6 @@ int genimg_get_format(const void *img_addr)
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	if (android_image_check_header(img_addr) == 0)
 		return IMAGE_FORMAT_ANDROID;
-#endif
-#ifdef CONFIG_ZIRCON_BOOT_IMAGE
-	if (zircon_image_check_header(img_addr) == 0)
-		return IMAGE_FORMAT_ZIRCON;
 #endif
 
 	return IMAGE_FORMAT_INVALID;

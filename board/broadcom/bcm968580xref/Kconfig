@@ -15,4 +15,3 @@ config TARGET_BCM968580XREF
 	bool "Support Broadcom bcm968580xref"
 	depends on ARCH_BCM6858
 	select ARM64
-

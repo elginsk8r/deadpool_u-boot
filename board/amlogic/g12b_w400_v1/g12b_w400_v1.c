@@ -1,23 +1,7 @@
-
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * board/amlogic/g12b_w400_v1/g12b_w400_v1.c
- *
- * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #include <common.h>
 #include <malloc.h>
@@ -25,7 +9,7 @@
 #include <environment.h>
 #include <fdt_support.h>
 #include <linux/libfdt.h>
-#include <asm/arch/cpu_id.h>
+#include <amlogic/cpu_id.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/pinctrl_init.h>
 #ifdef CONFIG_AML_VPU
@@ -349,61 +333,6 @@ static void hdmi_tx_set_hdmi_5v(void)
 }
 #endif
 
-/*
- * mtd nand partition table, only care the size!
- * offset will be calculated by nand driver.
- */
-#ifdef CONFIG_AML_MTD
-static struct mtd_partition normal_partition_info[] = {
-#ifdef CONFIG_DISCRETE_BOOTLOADER
-    /* MUST NOT CHANGE this part unless u know what you are doing!
-     * inherent parition for descrete bootloader to store fip
-     * size is determind by TPL_SIZE_PER_COPY*TPL_COPY_NUM
-     * name must be same with TPL_PART_NAME
-     */
-    {
-        .name = "tpl",
-        .offset = 0,
-        .size = 0,
-    },
-#endif
-    {
-        .name = "logo",
-        .offset = 0,
-        .size = 2*SZ_1M,
-    },
-    {
-        .name = "recovery",
-        .offset = 0,
-        .size = 16*SZ_1M,
-    },
-    {
-        .name = "boot",
-        .offset = 0,
-        .size = 15*SZ_1M,
-    },
-    {
-        .name = "system",
-        .offset = 0,
-        .size = 280*SZ_1M,
-    },
-	/* last partition get the rest capacity */
-    {
-        .name = "data",
-        .offset = MTDPART_OFS_APPEND,
-        .size = MTDPART_SIZ_FULL,
-    },
-};
-struct mtd_partition *get_aml_mtd_partition(void)
-{
-	return normal_partition_info;
-}
-int get_aml_partition_count(void)
-{
-	return ARRAY_SIZE(normal_partition_info);
-}
-#endif /* CONFIG_AML_MTD */
-
 #ifdef CONFIG_AML_SPIFC
 /*
  * BOOT_3: NOR_HOLDn:reg0[15:12]=3
@@ -414,6 +343,8 @@ int get_aml_partition_count(void)
  * BOOT_14: NOR_CS:reg1[27:24]=3
  */
 #define SPIFC_NUM_CS 1
+
+#if 0
 static int spifc_cs_gpios[SPIFC_NUM_CS] = {54};
 
 static int spifc_pinctrl_enable(void *pinctrl, bool enable)
@@ -432,7 +363,6 @@ static int spifc_pinctrl_enable(void *pinctrl, bool enable)
 	return 0;
 }
 
-#if 0
 static const struct spifc_platdata spifc_platdata = {
 	.reg = 0xffd14000,
 	.mem_map = 0xf6000000,
@@ -694,4 +624,39 @@ int ft_board_setup(void *blob, bd_t *bd)
 {
 	/* eg: bl31/32 rsv */
 	return 0;
+}
+
+static const struct mtd_partition spinand_partitions[] = {
+	{
+		.name = "logo",
+		.offset = 0,
+		.size = 2 * SZ_1M,
+	},
+	{
+		.name = "boot",
+		.offset = 0,
+		.size = 16 * SZ_1M,
+	},
+	{
+		.name = "dspA",
+		.offset = 0,
+		.size = 16 * SZ_1M,
+	},
+	{
+		.name = "dspB",
+		.offset = 0,
+		.size = 64 * SZ_1M,
+	},
+	/* last partition get the rest capacity */
+	{
+		.name = "data",
+		.offset = MTDPART_OFS_APPEND,
+		.size = MTDPART_SIZ_FULL,
+	}
+};
+
+const struct mtd_partition *get_spinand_partition_table(int *partitions)
+{
+	*partitions = ARRAY_SIZE(spinand_partitions);
+	return spinand_partitions;
 }

@@ -6,4 +6,3 @@ config UT_DM
 	  tests on the driver model code. Each subsystem (uclass) is tested.
 	  If all is well then all tests pass although there will be a few
 	  messages printed along the way.
-

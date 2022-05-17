@@ -13,4 +13,3 @@ config SYS_CONFIG_NAME
 	default "bcm28155_ap"
 
 endif
-

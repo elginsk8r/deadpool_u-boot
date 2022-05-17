@@ -14,4 +14,3 @@ config CONFIG_AML_ANTIROLLBACK
 	default n
 
 endif
-

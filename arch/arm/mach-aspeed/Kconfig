@@ -21,4 +21,3 @@ config ASPEED_AST2500
 source "arch/arm/mach-aspeed/ast2500/Kconfig"
 
 endif
-

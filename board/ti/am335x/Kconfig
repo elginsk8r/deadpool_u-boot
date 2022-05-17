@@ -22,4 +22,3 @@ config NOR
 source "board/ti/common/Kconfig"
 
 endif
-

@@ -150,4 +150,3 @@ source "board/renesas/sh7785lcr/Kconfig"
 source "board/shmin/Kconfig"
 
 endmenu
-

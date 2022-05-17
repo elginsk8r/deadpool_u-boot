@@ -18,4 +18,3 @@ config SYS_CONFIG_NAME
 source "board/ge/common/Kconfig"
 
 endif
-

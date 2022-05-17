@@ -300,4 +300,3 @@ config MKIMAGE_DTC_PATH
 	  calls to the dtc application in order to create the output.  In
 	  some cases the system dtc may not support all required features
 	  and the path to a different version should be given here.
-

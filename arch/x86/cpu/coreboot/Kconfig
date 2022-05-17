@@ -26,4 +26,3 @@ config SYS_COREBOOT
 	imply CBMEM_CONSOLE
 
 endif
-

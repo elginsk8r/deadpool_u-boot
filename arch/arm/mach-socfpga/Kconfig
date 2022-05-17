@@ -143,4 +143,3 @@ config SYS_CONFIG_NAME
 	default "socfpga_vining_fpga" if TARGET_SOCFPGA_SAMTEC_VINING_FPGA
 
 endif
-

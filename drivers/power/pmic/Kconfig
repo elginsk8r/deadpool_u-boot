@@ -238,4 +238,3 @@ config PMIC_STPMU1
 	The STPMU1 PMIC provides 4 BUCKs, 6 LDOs, 1 VREF and 2 power switches.
 	It is accessed via an I2C interface. The device is used with STM32MP1
 	SoCs. This driver implements register read/write operations.
-

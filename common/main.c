@@ -44,6 +44,11 @@ void main_loop(void)
 
 	bootstage_mark_name(BOOTSTAGE_ID_MAIN_LOOP, "main_loop");
 
+#ifdef CONFIG_MDUMP_COMPRESS
+	extern void ramdump_init(void);
+	ramdump_init();
+#endif
+
 	if (IS_ENABLED(CONFIG_VERSION_VARIABLE))
 		env_set("ver", version_string);  /* set version variable */
 
@@ -60,8 +65,6 @@ void main_loop(void)
 
 	autoboot_command(s);
 
-#if defined(CONFIG_CLI_ENABLED)
 	cli_loop();
-#endif /* CONFIG_CLI_ENABLED */
 	panic("No CLI available");
 }

@@ -15,4 +15,3 @@ config MTK_BROM_HEADER_INFO
 	default "media=nor"
 
 endif
-

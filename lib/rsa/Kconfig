@@ -35,4 +35,3 @@ config RSA_FREESCALE_EXP
 	accelerator - CAAM.
 
 endif
-

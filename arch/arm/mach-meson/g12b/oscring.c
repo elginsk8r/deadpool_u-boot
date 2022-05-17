@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #include <config.h>
 #include <common.h>
 #include <asm/arch/io.h>
@@ -58,7 +63,7 @@ int ring_msr(int index)
 			[0] = "am_ring_osc_clk_out_ee[0] " ,
 		};
 	const int tb[] = {0, 1, 2, 99, 100, 101, 102, 103, 104, 105, 3, 33};
-	unsigned long i;
+	unsigned long i = 0;
 	unsigned char efuseinfo[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	if ((index != 0xff) && (index != 0)) {
@@ -100,7 +105,7 @@ int ring_msr(int index)
 	}
 
 	printf("osc efuse info:\n");
-	for (i = 0; i <= 11; i++)
+	for (i = 0; i < sizeof(efuseinfo) / sizeof(uint8_t); i++)
 		printf("0x%x, ", efuseinfo[i]);
 	printf("\n");
 

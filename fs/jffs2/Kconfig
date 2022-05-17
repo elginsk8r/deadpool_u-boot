@@ -5,4 +5,3 @@ config FS_JFFS2
 	  Flash File System version 2). JFFS2 is a log-structured file system
 	  for use with flash memory devices. It supports raw NAND devices,
 	  hard links and compression.
-

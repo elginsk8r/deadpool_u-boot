@@ -134,4 +134,3 @@ source "board/gardena/smart-gateway-mt7688/Kconfig"
 source "board/seeed/linkit-smart-7688/Kconfig"
 
 endmenu
-

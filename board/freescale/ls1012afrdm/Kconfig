@@ -82,4 +82,3 @@ endif
 if TARGET_LS1012AFRDM || TARGET_LS1012AFRWY
 source "board/freescale/common/Kconfig"
 endif
-

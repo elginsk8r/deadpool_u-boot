@@ -16,4 +16,3 @@ config SYS_CONFIG_NAME
 	default "adp-ag101p"
 
 endif
-

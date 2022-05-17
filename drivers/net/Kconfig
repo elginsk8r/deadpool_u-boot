@@ -514,4 +514,3 @@ config TSEC_ENET
 	  Ethernet Controller found on Freescale SoCs.
 
 endif # NETDEVICES
-

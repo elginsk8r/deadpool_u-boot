@@ -241,24 +241,22 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 #endif
 	const char *select = NULL;
 	int		ok_no_fdt = 0;
-#ifndef CONFIG_ANDROID_BOOT_IMAGE
+
 	*of_flat_tree = NULL;
 	*of_size = 0;
-#endif
+
 	if (argc > 2)
 		select = argv[2];
-	/* find flattened device tree */
-	#ifdef CONFIG_DTB_MEM_ADDR
+
 	if (!select) {
 		if (env_get("dtb_mem_addr")) {
-			select = simple_strtoul(env_get("dtb_mem_addr"), NULL, 16);
-			printf("env select addr: 0x%x\n", select);
+			select = env_get("dtb_mem_addr");
+			printf("env select addr: 0x%s\n", select);
 		}
 		else {
-			select = 0x01000000;
+			select = "0x01000000";
 		}
 	}
-	#endif
 
 	if (select || genimg_has_config(images)) {
 #if CONFIG_IS_ENABLED(FIT)
@@ -287,7 +285,7 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 			} else
 #endif
 			{
-				fdt_addr = select; //simple_strtoul(select, NULL, 16);
+				fdt_addr = simple_strtoul(select, NULL, 16);
 				debug("*  fdt: cmdline image address = 0x%08lx\n",
 				      fdt_addr);
 			}
@@ -365,7 +363,7 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 			 */
 #if CONFIG_IS_ENABLED(FIT)
 			/* check FDT blob vs FIT blob */
-			if (!fit_check_format(buf, IMAGE_SIZE_INVAL)) {
+			if (fit_check_format(buf)) {
 				ulong load, len;
 
 				fdt_noffset = boot_get_fdt_fit(images,
@@ -419,39 +417,20 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 				fdt_error("image is not a fdt");
 				goto error;
 			}
-			/*
+
 			if (fdt_totalsize(fdt_blob) != fdt_len) {
 				fdt_error("fdt size != image size");
 				goto error;
 			}
-			*/
 		} else {
 			debug("## No Flattened Device Tree\n");
 			goto no_fdt;
 		}
 	} else {
-		#if defined(CONFIG_ANDROID_BOOT_IMAGE)
-		if (images->ft_len) {
-			fdt_blob = (char *)images->ft_addr;
-
-			if (fdt_check_header(fdt_blob) != 0) {
-				fdt_error("image is not a fdt");
-				goto error;
-			}
-			/*
-			if (fdt_totalsize(fdt_blob) != images->ft_len) {
-				fdt_error("fdt size != image size");
-				goto error;
-			}*/
-		} else {
-			printf("## No Flattened Device Tree\n");
-			goto error;
-		}
-		#else
 		debug("## No Flattened Device Tree\n");
 		goto no_fdt;
-		#endif
 	}
+
 	*of_flat_tree = fdt_blob;
 	*of_size = fdt_totalsize(fdt_blob);
 	debug("   of_flat_tree at 0x%08lx size 0x%08lx\n",

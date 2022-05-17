@@ -6,4 +6,3 @@ config UT_ENV
 	  tests on the env code.
 	  If all is well then all tests pass although there will be a few
 	  messages printed along the way.
-

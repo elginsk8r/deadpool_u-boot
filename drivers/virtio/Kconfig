@@ -60,4 +60,3 @@ config VIRTIO_BLK
 	  QEMU based targets.
 
 endmenu
-

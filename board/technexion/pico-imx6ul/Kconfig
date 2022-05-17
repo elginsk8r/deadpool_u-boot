@@ -13,4 +13,3 @@ config SYS_CONFIG_NAME
 	default "pico-imx6ul"
 
 endif
-

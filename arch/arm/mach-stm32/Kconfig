@@ -77,4 +77,3 @@ source "arch/arm/mach-stm32/stm32f7/Kconfig"
 source "arch/arm/mach-stm32/stm32h7/Kconfig"
 
 endif
-

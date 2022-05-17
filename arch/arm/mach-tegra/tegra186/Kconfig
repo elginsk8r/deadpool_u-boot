@@ -27,4 +27,3 @@ config SYS_INIT_SP_BSS_OFFSET
 source "board/nvidia/p2771-0000/Kconfig"
 
 endif
-

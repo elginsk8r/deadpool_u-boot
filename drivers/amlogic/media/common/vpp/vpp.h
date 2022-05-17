@@ -1,23 +1,7 @@
-
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/amlogic/media/common/vpp/vpp.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #ifndef __VPP_H__
 #define __VPP_H__
@@ -61,5 +45,93 @@ struct matrix_s {
 	u16 offset[3];
 	u16 right_shift;
 };
+
+/* vpp1 post2 matrix */
+#ifndef VPP1_MATRIX_COEF00_01
+#define VPP1_MATRIX_COEF00_01                      0x5990
+#endif
+#ifndef VPP1_MATRIX_COEF02_10
+#define VPP1_MATRIX_COEF02_10                      0x5991
+#endif
+#ifndef VPP1_MATRIX_COEF11_12
+#define VPP1_MATRIX_COEF11_12                      0x5992
+#endif
+#ifndef VPP1_MATRIX_COEF20_21
+#define VPP1_MATRIX_COEF20_21                      0x5993
+#endif
+#ifndef VPP1_MATRIX_COEF22
+#define VPP1_MATRIX_COEF22                         0x5994
+#endif
+#ifndef VPP1_MATRIX_COEF13_14
+#define VPP1_MATRIX_COEF13_14                      0x5995
+#endif
+#ifndef VPP1_MATRIX_COEF23_24
+#define VPP1_MATRIX_COEF23_24                      0x5996
+#endif
+#ifndef VPP1_MATRIX_COEF15_25
+#define VPP1_MATRIX_COEF15_25                      0x5997
+#endif
+#ifndef VPP1_MATRIX_CLIP
+#define VPP1_MATRIX_CLIP                           0x5998
+#endif
+#ifndef VPP1_MATRIX_OFFSET0_1
+#define VPP1_MATRIX_OFFSET0_1                      0x5999
+#endif
+#ifndef VPP1_MATRIX_OFFSET2
+#define VPP1_MATRIX_OFFSET2                        0x599a
+#endif
+#ifndef VPP1_MATRIX_PRE_OFFSET0_1
+#define VPP1_MATRIX_PRE_OFFSET0_1                  0x599b
+#endif
+#ifndef VPP1_MATRIX_PRE_OFFSET2
+#define VPP1_MATRIX_PRE_OFFSET2                    0x599c
+#endif
+#ifndef VPP1_MATRIX_EN_CTRL
+#define VPP1_MATRIX_EN_CTRL                        0x599d
+#endif
+
+/* vpp2 post2 matrix */
+#ifndef VPP2_MATRIX_COEF00_01
+#define VPP2_MATRIX_COEF00_01                      0x59d0
+#endif
+#ifndef VPP2_MATRIX_COEF02_10
+#define VPP2_MATRIX_COEF02_10                      0x59d1
+#endif
+#ifndef VPP2_MATRIX_COEF11_12
+#define VPP2_MATRIX_COEF11_12                      0x59d2
+#endif
+#ifndef VPP2_MATRIX_COEF20_21
+#define VPP2_MATRIX_COEF20_21                      0x59d3
+#endif
+#ifndef VPP2_MATRIX_COEF22
+#define VPP2_MATRIX_COEF22                         0x59d4
+#endif
+#ifndef VPP2_MATRIX_COEF13_14
+#define VPP2_MATRIX_COEF13_14                      0x59d5
+#endif
+#ifndef VPP2_MATRIX_COEF23_24
+#define VPP2_MATRIX_COEF23_24                      0x59d6
+#endif
+#ifndef VPP2_MATRIX_COEF15_25
+#define VPP2_MATRIX_COEF15_25                      0x59d7
+#endif
+#ifndef VPP2_MATRIX_CLIP
+#define VPP2_MATRIX_CLIP                           0x59d8
+#endif
+#ifndef VPP2_MATRIX_OFFSET0_1
+#define VPP2_MATRIX_OFFSET0_1                      0x59d9
+#endif
+#ifndef VPP2_MATRIX_OFFSET2
+#define VPP2_MATRIX_OFFSET2                        0x59da
+#endif
+#ifndef VPP2_MATRIX_PRE_OFFSET0_1
+#define VPP2_MATRIX_PRE_OFFSET0_1                  0x59db
+#endif
+#ifndef VPP2_MATRIX_PRE_OFFSET2
+#define VPP2_MATRIX_PRE_OFFSET2                    0x59dc
+#endif
+#ifndef VPP2_MATRIX_EN_CTRL
+#define VPP2_MATRIX_EN_CTRL                        0x59dd
+#endif
 
 #endif

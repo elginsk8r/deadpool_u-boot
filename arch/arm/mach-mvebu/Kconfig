@@ -229,4 +229,3 @@ config SECURED_MODE_CSK_INDEX
 	depends on SECURED_MODE_IMAGE
 
 endif
-

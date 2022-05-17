@@ -1,23 +1,12 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/amlogic/media/osd/osd_fb.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #ifndef _OSD_FB_H_
 #define _OSD_FB_H_
 
+int get_osd_layer(void);
 void img_mode_set(u32 display_mode);
 void img_addr_set(ulong pic_image);
 void img_type_set(u32 type);

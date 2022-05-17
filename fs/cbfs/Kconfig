@@ -6,4 +6,3 @@ config FS_CBFS
 	  on systems that use coreboot as the first boot-loader and then load
 	  U-Boot to actually boot the Operating System. You can also enable
 	  CMD_CBFS to get command-line access.
-

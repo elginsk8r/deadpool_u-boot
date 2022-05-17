@@ -22,4 +22,3 @@ config TARGET_QEMU_ARM_64BIT
 	bool "Support qemu_arm64"
 	depends on ARCH_QEMU
 	select ARM64
-

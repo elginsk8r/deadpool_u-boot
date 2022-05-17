@@ -58,4 +58,3 @@ config PINCTRL_UNIPHIER_PXS3
 	select PINCTRL_UNIPHIER
 
 endif
-

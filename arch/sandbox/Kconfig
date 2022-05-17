@@ -47,4 +47,3 @@ config SANDBOX_BITS_PER_LONG
 	default 64 if HOST_64BIT
 
 endmenu
-

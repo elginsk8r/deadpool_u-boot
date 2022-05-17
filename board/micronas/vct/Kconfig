@@ -50,4 +50,3 @@ config VCT_SMALL_IMAGE
 endmenu
 
 endif
-

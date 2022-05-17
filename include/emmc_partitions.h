@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #ifndef _AML_MMC_H
 #define _AML_MMC_H
 
@@ -41,6 +46,9 @@
 #define		MMC_BOTTOM_RSV_SIZE				(0)
 #endif		/* CONFIG_AML_MMC_INHERENT_PART */
 
+#define     MMC_FREERTOS_NAME               "rtos-0"
+#define		MMC_NBG_NAME					"NBG"
+
 #define     MMC_CACHE_NAME                  "cache"
 // #define     MMC_CACHE_SIZE                  (512*SZ_1M) // this is not used and should be get from spl
 
@@ -52,9 +60,10 @@
 #define     EMMCKEY_RESERVE_OFFSET           (0x4000)
 #define     MMC_RESERVED_OFFSET              (36*SZ_1M)
 #define     MMC_BLOCK_SIZE                   (512)
+#define     KEY_COPIES                       (2)
 // #define     MMC_SECURE_NAME                 "secure"
 // #define     MMC_SECURE_SIZE                 (0x1*SZ_1M)
-//
+
 #define MMC_DDR_PARAMETER_NAME	"ddr-parameter"
 #define DDR_PARAMETER_OFFSET	(SZ_1M * 8)
 #define DDR_PARAMETER_SIZE	(4 * 512)
@@ -91,6 +100,19 @@
 #define CALI_PATTERN_OFFSET	(SZ_1M * 3)
 #define CALI_PATTERN_SIZE	(256 * 512)
 #define CALI_BLOCK_SIZE		(512)
+#define CALI_PATTERN		(0x55aa55aa)
+
+#define	MMC_MAGIC_NAME		"magic"
+#define MAGIC_OFFSET	(SZ_1M * 6)
+#define MAGIC_SIZE	(256 * 512)
+#define MAGIC_BLOCK_SIZE		(512)
+#define MAGIC_PATTERN	(0X00FF00FF)
+
+#define	MMC_RANDOM_NAME		"random"
+#define RANDOM_OFFSET	(SZ_1M * 7)
+#define RANDOM_SIZE	(256 * 512)
+#define RANDOM_BLOCK_SIZE		(512)
+#define RANDOM_PATTERN	(0X52414E44)
 /*
  * 2 copies dtb were stored in dtb area.
  * each is 256K.
@@ -121,6 +143,12 @@ struct virtual_partition {
 };
 
 #define VIRTUAL_PARTITION_ELEMENT(na, of, sz) {.name = na, .offset = of, .size = sz,}
+
+struct aml_pattern {
+	char name[MAX_MMC_PART_NAME_LEN];
+	unsigned int pattern;
+};
+#define AML_PATTERN_ELEMENT(na, pa) {.name = na, .pattern = pa,}
 
 #ifdef AML_MMC_DBG
 #define aml_mmc_dbg(fmt, ...) printk( "%s: line:%d " fmt "\n", \
@@ -194,14 +222,15 @@ struct _mmc_device{
 #define LOCK_MAJOR_VERSION 1
 #define LOCK_MINOR_VERSION 0
 
-#define LOCK_DATA_SIZE 8
+#define LOCK_DATA_SIZE 16
 
 typedef struct LockData {
 	uint8_t version_major;
 	uint8_t version_minor;
+	uint8_t unlock_ability;
 
 	/* Padding to eight bytes. */
-	uint8_t reserved1[2];
+	uint8_t reserved1;
 
 	/* 0: unlock    1: lock*/
 	uint8_t lock_state;
@@ -224,6 +253,8 @@ typedef struct FastbootContext {
 } FastbootContext_t;
 
 extern bool is_partition_checked;
+extern struct partitions *part_table;
+extern int parts_total_num;
 extern struct partitions emmc_partition_table[];
 
 extern int get_emmc_partition_arraysize(void);
@@ -235,6 +266,10 @@ extern int get_emmc_partition_arraysize(void);
  *	>= 0 means valid partition
  */
 extern int get_partition_num_by_name(char const *name);
+extern int aml_gpt_valid(struct mmc *mmc);
+int mmc_gpt_read(void *source);
+int mmc_gpt_write(void *source);
+int mmc_gpt_erase(void);
 
 struct partitions* find_mmc_partition_by_name (char const *name);
 struct partitions *aml_get_partition_by_name(const char *name);
@@ -242,6 +277,7 @@ int mmc_boot_size(char *name, uint64_t* size);
 struct virtual_partition *aml_get_virtual_partition_by_name(const char *name);
 bool aml_is_emmc_tsd (struct mmc *mmc);
 int mmc_device_init (struct mmc *mmc);
+int get_ept_from_gpt(struct mmc *mmc);
 
 #define PARTITION_ELEMENT(na, sz, flags) {.name = na, .size = sz, .mask_flags = flags,}
 

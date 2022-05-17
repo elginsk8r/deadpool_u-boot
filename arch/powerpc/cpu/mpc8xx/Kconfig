@@ -177,4 +177,3 @@ config SYS_IMMR
 source "board/cssi/MCR3000/Kconfig"
 
 endmenu
-

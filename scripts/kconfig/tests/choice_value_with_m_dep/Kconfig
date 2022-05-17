@@ -17,4 +17,3 @@ config CHOICE1
 	depends on DEP
 
 endchoice
-

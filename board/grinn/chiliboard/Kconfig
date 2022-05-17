@@ -13,4 +13,3 @@ config SYS_SOC
 	default "am33xx"
 
 endif
-

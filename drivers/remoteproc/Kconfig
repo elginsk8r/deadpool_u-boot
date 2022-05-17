@@ -50,4 +50,3 @@ config REMOTEPROC_TI_POWER
 	  Say 'y' here to add support for TI power processors such as those
 	  found on certain TI keystone and OMAP generation SoCs.
 endmenu
-

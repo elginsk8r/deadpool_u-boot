@@ -42,4 +42,3 @@ config TDX_CMD_IMX_MFGR
 source "board/toradex/common/Kconfig"
 
 endif
-

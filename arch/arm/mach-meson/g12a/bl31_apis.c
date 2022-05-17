@@ -1,21 +1,6 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * arch/arm/cpu/armv8/txlx/bl31_apis.c
- *
- * Copyright (C) 2014-2017 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 /*
@@ -26,7 +11,7 @@
 #include <asm/arch/efuse.h>
 #include <asm/cache.h>
 #include <asm/arch/bl31_apis.h>
-#include <asm/arch/cpu_id.h>
+#include <amlogic/cpu_id.h>
 #include <asm/arch/secure_apb.h>
 
 static long sharemem_input_base;
@@ -40,6 +25,36 @@ long get_sharemem_info(unsigned long function_id)
 		: "+r" (function_id));
 
 	return function_id;
+}
+
+int32_t set_boot_params(const keymaster_boot_params *boot_params)
+{
+	const unsigned cmd = SET_BOOT_PARAMS;
+
+	if (!boot_params)
+		return -1;
+
+	if (!sharemem_input_base)
+		sharemem_input_base =
+			get_sharemem_info(GET_SHARE_MEM_INPUT_BASE);
+
+	memcpy((void *)sharemem_input_base,
+			(const void *)boot_params, sizeof(keymaster_boot_params));
+
+	asm __volatile__("" : : : "memory");
+	register uint64_t x0 asm("x0") = cmd;
+	register uint64_t x1 asm("x1") = sizeof(keymaster_boot_params);
+	do {
+		asm volatile(
+		    __asmeq("%0", "x0")
+		    __asmeq("%1", "x0")
+		    __asmeq("%2", "x1")
+		    "smc    #0\n"
+		    : "=r"(x0)
+		    : "r"(x0), "r"(x1));
+	} while (0);
+
+	return (!x0)? -1: 0;
 }
 
 #ifdef CONFIG_EFUSE
@@ -68,7 +83,7 @@ int32_t meson_trustzone_efuse(struct efuse_hal_api_arg *arg)
 	if (arg->cmd == EFUSE_HAL_API_WRITE)
 		memcpy((void *)sharemem_input_base,
 		       (const void *)arg->buffer_phy, size);
-		asm __volatile__("" : : : "memory");
+	asm __volatile__("" : : : "memory");
 
 	register uint64_t x0 asm("x0") = cmd;
 	register uint64_t x1 asm("x1") = offset;
@@ -98,7 +113,7 @@ int32_t meson_trustzone_efuse(struct efuse_hal_api_arg *arg)
 
 int32_t meson_trustzone_efuse_get_max(struct efuse_hal_api_arg *arg)
 {
-	int32_t ret = 0;
+	int32_t ret;
 	unsigned cmd = 0;
 
 	if (arg->cmd == EFUSE_HAL_API_USER_MAX)
@@ -232,21 +247,6 @@ unsigned aml_get_reboot_reason(void)
 		ret = x0;
 		reason = (unsigned)(ret&0xffffffff);
 		return reason;
-}
-
-unsigned aml_get_dvfs_id(void)
-{
-	unsigned dvfs_id;
-	uint64_t ret;
-
-	register uint64_t x0 asm("x0") = GET_DVFS_TABLE_INDEX;
-	asm volatile(
-		__asmeq("%0", "x0")
-		"smc #0\n"
-		:"+r"(x0));
-		ret = x0;
-		dvfs_id = (unsigned)(ret&0xffffffff);
-		return dvfs_id;
 }
 
 void set_viu_probe_enable(void)
@@ -422,4 +422,38 @@ int __get_chip_id(unsigned char *buff, unsigned int size)
 	}
 
 	return -1;
+}
+
+int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen)
+{
+	const unsigned cmd = GET_AVBKEY_FROM_FIP;
+	uint32_t retlen = 0;
+	uint32_t ret = 0;
+
+	if (!buf)
+		return -1;
+
+	if (!sharemem_output_base)
+		sharemem_output_base =
+			get_sharemem_info(GET_SHARE_MEM_OUTPUT_BASE);
+
+	asm __volatile__("" : : : "memory");
+	register uint64_t x0 asm("x0") = cmd;
+	do {
+		asm volatile(
+		    __asmeq("%0", "x0")
+		    __asmeq("%1", "x0")
+		    "smc    #0\n"
+		    : "=r"(x0)
+		    : "r"(x0));
+	} while (0);
+
+	if (!x0)
+		ret = -1;
+	retlen = x0;
+
+	if (ret != -1 && buflen >= retlen)
+		memcpy(buf, (const void *)sharemem_output_base, retlen);
+
+	return ret;
 }

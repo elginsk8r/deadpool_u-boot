@@ -55,4 +55,3 @@ source "board/nvidia/venice2/Kconfig"
 source "board/toradex/apalis-tk1/Kconfig"
 
 endif
-

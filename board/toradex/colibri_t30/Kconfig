@@ -28,4 +28,3 @@ config TDX_CFG_BLOCK_OFFSET
 source "board/toradex/common/Kconfig"
 
 endif
-

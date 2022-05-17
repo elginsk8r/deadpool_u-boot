@@ -37,4 +37,3 @@ config BOARD_SDRAM_SIZE
 	default 0x38000000 if XTFPGA_KC705
 
 endif
-

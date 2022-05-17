@@ -107,4 +107,3 @@ config RESET_SOCFPGA
 	  Support for reset controller on SoCFPGA platform.
 
 endmenu
-

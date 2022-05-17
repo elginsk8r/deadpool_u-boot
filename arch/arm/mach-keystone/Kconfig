@@ -38,4 +38,3 @@ config SYS_SOC
 source "board/ti/ks2_evm/Kconfig"
 
 endif
-

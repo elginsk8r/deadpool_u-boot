@@ -10,4 +10,3 @@ config STM32MP1_DDR
 		family:	support for LPDDR2, LPDDR3 and DDR3
 		the SDRAM parameters for controleur and phy need to be provided
 		in device tree (computed by DDR tuning tools)
-

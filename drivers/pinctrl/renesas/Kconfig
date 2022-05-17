@@ -117,4 +117,3 @@ config PINCTRL_PFC_R8A77995
 	  multiplex function.
 
 endif
-

@@ -32,4 +32,3 @@ config ACPI_PM1_BASE
 	  This device is defined in ACPI specification, with 16 bytes in size.
 
 endif
-

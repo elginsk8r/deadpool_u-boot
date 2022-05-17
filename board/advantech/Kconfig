@@ -26,4 +26,3 @@ endchoice
 source "board/advantech/som-db5800-som-6867/Kconfig"
 
 endif
-

@@ -58,4 +58,3 @@ config APBH_DMA_BURST8
 endif
 
 endmenu # menu "DMA Support"
-

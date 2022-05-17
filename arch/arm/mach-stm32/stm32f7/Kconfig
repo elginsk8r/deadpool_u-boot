@@ -6,4 +6,3 @@ config TARGET_STM32F746_DISCO
 source "board/st/stm32f746-disco/Kconfig"
 
 endif
-

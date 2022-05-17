@@ -16,4 +16,3 @@ endchoice
 source "board/freescale/mx7ulp_evk/Kconfig"
 
 endif
-

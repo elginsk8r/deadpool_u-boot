@@ -21,4 +21,3 @@ source "board/samsung/goni/Kconfig"
 source "board/samsung/smdkc100/Kconfig"
 
 endif
-

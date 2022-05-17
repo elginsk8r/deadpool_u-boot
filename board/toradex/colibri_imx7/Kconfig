@@ -74,4 +74,3 @@ endif
 source "board/toradex/common/Kconfig"
 
 endif
-

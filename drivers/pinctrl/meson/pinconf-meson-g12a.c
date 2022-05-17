@@ -1,17 +1,6 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- *
- * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include <linux/io.h>
@@ -58,10 +47,13 @@ int meson_pinconf_set_drive_strength(struct meson_pinctrl *priv,
 	if (ret)
 		return ret;
 
-	if (arg >= 4) {
-		debug("pin %u: invalid drive-strength [0-3]: %d\n", pin, arg);
+	if (arg < 1 || arg > 4) {
+		debug("pin %u: invalid drive-strength [1-4]: %d\n", pin, arg);
 		return -EINVAL;
 	}
+
+	arg = arg - 1;
+
 	meson_drive_calc_reg_and_bit(drive_bank, pin, &reg, &bit);
 
 	clrsetbits_le32(priv->reg_drive + reg, 0x3 << bit, (arg & 0x3) << bit);

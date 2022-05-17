@@ -137,7 +137,6 @@ void dwc3_set_fladj(struct dwc3 *dwc3_reg, u32 val)
 
 void xhci_dwc3_phy_tuning_1(struct udevice *dev, int port)
 {
-    unsigned long phy_reg_base;
     int ret, i;
     struct xhci_dwc3_platdata *plat;
     struct udevice *udev = dev;
@@ -152,13 +151,15 @@ void xhci_dwc3_phy_tuning_1(struct udevice *dev, int port)
 			return ;
 		}
 	}
-
 }
 
 static int xhci_dwc3_setup_phy(struct udevice *dev)
 {
 	struct xhci_dwc3_platdata *plat = dev_get_platdata(dev);
 	int i, ret, count;
+#ifdef CONFIG_AML_USB
+	unsigned int usb_type = 0;
+#endif
 
 	/* Return if no phy declared */
 	if (!dev_read_prop(dev, "phys", NULL))
@@ -207,8 +208,6 @@ static int xhci_dwc3_setup_phy(struct udevice *dev)
 	}
 
 #ifdef CONFIG_AML_USB
-	int usb_type = 0;
-
 	for (i = 0; i < plat->num_phys; i++) {
 		dev_read_u32((&plat->usb_phys[i])->dev, "phy-version", &usb_type);
 		if (usb_type == 2) {
@@ -235,33 +234,15 @@ phys_init_err:
 	return ret;
 }
 
-static int xhci_dwc3_shutdown_phy(struct udevice *dev)
-{
-	struct xhci_dwc3_platdata *plat = dev_get_platdata(dev);
-	int i, ret;
-
-	for (i = 0; i < plat->num_phys; i++) {
-		if (!generic_phy_valid(&plat->usb_phys[i]))
-			continue;
-
-		ret = generic_phy_power_off(&plat->usb_phys[i]);
-		ret |= generic_phy_exit(&plat->usb_phys[i]);
-		if (ret) {
-			pr_err("Can't shutdown USB PHY%d for %s\n",
-			       i, dev->name);
-		}
-	}
-
-	return 0;
-}
-
 static int xhci_dwc3_probe(struct udevice *dev)
 {
 	struct xhci_hcor *hcor;
 	struct xhci_hccr *hccr;
 	struct dwc3 *dwc3_reg;
 	enum usb_dr_mode dr_mode;
+#ifndef CONFIG_AML_USB
 	struct xhci_dwc3_platdata *plat = dev_get_platdata(dev);
+#endif
 	int ret;
 
 #ifdef CONFIG_AML_USB

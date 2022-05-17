@@ -4,4 +4,3 @@ config UBIFS_SILENCE_MSG
 	help
 	  Make the verbose messages from UBIFS stop printing. This leaves
 	  warnings and errors enabled.
-

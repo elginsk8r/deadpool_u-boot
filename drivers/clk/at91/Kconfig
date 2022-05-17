@@ -54,4 +54,3 @@ config AT91_GENERIC_CLK
 	  that may be different from the system clock. This second
 	  clock is the generic clock (GCLK) and is managed by
 	  the PMC via PMC_PCR register.
-

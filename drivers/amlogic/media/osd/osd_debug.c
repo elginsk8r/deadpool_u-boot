@@ -1,26 +1,14 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/amlogic/media/osd/osd_hw.c
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 /* System Headers */
 #include <config.h>
 #include <common.h>
 #include <malloc.h>
 #include <asm/arch/io.h>
-#include <asm/arch/cpu_id.h>
+#include <amlogic/cpu_id.h>
 #include <asm/arch/cpu.h>
 
 /* Local Headers */
@@ -199,6 +187,26 @@ static void osd_debug_dump_register_all(void)
 			reg = VIU_OSD2_BLK0_CFG_W4;
 		osd_logi("reg[0x%x]: 0x%08x\n\n", reg, osd_reg_read(reg));
 	}
+
+#ifdef CONFIG_AML_MESON_G12A
+	/* for viu2_osd */
+	if (!strcmp(env_get("display_layer"), "viu2_osd0")) {
+		reg = VIU2_OSD1_FIFO_CTRL_STAT;
+		osd_logi("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
+		reg = VIU2_OSD1_CTRL_STAT;
+		osd_logi("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
+		reg = VIU2_OSD1_BLK0_CFG_W0;
+		osd_logi("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
+		reg = VIU2_OSD1_BLK0_CFG_W1;
+		osd_logi("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
+		reg = VIU2_OSD1_BLK0_CFG_W2;
+		osd_logi("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
+		reg = VIU2_OSD1_BLK0_CFG_W3;
+		osd_logi("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
+		reg = VIU2_OSD1_BLK0_CFG_W4;
+		osd_logi("reg[0x%x]: 0x%08x\n\n", reg, osd_reg_read(reg));
+	}
+#endif
 }
 
 static void osd_test_colorbar(void)

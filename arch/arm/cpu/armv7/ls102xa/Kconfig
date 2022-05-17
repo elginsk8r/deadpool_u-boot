@@ -107,4 +107,3 @@ config SYS_FSL_ERRATUM_A008407
 	bool
 
 endmenu
-

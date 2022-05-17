@@ -21,4 +21,3 @@ config SYS_FDT_ADDR
 	  The address the FDT file should be loaded to.
 
 endif
-

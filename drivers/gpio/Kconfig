@@ -330,4 +330,3 @@ config MT7621_GPIO
 	  Say yes here to support MediaTek MT7621 compatible GPIOs.
 
 endmenu
-

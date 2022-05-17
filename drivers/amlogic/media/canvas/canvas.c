@@ -1,18 +1,6 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * AMLOGIC Canvas management driver.
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 /* System Headers */
@@ -24,9 +12,7 @@
 /* Amlogic Headers */
 #include <amlogic/canvas.h>
 
-#ifdef BL33_DEBUG_PRINT
 #define CANVAS_DEBUG_ENABLE
-#endif
 #ifdef CANVAS_DEBUG_ENABLE
 #define canvas_log(fmt, args...) \
 	do { \
@@ -36,12 +22,33 @@
 #define canvas_log(fmt, args...)
 #endif
 
-#define canvas_reg_read(reg) readl(DMC_REG_BASE + reg)
-#define canvas_reg_write(val, reg) writel(val, (DMC_REG_BASE + reg))
+#ifndef DMC_REG_BASE
+#define DMC_REG_BASE                    (0xFF638000L)
+#endif
+#define REG_CANVAS_ADDR(reg)               (reg + 0L)
 
 #define CANVAS_NUM 256
 static canvas_t canvasPool[CANVAS_NUM];
 static int canvas_inited = 0;
+
+static inline u32 canvas_reg_read(u32 reg)
+{
+	u32 val;
+
+	if (reg > 0x10000)
+		val = *(volatile unsigned int *)REG_CANVAS_ADDR(reg);
+	else
+		val = readl(DMC_REG_BASE + reg);
+	return val;
+}
+
+static inline void canvas_reg_write(const u32 val, u32 reg)
+{
+	if (reg > 0x10000)
+		*(volatile unsigned int *)REG_CANVAS_ADDR(reg) = (val);
+	else
+		writel(val, (DMC_REG_BASE + reg));
+}
 
 void canvas_init(void)
 {

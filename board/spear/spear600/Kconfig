@@ -13,4 +13,3 @@ config SYS_CONFIG_NAME
 	default "spear6xx_evb"
 
 endif
-

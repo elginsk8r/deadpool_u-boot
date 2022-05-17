@@ -72,4 +72,3 @@ config DEBUG_UART_CLOCK
 endif
 
 endif
-

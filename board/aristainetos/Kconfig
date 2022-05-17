@@ -27,4 +27,3 @@ config SYS_CONFIG_NAME
 	default "aristainetos2b"
 
 endif
-

@@ -23,9 +23,18 @@
 #include <emmc_partitions.h>
 #include <partition_table.h>
 #include <amlogic/storage.h>
+#include <asm/arch/secure_apb.h>
+#include <asm/arch/sd_emmc.h>
 
-static int amlmmc_init = 0;
+#define stamp_after(a, b) ((int)(b) - (int)(a) < 0)
 
+#define KEY_BACKUP
+
+struct aml_pattern aml_pattern_table[] = {
+	AML_PATTERN_ELEMENT(MMC_PATTERN_NAME, CALI_PATTERN),
+	AML_PATTERN_ELEMENT(MMC_MAGIC_NAME, MAGIC_PATTERN),
+	AML_PATTERN_ELEMENT(MMC_RANDOM_NAME, RANDOM_PATTERN),
+};
 static int mmc_set_signal_voltage(struct mmc *mmc, uint signal_voltage);
 static int mmc_power_cycle(struct mmc *mmc);
 #if !CONFIG_IS_ENABLED(MMC_TINY)
@@ -33,33 +42,58 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps);
 #endif
 
 extern int emmc_probe(uint32_t init_flag);
-int amlmmc_is_inited(void) {
-	return amlmmc_init;
-}
+
+#ifdef KEY_BACKUP
+static struct aml_key_info key_infos[2] = { {0, 0, 0}, {0, 0, 0} };
+#endif
+
 bool emmckey_is_access_range_legal (struct mmc *mmc, ulong start, lbaint_t blkcnt) {
 	ulong key_start_blk, key_end_blk;
 	u64 key_glb_offset;
 	struct partitions * part = NULL;
 	struct virtual_partition *vpart = NULL;
+#ifdef KEY_BACKUP
+	int cpy = KEY_COPIES;
+#endif
 	if (IS_MMC(mmc)) {
 		vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
 		part = aml_get_partition_by_name(MMC_RESERVED_NAME);
 		key_glb_offset = part->offset + vpart->offset;
 		key_start_blk = (key_glb_offset / MMC_BLOCK_SIZE);
+#ifdef KEY_BACKUP
+		key_end_blk = ((key_glb_offset + vpart->size * cpy) / MMC_BLOCK_SIZE - 1) + 2;
+#else
 		key_end_blk = ((key_glb_offset + vpart->size) / MMC_BLOCK_SIZE - 1);
+#endif
+
 		if (!(info_disprotect & DISPROTECT_KEY)) {
 			if ((key_start_blk <= (start + blkcnt -1))
 				&& (key_end_blk >= start)
 				&& (blkcnt != start)) {
-				pr_info("%s, keys %ld, keye %ld, start %ld, blkcnt %ld\n",
+				printf("%s, keys %ld, keye %ld, start %ld, blkcnt %ld\n",
 						mmc->cfg->name, key_start_blk,
 						key_end_blk, start, blkcnt);
-				pr_err("Emmckey: Access range is illegal!\n");
+				pr_err("eMMCkey: Access range is illegal!\n");
 				return 0;
 			}
 		}
 	}
 	return 1;
+}
+
+int emmc_boot_chk(struct mmc *mmc)
+{
+	u32 val = 0;
+
+	if (strcmp(mmc->dev->name, "emmc"))
+		return 0;
+
+	val = readl(SEC_AO_SEC_GP_CFG0);
+	pr_info("SEC_AO_SEC_GP_CFG0 = %x\n", val);
+	if ((val & 0xf) == 0x1)
+		return 1;
+
+	return 0;
 }
 
 #if CONFIG_IS_ENABLED(MMC_TINY)
@@ -966,45 +1000,9 @@ static int mmc_set_capacity(struct mmc *mmc, int part_num)
 	return 0;
 }
 
-#if CONFIG_IS_ENABLED(MMC_HS200_SUPPORT)
-static int mmc_boot_part_access_chk(struct mmc *mmc, unsigned int part_num)
-{
-	int forbidden = 0;
-	bool change = false;
-
-	if (part_num & PART_ACCESS_MASK)
-		forbidden = MMC_CAP(MMC_HS_200);
-
-	if (MMC_CAP(mmc->selected_mode) & forbidden) {
-		pr_debug("selected mode (%s) is forbidden for part %d\n",
-			 mmc_mode_name(mmc->selected_mode), part_num);
-		change = true;
-	} else if (mmc->selected_mode != mmc->best_mode) {
-		pr_debug("selected mode is not optimal\n");
-		change = true;
-	}
-
-	if (change)
-		return mmc_select_mode_and_width(mmc,
-						 mmc->card_caps & ~forbidden);
-
-	return 0;
-}
-#else
-static inline int mmc_boot_part_access_chk(struct mmc *mmc,
-					   unsigned int part_num)
-{
-	return 0;
-}
-#endif
-
 int mmc_switch_part(struct mmc *mmc, unsigned int part_num)
 {
 	int ret;
-
-	ret = mmc_boot_part_access_chk(mmc, part_num);
-	if (ret)
-		return ret;
 
 	ret = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONF,
 			 (mmc->part_config & ~PART_ACCESS_MASK)
@@ -1697,6 +1695,9 @@ static const struct mode_width_tuning sd_modes_by_pref[] = {
 	{
 		.mode = SD_HS,
 		.widths = MMC_MODE_4BIT | MMC_MODE_1BIT,
+#ifdef MMC_SUPPORTS_TUNING
+		.tuning = MMC_SD_HS_TUNING
+#endif
 	},
 #if CONFIG_IS_ENABLED(MMC_UHS_SUPPORT)
 	{
@@ -1902,6 +1903,9 @@ static const struct mode_width_tuning mmc_modes_by_pref[] = {
 	{
 		.mode = MMC_HS_52,
 		.widths = MMC_MODE_8BIT | MMC_MODE_4BIT | MMC_MODE_1BIT,
+#ifdef MMC_SUPPORTS_TUNING
+		.tuning = MMC_SD_HS_TUNING
+#endif
 	},
 	{
 		.mode = MMC_HS,
@@ -2008,8 +2012,6 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 		return -ENOTSUPP;
 	}
 
-	mmc_set_clock(mmc, mmc->legacy_speed, MMC_CLK_ENABLE);
-
 	for_each_mmc_mode_by_pref(card_caps, mwt) {
 		for_each_supported_width(card_caps & mwt->widths,
 					 mmc_is_mode_ddr(mwt->mode), ecbw) {
@@ -2023,10 +2025,6 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 						     MMC_ALL_SIGNAL_VOLTAGE);
 			if (err)
 				continue;
-
-			err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING, 1);
-			if (err)
-				goto error;
 
 			/* configure the bus width (card + host) */
 			err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
@@ -2326,52 +2324,82 @@ static int mmc_startup(struct mmc *mmc)
 	}
 #endif
 
-	/* Put the Card in Identify Mode */
-	cmd.cmdidx = mmc_host_is_spi(mmc) ? MMC_CMD_SEND_CID :
-		MMC_CMD_ALL_SEND_CID; /* cmd not supported in spi */
-	cmd.resp_type = MMC_RSP_R2;
-	cmd.cmdarg = 0;
+#ifdef CONFIG_MMC_FBOOT
+	if (emmc_boot_chk(mmc)) {
+		mmc_switch_part(mmc, 0);
 
-	err = mmc_send_cmd(mmc, &cmd, NULL);
-
-#ifdef CONFIG_MMC_QUIRKS
-	if (err && (mmc->quirks & MMC_QUIRK_RETRY_SEND_CID)) {
-		int retries = 4;
-		/*
-		 * It has been seen that SEND_CID may fail on the first
-		 * attempt, let's try a few more time
-		 */
-		do {
+		/* disSelect the card, and put it into detect Mode */
+		if (!mmc_host_is_spi(mmc)) { /* cmd not supported in spi */
+			cmd.cmdidx = MMC_CMD_SELECT_CARD;
+			cmd.resp_type = MMC_RSP_NONE;
+			cmd.cmdarg = 0;
 			err = mmc_send_cmd(mmc, &cmd, NULL);
-			if (!err)
-				break;
-		} while (retries--);
-	}
-#endif
 
-	if (err)
-		return err;
+			if (err)
+				return err;
+		}
 
-	memcpy(mmc->cid, cmd.response, 16);
-
-	/*
-	 * For MMC cards, set the Relative Address.
-	 * For SD cards, get the Relatvie Address.
-	 * This also puts the cards into Standby State
-	 */
-	if (!mmc_host_is_spi(mmc)) { /* cmd not supported in spi */
-		cmd.cmdidx = SD_CMD_SEND_RELATIVE_ADDR;
+		/* Put the Card in Identify Mode */
+		cmd.cmdidx = MMC_CMD_SEND_CID;
+		cmd.resp_type = MMC_RSP_R2;
 		cmd.cmdarg = mmc->rca << 16;
-		cmd.resp_type = MMC_RSP_R6;
 
 		err = mmc_send_cmd(mmc, &cmd, NULL);
+		if (err)
+			return err;
+
+		memcpy(mmc->cid, cmd.response, 16);
+	} else {
+#endif
+		/* Put the Card in Identify Mode */
+		cmd.cmdidx = mmc_host_is_spi(mmc) ? MMC_CMD_SEND_CID :
+			MMC_CMD_ALL_SEND_CID; /* cmd not supported in spi */
+		cmd.resp_type = MMC_RSP_R2;
+		cmd.cmdarg = 0;
+
+		err = mmc_send_cmd(mmc, &cmd, NULL);
+
+#ifdef CONFIG_MMC_QUIRKS
+		if (err && (mmc->quirks & MMC_QUIRK_RETRY_SEND_CID)) {
+			int retries = 4;
+			/*
+			 * It has been seen that SEND_CID may fail on the first
+			 * attempt, let's try a few more time
+			 */
+			do {
+				err = mmc_send_cmd(mmc, &cmd, NULL);
+				if (!err)
+					break;
+			} while (retries--);
+		}
+#endif
 
 		if (err)
 			return err;
 
-		if (IS_SD(mmc))
-			mmc->rca = (cmd.response[0] >> 16) & 0xffff;
+		memcpy(mmc->cid, cmd.response, 16);
+
+		/*
+		 * For MMC cards, set the Relative Address.
+		 * For SD cards, get the Relatvie Address.
+		 * This also puts the cards into Standby State
+		 */
+		if (!mmc_host_is_spi(mmc)) { /* cmd not supported in spi */
+			cmd.cmdidx = SD_CMD_SEND_RELATIVE_ADDR;
+			cmd.cmdarg = mmc->rca << 16;
+			cmd.resp_type = MMC_RSP_R6;
+
+			err = mmc_send_cmd(mmc, &cmd, NULL);
+
+			if (err)
+				return err;
+
+			if (IS_SD(mmc))
+				mmc->rca = (cmd.response[0] >> 16) & 0xffff;
+		}
+#ifdef CONFIG_MMC_FBOOT
 	}
+#endif
 
 	/* Get the Card-Specific Data */
 	cmd.cmdidx = MMC_CMD_SEND_CSD;
@@ -2564,7 +2592,6 @@ static int mmc_send_if_cond(struct mmc *mmc)
 	cmd.resp_type = MMC_RSP_R7;
 
 	err = mmc_send_cmd(mmc, &cmd, NULL);
-
 	if (err)
 		return err;
 
@@ -2727,7 +2754,6 @@ retry:
 
 	/* Reset the Card */
 	err = mmc_go_idle(mmc);
-
 	if (err)
 		return err;
 
@@ -2789,7 +2815,14 @@ int mmc_start_init(struct mmc *mmc)
 		return -ENOMEDIUM;
 	}
 
-	err = mmc_get_op_cond(mmc);
+#ifdef CONFIG_MMC_FBOOT
+	if (emmc_boot_chk(mmc)) {
+		mmc->high_capacity = 1;
+		mmc->rca = 1;
+		mmc->version = MMC_VERSION_UNKNOWN;
+	} else
+#endif
+		err = mmc_get_op_cond(mmc);
 
 	if (!err)
 		mmc->init_in_progress = 1;
@@ -2814,47 +2847,68 @@ static int mmc_complete_init(struct mmc *mmc)
 	return err;
 }
 
-static int enable_vendor_erase(struct mmc *mmc)
+void mmc_write_cali_mattern(void *addr, struct aml_pattern *table)
 {
-	int ret = 0;
-	u8 ext_csd[512] = {0};
-
-	/*read ext_csd[16]*/
-	ret = mmc_get_ext_csd(mmc, ext_csd);
-	if (!ret)
-	{
-		/*0x39(hex) --> 57(dec)*/
-		if ((0x39) == ext_csd[16])
-			return ret;
+	int i = 0;
+	unsigned int s = 10;
+	u32 *mattern = (u32 *)addr;
+	struct virtual_partition *vpart =
+		aml_get_virtual_partition_by_name(table->name);
+	for (i = 0;i < (vpart->size)/4 - 1;i++) {
+		if (!strcmp(table->name, "random"))
+			mattern[i] = rand_r(&s);
+		else
+			mattern[i] = table->pattern;
 	}
+	mattern[i] = crc32(0, (u8 *)addr, (vpart->size - 4));
+	return;
+}
 
-	/*ext_csd[16] register description
-	 * * Bit[7:6]: Reserved
-	 * * Bit[5:4]: Configure Secure Removal Type
-	 * *	0x0: information removed by an erase of the physical memory
-	 * *	0x1: information removed by an overwriting the addressed locations
-	 * *		 with a character followed by an erase
-	 * *	0x2: information removed by an overwriting the addressed locations with
-	 * *		 a character, its complement, then a random character
-	 * *	0x3: information removed using a vendor defined
-	 * * Bit[3:0]: Supported Secure Removal Type
-	 * *	Bit 0: information removed by an erase of the physical memory
-	 * *	Bit 1: information removed by an overwriting the addressed locations
-	 * *		   with a character followed by an erase
-	 * *	Bit 2: information removed by an overwriting the addressed locations
-	 * *		   with a character, its complement, then a random character
-	 * *	Bit 3: information removed using a vendor defined
-	 */
-	/*set ext_csd[16] Bit[5:4] to 0x3*/
-	/*Bit[3:0} default value is 0x9*/
-	/*ext_csd[16] setting property is OTP*/
-	/*0x39(hex) --> 57(dec)*/
-	return mmc_set_ext_csd(mmc, 16, 57);
+int mmc_pattern_check(struct mmc *mmc, struct aml_pattern *table)
+{
+	void *addr = NULL;
+	u64 cnt = 0, n = 0, blk = 0;
+	u32 *buf = NULL;
+	u32 crc32_s = 0;
+	struct partitions *part = NULL;
+	struct virtual_partition *vpart = NULL;
+
+	vpart = aml_get_virtual_partition_by_name(table->name);
+
+	addr = (void *)malloc(vpart->size);
+	if (!addr) {
+		printf("%s malloc failed\n", table->name);
+		return 1;
+	}
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	blk = (part->offset + vpart->offset) / mmc->read_bl_len;
+	cnt = vpart->size / mmc->read_bl_len;
+	n = blk_dread(mmc_get_blk_desc(mmc), blk, cnt, addr);
+	if (n != cnt) {
+		printf("read pattern failed\n");
+		free(addr);
+		return 1;
+	} else {
+		buf = (u32 *)addr;
+		crc32_s = crc32(0, (u8 *)addr, (vpart->size - 4));
+		if (crc32_s != buf[vpart->size/4 - 1]) {
+			printf("check %s failed,need to write\n",
+						table->name);
+			mmc_write_cali_mattern(addr, table);
+			n = blk_dwrite(mmc_get_blk_desc(mmc), blk, cnt, addr);
+			printf("several 0x%x pattern blocks write %s\n",
+				table->pattern, (n == cnt) ? "OK" : "ERROR");
+		}
+		printf("crc32_s:0x%x == storage crc_pattern:0x%x!!!\n",
+				crc32_s, buf[vpart->size/4 - 1]);
+	}
+	free(addr);
+	return (n == cnt) ? 0 : 1;
 }
 
 int mmc_init(struct mmc *mmc)
 {
-	int err = 0;
+	int err = 0, i;
 	__maybe_unused ulong start;
 #if CONFIG_IS_ENABLED(DM_MMC)
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(mmc->dev);
@@ -2877,26 +2931,14 @@ int mmc_init(struct mmc *mmc)
 	if (IS_MMC(mmc)) {
 		if (!is_partition_checked) {
 			if (mmc_device_init(mmc) == 0) {
-			is_partition_checked = true;
-			pr_info("eMMC/TSD partition table have been checked OK!\n");
+				is_partition_checked = true;
+				printf("eMMC/TSD partition table have been checked OK!\n");
+				for (i = 0; i < ARRAY_SIZE(aml_pattern_table); i++)
+					mmc_pattern_check(mmc, &aml_pattern_table[i]);
 			}
-		}
-		err = emmc_probe(0xff);
-		/*For TOSHIBA(MID:0x11) emmc*/
-		if ((0x11) == (mmc->cid[0] >> 24)) {
-			if (enable_vendor_erase(mmc))
-				pr_err("%s:%d TOSHIBA emmc enable vendor erase fail!\n", __func__, __LINE__);
 		}
 	}
 	info_disprotect &= ~DISPROTECT_KEY;
-
-	/*mmc init flag*/
-	if (!err) {
-		amlmmc_init = 1;
-	} else {
-		amlmmc_init = 0;
-	}
-
 	return err;
 
 }
@@ -2910,14 +2952,14 @@ ulong mmc_ffu_write(int dev_num, lbaint_t start, lbaint_t blkcnt, const void *sr
 	if (!mmc || !blkcnt)
 		return 0;
 
-	pr_info("mmc ffu start = %lx, cnt = %lx, addr = %p\n", start, blkcnt, src);
+	printf("mmc ffu start = %lx, cnt = %lx, addr = %p\n", start, blkcnt, src);
 
 	cmd.cmdidx = MMC_CMD_SET_BLOCK_COUNT;
 	cmd.cmdarg = blkcnt & 0xFFFF;
 	cmd.resp_type = MMC_RSP_R1;
 	ret = mmc_send_cmd(mmc, &cmd, NULL);
 	if (ret) {
-		pr_err("mmc set blkcnt failed\n");
+		printf("mmc set blkcnt failed\n");
 		return 0;
 	}
 
@@ -2932,7 +2974,7 @@ ulong mmc_ffu_write(int dev_num, lbaint_t start, lbaint_t blkcnt, const void *sr
 
 	ret = mmc_send_cmd(mmc, &cmd, &data);
 	if (ret) {
-		pr_err("mmc write failed\n");
+		printf("mmc write failed\n");
 		return 0;
 	}
 
@@ -2953,14 +2995,16 @@ int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt)
 	if (!mmc)
 		return -ENODEV;
 
-	pr_info("ffu update start\n");
+	printf("ffu update start\n");
 	/* check Manufacturer MID */
 	if ((mmc->cid[0] >> 24) == SAMSUNG_MID) {
 		ffu_addr = SAMSUNG_FFU_ADDR;
 	} else if ((mmc->cid[0] >> 24) == KINGSTON_MID) {
 		ffu_addr = KINGSTON_FFU_ADDR;
+	} else if ((mmc->cid[0] >> 24) == BIWIN_MID) {
+		ffu_addr = BIWIN_FFU_ADDR;
 	} else {
-		pr_err("FFU update for this manufacturer not support yet\n");
+		printf("FFU update for this manufacturer not support yet\n");
 		return -1;
 	}
 
@@ -2976,23 +3020,28 @@ int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt)
 
 	supported_modes = ext_csd_ffu[EXT_CSD_SUPPORTED_MODES] & 0x1;
 	fw_cfg = ext_csd_ffu[EXT_CSD_FW_CFG] & 0x1;
-	for (i = 0; i < 8; i++)
-		fw_ver |= (ext_csd_ffu[EXT_CSD_FW_VERSION + i] << (i * 8));
-	pr_info("old fw_ver = %llx\n", fw_ver);
+	for (i = 0; i < 8; i++) {
+		fw_ver |= ext_csd_ffu[EXT_CSD_FW_VERSION + 7 - i];
+		if (i < 7)
+			fw_ver <<= 8;
+	}
+	if ((mmc->cid[0] >> 24) == BIWIN_MID)
+		fw_ver = ((fw_ver >> 16) & 0xffffffff);
+	printf("old fw_ver = %llx\n", fw_ver);
 	if (!supported_modes || fw_cfg || (fw_ver >= ffu_ver))
 		return -1;
 
 	/* Set FFU Mode */
 	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_MODE_CFG, 1);
 	if (err) {
-		pr_err("Failed: set FFU mode\n");
+		printf("Failed: set FFU mode\n");
 		return err;
 	}
 
 	/* Write patch file at one write command */
 	n = mmc_ffu_write(dev, ffu_addr, cnt, addr);
 	if (n != cnt) {
-		pr_err("target is %llx block, but only %llx block has been write\n", cnt, n);
+		printf("target is %llx block, but only %llx block has been write\n", cnt, n);
 		return -1;
 	}
 
@@ -3001,9 +3050,14 @@ int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt)
 	if (err)
 		return err;
 
-	for (i = 0; i < 8; i++)
-		fw_ver |= (ext_csd_ffu[EXT_CSD_FW_VERSION + i] << (i * 8));
-	pr_info("new fw_ver = %llx\n", fw_ver);
+	for (i = 0; i < 8; i++) {
+		fw_ver |= ext_csd_ffu[EXT_CSD_FW_VERSION + 7 - i];
+		if (i < 7)
+			fw_ver <<= 8;
+	}
+	if ((mmc->cid[0] >> 24) == BIWIN_MID)
+		fw_ver = ((fw_ver >> 16) & 0xffffffff);
+	printf("new fw_ver = %llx\n", fw_ver);
 	if ((mmc->cid[0] >> 24) == SAMSUNG_MID) {
 		/* Set Normal Mode */
 		err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_MODE_CFG, 0);
@@ -3029,13 +3083,18 @@ int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt)
 		return err;
 	ffu_status = ext_csd_ffu[EXT_CSD_FFU_STATUS] & 0xff;
 	fw_ver = 0;
-	for (i = 0; i < 8; i++)
-		fw_ver |= (ext_csd_ffu[EXT_CSD_FW_VERSION + i] << (i * 8));
-	pr_info("new fw_ver = %llx\n", fw_ver);
+	for (i = 0; i < 8; i++) {
+		fw_ver |= ext_csd_ffu[EXT_CSD_FW_VERSION + 7 - i];
+		if (i < 7)
+			fw_ver <<= 8;
+	}
+	if ((mmc->cid[0] >> 24) == BIWIN_MID)
+		fw_ver = ((fw_ver >> 16) & 0xffffffff);
+	printf("new fw_ver = %llx\n", fw_ver);
 	if (ffu_status || (fw_ver != ffu_ver))
 		return ffu_status;
 
-	pr_info("FFU update ok!\n");
+	printf("FFU update ok!\n");
 	return 0;
 }
 
@@ -3119,7 +3178,7 @@ int mmc_initialize(bd_t *bis)
 		return ret;
 
 #ifndef CONFIG_SPL_BUILD
-	print_mmc_devices(',');
+	//print_mmc_devices(',');
 #endif
 
 	mmc_do_preinit();
@@ -3163,37 +3222,6 @@ int mmc_set_bkops_enable(struct mmc *mmc)
 extern unsigned long blk_dwrite(struct blk_desc *block_dev, lbaint_t start,
 		lbaint_t blkcnt, const void *buffer);
 
-int mmc_key_write(unsigned char *buf, unsigned int size, uint32_t *actual_lenth)
-{
-	ulong start, start_blk, blkcnt, ret;
-	unsigned char * temp_buf = buf;
-	int i = 2, dev = EMMC_DTB_DEV;
-	struct partitions * part = NULL;
-	struct mmc *mmc;
-	struct virtual_partition *vpart = NULL;
-	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
-	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
-
-	mmc = find_mmc_device(dev);
-
-	start = part->offset + vpart->offset;
-	start_blk = (start / MMC_BLOCK_SIZE);
-	blkcnt = (size / MMC_BLOCK_SIZE);
-	info_disprotect |= DISPROTECT_KEY;
-	do {
-		ret = blk_dwrite(mmc_get_blk_desc(mmc), start_blk, blkcnt, temp_buf);
-		if (ret != blkcnt) {
-			pr_err("[%s] %d, mmc_bwrite error\n",
-				__func__, __LINE__);
-			return 1;
-		}
-		start_blk += vpart->size / MMC_BLOCK_SIZE;
-	} while (--i);
-	info_disprotect &= ~DISPROTECT_KEY;
-	return 0;
-}
-
-
 
 
 extern unsigned long blk_derase(struct blk_desc *block_dev, lbaint_t start,
@@ -3212,7 +3240,11 @@ int mmc_key_erase(void)
 	mmc = find_mmc_device(dev);
 	start = part->offset + vpart->offset;
 	start_blk = (start / MMC_BLOCK_SIZE);
+#ifdef KEY_BACKUP
+	blkcnt = (vpart->size / MMC_BLOCK_SIZE) * 2 + 2;//key and backup key
+#else
 	blkcnt = (vpart->size / MMC_BLOCK_SIZE) * 2;//key and backup key
+#endif
 	info_disprotect |= DISPROTECT_KEY;
 	ret = blk_derase(mmc_get_blk_desc(mmc), start_blk, blkcnt);
 	info_disprotect &= ~DISPROTECT_KEY;
@@ -3224,32 +3256,407 @@ int mmc_key_erase(void)
 	return 0;
 }
 
+#ifdef KEY_BACKUP
+/* unifykey backup distributioin */
+
+/*--------------------------------------------------------
+ * offset |  0x12020  |  0x12220  |  0x12420  |  0x12421  |
+ *--------------------------------------------------------
+ *  size  | 200 block | 200 block |  1 block  |  1 block  |
+ *--------------------------------------------------------
+ *content |    key1   |    key2   | checksum1 | checksum2 |
+ *--------------------------------------------------------
+ */
+static u64 _calc_key_checksum(void *addr, int size)
+{
+	int i = 0;
+	u32 *buffer;
+	u64 checksum = 0;
+
+	if ((u64)addr % 4 != 0)
+		BUG();
+
+	buffer = (u32 *)addr;
+	size = size >> 2;
+	while (i < size)
+		checksum += buffer[i++];
+
+	return checksum;
+}
+
+static int _key_read(struct mmc *mmc, u64 blk, u64 cnt, void * addr)
+{
+	int dev = EMMC_DTB_DEV;
+	u64 n;
+	n = blk_dread(mmc_get_blk_desc(mmc), blk, cnt, addr);
+	if (n != cnt) {
+		printf("%s: dev # %d, block # %#llx, count # %#llx ERROR!\n",
+				__func__, dev, blk, cnt);
+	}
+
+	return (n != cnt);
+}
+
+static int _verify_key_checksum(struct mmc *mmc, void *addr, int cpy)
+{
+	u64 checksum;
+	int ret = 0;
+	u64 blk, key_glb_offset;
+	struct partitions * part = NULL;
+	struct virtual_partition *vpart = NULL;
+	char checksum_info[512] = {0};
+
+	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	key_glb_offset = part->offset + vpart->offset;
+
+	blk = (key_glb_offset + 2 * (vpart->size)) / MMC_BLOCK_SIZE + cpy;
+	ret = _key_read(mmc, blk, 1, (void *)checksum_info);
+	if (ret)
+		return -1;
+
+	memcpy(&key_infos[cpy], checksum_info, sizeof(struct aml_key_info));
+
+	checksum = _calc_key_checksum(addr, vpart->size);
+	printf("calc %llx, store %llx\n", checksum, key_infos[cpy].checksum);
+
+	return !(checksum == key_infos[cpy].checksum);
+}
+
+static int update_key_info(struct mmc *mmc, unsigned char *addr)
+{
+	int ret = 0;
+	u64 blk, cnt, key_glb_offset;
+	int cpy = 1;
+	struct partitions * part = NULL;
+	struct virtual_partition *vpart = NULL;
+	int valid_flag = 0;
+
+	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	key_glb_offset = part->offset + vpart->offset;
+
+	while (cpy >= 0) {
+		blk = (key_glb_offset + cpy * (vpart->size)) / MMC_BLOCK_SIZE;
+		cnt = vpart->size / mmc->read_bl_len;
+		ret = _key_read(mmc, blk, cnt, addr);
+		if (ret) {
+			printf("%s: block # %#llx, cnt # %#llx ERROR!\n",
+				__func__, blk, cnt);
+			return -1;
+		}
+
+		ret = _verify_key_checksum(mmc, addr, cpy);
+		if (!ret && key_infos[cpy].magic != 0)
+			valid_flag += cpy + 1;
+		else
+			printf("cpy %d is not valid\n", cpy);
+		cpy--;
+	}
+
+	if (key_infos[0].stamp > key_infos[1].stamp)
+		mmc->key_stamp = key_infos[0].stamp;
+	else
+		mmc->key_stamp = key_infos[1].stamp;
+
+	return valid_flag;
+}
+
+static int _key_write(struct mmc *mmc, u64 blk, u64 cnt, void *addr)
+{
+	int dev = EMMC_KEY_DEV;
+	u32 n;
+	n = blk_dwrite(mmc_get_blk_desc(mmc), blk, cnt, addr);
+	if (n != cnt) {
+		printf("%s: dev # %d, block # %#llx, count # %#llx ERROR!\n",
+				__func__, dev, blk, cnt);
+	}
+
+	return (n != cnt);
+}
+
+static int write_invalid_key(struct mmc *mmc, void *addr, int valid_flag)
+{
+	u64 blk, cnt, key_glb_offset;
+	int ret;
+	struct partitions * part = NULL;
+	struct virtual_partition *vpart = NULL;
+	char checksum_info[512] = {0};
+
+	if (valid_flag > 2 || valid_flag < 1)
+		return 1;
+
+	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	key_glb_offset = part->offset + vpart->offset;
+
+	blk = (key_glb_offset + (valid_flag - 1) * (vpart->size)) / MMC_BLOCK_SIZE;
+	cnt = vpart->size / mmc->read_bl_len;
+
+	if (_key_read(mmc, blk, cnt, addr)) {
+	printf("%s: block # %#llx,cnt # %#llx ERROR!\n",
+			__func__, blk, cnt);
+		ret = -2;
+	}
+	/* fixme, update the invalid one - key1 */
+	blk = (key_glb_offset + (valid_flag % 2) * vpart->size) / MMC_BLOCK_SIZE;
+	if (_key_write(mmc, blk, cnt, addr)) {
+		printf("%s: block # %#llx,cnt # %#llx ERROR!\n",
+			__func__, blk, cnt);
+		ret = -4;
+	}
+
+	memcpy(checksum_info, &key_infos[valid_flag - 1], sizeof(struct aml_key_info));
+	blk = (key_glb_offset + 2 * (vpart->size)) / MMC_BLOCK_SIZE + valid_flag % 2;
+	if (_key_write(mmc, blk, 1, checksum_info)) {
+		printf("%s: block # %#llx,cnt # %#llx ERROR!\n",
+			__func__, blk, cnt);
+		ret = -4;
+	}
+
+	return ret;
+}
+
+static int update_invalid_key(struct mmc *mmc, void *addr, int valid_flag)
+{
+	int ret = 0, dev = EMMC_KEY_DEV;
+	u64 blk, cnt, key_glb_offset;
+	struct partitions * part = NULL;
+	struct virtual_partition *vpart = NULL;
+	char checksum_info[512] = {0};
+
+	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	key_glb_offset = part->offset + vpart->offset;
+	cnt = vpart->size / mmc->read_bl_len;
+
+	if (valid_flag == 2) {
+		printf("update key1");
+		ret = write_invalid_key(mmc, addr, valid_flag);
+		if (ret)
+			ret = -2;
+	} else {
+		printf("update key2");
+		blk = (key_glb_offset + vpart->size) / MMC_BLOCK_SIZE;
+		if (_key_write(mmc, blk, cnt, addr)) {
+			printf("%s: dev # %d, block # %#llx,cnt # %#llx ERROR!\n",
+				__func__, dev, blk, cnt);
+			ret = -2;
+		}
+		memcpy(checksum_info, &key_infos[valid_flag - 1],
+				sizeof(struct aml_key_info));
+		blk = (key_glb_offset + 2 * (vpart->size)) / MMC_BLOCK_SIZE + valid_flag % 2;
+		if (_key_write(mmc, blk, 1, checksum_info)) {
+			printf("%s: block # %#llx,cnt # %#llx ERROR!\n",
+				__func__, blk, cnt);
+			ret = -4;
+		}
+	}
+	return ret;
+}
+
+int update_old_key(struct mmc *mmc, void *addr)
+{
+	int ret = 0;
+	int valid_flag;
+
+	if (stamp_after(key_infos[1].stamp, key_infos[0].stamp)) {
+		memcpy(&key_infos[1], &key_infos[0], sizeof(struct aml_key_info));
+		valid_flag = 2;
+	} else if (stamp_after(key_infos[0].stamp, key_infos[1].stamp)) {
+		memcpy(&key_infos[0], &key_infos[1], sizeof(struct aml_key_info));
+		valid_flag = 1;
+	} else {
+		printf("do nothing\n");
+		return ret;
+	}
+
+	ret = write_invalid_key(mmc, addr, valid_flag);
+	/*update key*/
+	if (ret)
+		ret = -3;
+	mmc->key_stamp = key_infos[0].stamp;
+	return ret;
+}
+
+static struct mmc *_rsv_init(void)
+{
+	struct mmc *mmc = find_mmc_device(EMMC_KEY_DEV);
+	if (!mmc) {
+		printf("not find mmc\n");
+		return NULL;
+	}
+
+	if (mmc_init(mmc)) {
+		printf("mmc init failed\n");
+		return NULL;
+	}
+
+	return mmc;
+}
+
+static int mmc_key_write_backup(const char *name,
+			      unsigned char *addr, unsigned int size)
+{
+	int ret = 0;
+	u64 blk, cnt, key_glb_offset;
+	int cpy;
+	struct mmc * mmc;
+	struct partitions * part = NULL;
+	struct virtual_partition *vpart = NULL;
+	char checksum_info[512] = {0};
+
+	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	key_glb_offset = part->offset + vpart->offset;
+
+	mmc = _rsv_init();
+	if (mmc == NULL)
+		return -10;
+
+	key_infos[0].stamp =  mmc->key_stamp + 1;
+	key_infos[0].magic = 9;
+	key_infos[0].checksum = _calc_key_checksum(addr, vpart->size);
+	printf("new stamp %d, checksum 0x%llx, magic %d\n",
+		key_infos[0].stamp, key_infos[0].checksum, key_infos[0].magic);
+
+	memcpy(checksum_info, &key_infos[0], sizeof(struct aml_key_info));
+
+	for (cpy = 0; cpy < KEY_COPIES; cpy++) {
+		blk = (key_glb_offset + cpy * (vpart->size)) / MMC_BLOCK_SIZE;
+		cnt = vpart->size / mmc->read_bl_len;
+		ret |= _key_write(mmc, blk, cnt, addr);
+
+		blk = (key_glb_offset + 2 * (vpart->size)) / MMC_BLOCK_SIZE + cpy;
+		ret |= _key_write(mmc, blk, 1, checksum_info);
+	}
+
+	if (ret) {
+		printf("%s() %d: emmc init %d\n", __func__, __LINE__, ret);
+		ret = -2;
+	}
+
+	return ret;
+}
+
+static int mmc_key_read_backup(const char *name,
+			      unsigned char *addr, unsigned int size)
+{
+	int valid = 0;
+	struct mmc *mmc;
+
+	mmc = _rsv_init();
+	if (mmc == NULL)
+		return -10;
+
+	/* check valid key flag , addr save the first key content */
+	valid = update_key_info(mmc, addr);
+	switch (valid) {
+		/* none is valid, using the 1st one for compatibility*/
+		case 0:
+			goto _out;
+		break;
+		/* only first is valid, using the first update the second */
+		case 1:
+			update_invalid_key(mmc, addr, 1);
+		break;
+		/* only second is valid, using the second */
+		case 2:
+			update_invalid_key(mmc, addr, 2);
+		break;
+		case 3:
+		/*update the old key */
+			update_old_key(mmc, addr);
+		break;
+		default:
+			printf("impossble valid values.\n");
+			BUG();
+		break;
+	}
+_out:
+	return 0;
+}
+#endif
+
+int mmc_key_write(unsigned char *buf, unsigned int size, uint32_t *actual_lenth)
+{
+	ulong blkcnt, ret;
+	unsigned char * temp_buf = buf;
+#ifndef KEY_BACKUP
+	int dev = EMMC_DTB_DEV;
+	int i = 2;
+	struct mmc *mmc;
+	ulong start, start_blk;
+	struct virtual_partition *vpart = NULL;
+	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
+	struct partitions * part = NULL;
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+
+	mmc = find_mmc_device(dev);
+	start_blk = (start / MMC_BLOCK_SIZE);
+	start = part->offset + vpart->offset;
+#endif
+	blkcnt = (size / MMC_BLOCK_SIZE);
+	info_disprotect |= DISPROTECT_KEY;
+#ifdef KEY_BACKUP
+	ret = mmc_key_write_backup(MMC_KEY_NAME, temp_buf, blkcnt);
+	if (ret != 0) {
+		pr_err("[%s] %d, mmc_bwrite error\n",
+			__func__, __LINE__);
+		return 1;
+	}
+#else
+	do {
+		ret = blk_dwrite(mmc_get_blk_desc(mmc), start_blk, blkcnt, temp_buf);
+		if (ret != blkcnt) {
+			pr_err("[%s] %d, mmc_bwrite error\n",
+				__func__, __LINE__);
+			return 1;
+		}
+		start_blk += vpart->size / MMC_BLOCK_SIZE;
+	} while (--i);
+#endif
+	info_disprotect &= ~DISPROTECT_KEY;
+	return 0;
+}
 
 int mmc_key_read(unsigned char *buf, unsigned int size, uint32_t *actual_lenth)
 {
-	ulong start, start_blk, blkcnt, ret;
-	int dev = EMMC_DTB_DEV;
+	ulong blkcnt, ret;
 	unsigned char *temp_buf = buf;
-	struct partitions * part = NULL;
+#ifndef KEY_BACKUP
 	struct mmc *mmc;
+	int dev = EMMC_DTB_DEV;
+	ulong start, start_blk;
+	struct partitions * part = NULL;
 	struct virtual_partition *vpart = NULL;
 	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
 	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
 
 	mmc = find_mmc_device(dev);
-	*actual_lenth =  0x40000;/*key size is 256KB*/
 	start = part->offset + vpart->offset;
 	start_blk = (start / MMC_BLOCK_SIZE);
+#endif
+
+	*actual_lenth =  0x40000;/*key size is 256KB*/
 	blkcnt = (size / MMC_BLOCK_SIZE);
 	info_disprotect |= DISPROTECT_KEY;
+#ifdef KEY_BACKUP
+	ret = mmc_key_read_backup(MMC_KEY_NAME, temp_buf, blkcnt);
+	if (ret != 0) {
+		pr_err("[%s] %d, mmc_bread error\n",
+			__func__, __LINE__);
+		return 1;
+	}
+#else
 	ret = blk_dread(mmc_get_blk_desc(mmc), start_blk, blkcnt, temp_buf);
-	info_disprotect &= ~DISPROTECT_KEY;
 	if (ret != blkcnt) {
 		pr_err("[%s] %d, mmc_bread error\n",
 			__func__, __LINE__);
 		return 1;
 	}
+#endif
+	info_disprotect &= ~DISPROTECT_KEY;
 	return 0;
 }
-
 

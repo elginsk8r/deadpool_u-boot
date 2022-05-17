@@ -36,7 +36,7 @@ typedef int boot_os_fn(int flag, int argc, char * const argv[],
 
 extern boot_os_fn do_bootm_linux;
 extern boot_os_fn do_bootm_vxworks;
-extern boot_os_fn do_bootm_zircon;
+
 int do_bootelf(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
 void lynxkdi_boot(image_header_t *hdr);
 
@@ -81,5 +81,7 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
  * TODO(sjg@chromium.org>): Update this to use driver model's device_remove().
  */
 void board_quiesce_devices(void);
+
+void jump_to_a32_kernel(unsigned long a, unsigned long b, unsigned long c);
 
 #endif

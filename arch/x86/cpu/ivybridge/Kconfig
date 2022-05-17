@@ -72,4 +72,3 @@ config FSP_BROKEN_HOB
 	default y
 
 endif
-

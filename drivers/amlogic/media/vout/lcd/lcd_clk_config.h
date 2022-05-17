@@ -1,21 +1,6 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/amlogic/media/vout/lcd/lcd_clk_config.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef _LCD_CLK_CONFIG_H
@@ -27,6 +12,11 @@
 /* **********************************
  * clk config
  * ********************************** */
+#define LCD_PLL_MODE_DEFAULT         BIT(0)
+#define LCD_PLL_MODE_SPECIAL_CNTL    BIT(1)
+#define LCD_PLL_MODE_FRAC_SHIFT      BIT(2)
+
+#define PLL_RETRY_MAX		20
 #define LCD_CLK_CTRL_EN      0
 #define LCD_CLK_CTRL_RST     1
 #define LCD_CLK_CTRL_FRAC    2
@@ -43,13 +33,13 @@ struct lcd_clk_ctrl_s {
 
 struct lcd_clk_data_s {
 	/* clk path node parameters */
-	unsigned int ss_level_max;
 	unsigned int pll_od_fb;
 	unsigned int pll_m_max;
 	unsigned int pll_m_min;
 	unsigned int pll_n_max;
 	unsigned int pll_n_min;
 	unsigned int pll_frac_range;
+	unsigned int pll_frac_sign_bit;
 	unsigned int pll_od_sel_max;
 	unsigned int pll_ref_fmax;
 	unsigned int pll_ref_fmin;
@@ -63,15 +53,26 @@ struct lcd_clk_data_s {
 
 	unsigned char clk_path_valid;
 	unsigned char vclk_sel;
+	int enc_clk_msr_id;
 	struct lcd_clk_ctrl_s *pll_ctrl_table;
-	char **pll_ss_table;
 
-	void (*clk_generate_parameter)(struct lcd_config_s *pconf);
-	void (*pll_frac_generate)(struct lcd_config_s *pconf);
-	void (*set_spread_spectrum)(unsigned int ss_level);
-	void (*clk_set)(struct lcd_config_s *pconf);
-	void (*clk_config_init_print)(void);
-	void (*clk_config_print)(void);
+	unsigned int ss_level_max;
+	unsigned int ss_freq_max;
+	unsigned int ss_mode_max;
+	char **ss_level_table;
+	char **ss_freq_table;
+	char **ss_mode_table;
+
+	void (*clk_generate_parameter)(struct aml_lcd_drv_s *pdrv);
+	void (*pll_frac_generate)(struct aml_lcd_drv_s *pdrv);
+	void (*set_ss_level)(struct aml_lcd_drv_s *pdrv);
+	void (*set_ss_advance)(struct aml_lcd_drv_s *pdrv);
+	void (*clk_set)(struct aml_lcd_drv_s *pdrv);
+	void (*vclk_crt_set)(struct aml_lcd_drv_s *pdrv);
+	void (*clk_disable)(struct aml_lcd_drv_s *pdrv);
+	void (*clk_config_init_print)(struct aml_lcd_drv_s *pdrv);
+	void (*clk_config_print)(struct aml_lcd_drv_s *pdrv);
+	void (*prbs_clk_config)(struct aml_lcd_drv_s *pdrv, unsigned int lcd_prbs_mode);
 };
 
 struct lcd_clk_config_s { /* unit: kHz */
@@ -80,6 +81,8 @@ struct lcd_clk_config_s { /* unit: kHz */
 	unsigned int fout;
 
 	/* pll parameters */
+	unsigned int pll_id;
+	unsigned int pll_offset;
 	unsigned int pll_mode; /* txl */
 	unsigned int pll_od_fb;
 	unsigned int pll_m;
@@ -88,32 +91,39 @@ struct lcd_clk_config_s { /* unit: kHz */
 	unsigned int pll_od1_sel;
 	unsigned int pll_od2_sel;
 	unsigned int pll_od3_sel;
-	unsigned int pll_pi_div_sel; /* for tcon */
+	unsigned int pll_tcon_div_sel;
 	unsigned int pll_level;
 	unsigned int pll_frac;
+	unsigned int pll_frac_half_shift;
 	unsigned int pll_fout;
 	unsigned int ss_level;
+	unsigned int ss_freq;
+	unsigned int ss_mode;
+	unsigned int edp_div0;
+	unsigned int edp_div1;
 	unsigned int div_sel;
 	unsigned int xd;
 	unsigned int div_sel_max;
 	unsigned int xd_max;
 	unsigned int err_fmin;
+	unsigned int done;
 
 	struct lcd_clk_data_s *data;
 };
 
-
 /* ******** api ******** */
-extern struct lcd_clk_config_s *get_lcd_clk_config(void);
-extern void lcd_clk_config_print(void);
+struct lcd_clk_config_s *get_lcd_clk_config(struct aml_lcd_drv_s *pdrv);
 
-extern char *lcd_get_spread_spectrum(void);
-extern void lcd_set_spread_spectrum(unsigned int ss_level);
-extern void lcd_clk_update(struct lcd_config_s *pconf);
-extern void lcd_clk_set(struct lcd_config_s *pconf);
-extern void lcd_clk_disable(void);
+void lcd_clk_config_print(struct aml_lcd_drv_s *pdrv);
 
-extern void lcd_clk_generate_parameter(struct lcd_config_s *pconf);
-extern void lcd_clk_config_probe(void);
+void lcd_get_ss(struct aml_lcd_drv_s *pdrv);
+int lcd_set_ss(struct aml_lcd_drv_s *pdrv, unsigned int level,
+	       unsigned int freq, unsigned int mode);
+void lcd_update_clk(struct aml_lcd_drv_s *pdrv);
+void lcd_set_clk(struct aml_lcd_drv_s *pdrv);
+void lcd_disable_clk(struct aml_lcd_drv_s *pdrv);
+
+void lcd_clk_generate_parameter(struct aml_lcd_drv_s *pdrv);
+void lcd_clk_config_probe(struct aml_lcd_drv_s *pdrv);
 
 #endif

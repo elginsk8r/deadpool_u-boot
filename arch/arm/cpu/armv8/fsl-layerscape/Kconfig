@@ -571,4 +571,3 @@ config TFABOOT
        help
          Enabling this will make a U-Boot binary that is capable of being
          booted via TFA.
-

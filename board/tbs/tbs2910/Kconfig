@@ -16,4 +16,3 @@ config IMX_CONFIG
 	default "board/tbs/tbs2910/tbs2910.cfg"
 
 endif
-

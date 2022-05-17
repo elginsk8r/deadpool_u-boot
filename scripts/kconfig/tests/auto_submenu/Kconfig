@@ -48,4 +48,3 @@ config C
 	help
 	  This depends on A, but not a consecutive item, so can/should not
 	  be a submenu.
-

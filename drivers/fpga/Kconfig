@@ -69,4 +69,3 @@ config FPGA_ZYNQPL
 	  on Xilinx Zynq devices.
 
 endmenu
-

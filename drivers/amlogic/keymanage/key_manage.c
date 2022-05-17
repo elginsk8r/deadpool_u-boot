@@ -1,15 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * \file        key_encrypt_decrypt.c
- * \brief       encrypt a key before burn to target deive,
- *              decrypt a key after read from target device
- *
- * \version     1.0.0
- * \date        15/07/17
- * \author      Sam.Wu <yihui.wu@amlgic.com>
- *
- * Copyright (c) 2015 Amlogic. All Rights Reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
+
 #include "key_manage_i.h"
 #include <u-boot/sha1.h>
 #include <linux/ctype.h>
@@ -534,7 +527,8 @@ static int do_keyman_read(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
         else KM_MSG("Err key dataFmt(%s)\n", dataFmt);
     }
 
-    return ret ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
+    //return ret ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
+    return CMD_RET_SUCCESS;
 }
 
 //argv: 1       2       3

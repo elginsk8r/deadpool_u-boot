@@ -24,4 +24,3 @@ endchoice
 source "board/imgtec/ci20/Kconfig"
 
 endmenu
-

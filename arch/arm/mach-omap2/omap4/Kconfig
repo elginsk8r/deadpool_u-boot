@@ -27,4 +27,3 @@ source "board/ti/sdp4430/Kconfig"
 source "board/amazon/kc1/Kconfig"
 
 endif
-

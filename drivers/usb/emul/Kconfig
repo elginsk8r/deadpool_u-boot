@@ -6,4 +6,3 @@ config USB_EMUL
 	  to use device emulators instead. This allows testing of the USB
 	  stack on sandbox without needing a real device, or any host machine
 	  USB resources.
-

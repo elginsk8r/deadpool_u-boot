@@ -1,5 +1,9 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #include <common.h>
-#include <u-boot/sha256.h>
 //#include <asm/arch/secure_apb.h>
 
 
@@ -14,21 +18,6 @@
 //#ifndef   char* itoa(intnum,char*str,intradix)
 
 
-#define  USE_FOR_NEWMAN
-#define USE_FOR_UBOOT_2018
-#ifdef USE_FOR_NEWMAN
-///*
-int setenv(const char *varname, const char *varvalue)
-{
-return 1;
-}
-
-char *getenv(const char *name)
-{
-	return NULL;
-}
-//*/
-#endif
 #define DWC_AC_PINMUX_TOTAL						28
 #define DWC_DFI_PINMUX_TOTAL					26
 
@@ -69,7 +58,7 @@ uint32_t addr_t=((addr>>2) << 2);
 read_value= (*(volatile uint32_t *)(( unsigned long )(addr_t)));
 read_value=(read_value>>((addr%4)<<3))&0xffff;
 return read_value;
-	
+
 }
 static uint32_t ddr_wr_16bit_on_32reg(uint32_t addr,uint32_t value)
 {
@@ -82,7 +71,7 @@ write_value=(value<<offset)|(read_value&(~(0xffff<<offset)));
  *(volatile uint32_t *)(( unsigned long )(addr_t))=write_value;
 
 return write_value;
-	
+
 }
 */
 static uint32_t ddr_rd_8_16bit_on_32reg(uint32_t base_addr,uint32_t size,uint32_t offset_index)
@@ -90,21 +79,21 @@ static uint32_t ddr_rd_8_16bit_on_32reg(uint32_t base_addr,uint32_t size,uint32_
 	uint32_t read_value=0;
 	uint32_t addr_t=0;
 	uint32_t offset=0;
-	if(size==8){
+	if (size == 8) {
 		offset=((offset_index%4)<<3);
 		addr_t=(base_addr+((offset_index>>2) << 2));
 		read_value= (*(volatile uint32_t *)(( unsigned long )(addr_t)));
 		read_value=(read_value>>offset)&0xff;
-	
+
 	}
-	if(size==16){
+	if (size == 16) {
 		offset=((offset_index%2)<<4);
 		addr_t=(base_addr+((offset_index>>1) << 2));
 		read_value= (*(volatile uint32_t *)(( unsigned long )(addr_t)));
 		read_value=(read_value>>offset)&0xffff;
 	}
 	return read_value;
-	
+
 }
 static uint32_t ddr_wr_8_16bit_on_32reg(uint32_t base_addr,uint32_t size,uint32_t offset_index,uint32_t value)
 {
@@ -112,13 +101,13 @@ static uint32_t ddr_wr_8_16bit_on_32reg(uint32_t base_addr,uint32_t size,uint32_
 	uint32_t write_value=0;
 	uint32_t addr_t=0;
 	uint32_t offset=0;
-	if(size==8){
+	if (size == 8) {
 		offset=((offset_index%4)<<3);
 		addr_t=(base_addr+((offset_index>>2) << 2));
 		read_value= (*(volatile uint32_t *)(( unsigned long )(addr_t)));
 		write_value=(value<<offset)|(read_value&(~(0xff<<offset)));
 	}
-	if(size==16){
+	if (size == 16) {
 		offset=((offset_index%2)<<4);
 		addr_t=(base_addr+((offset_index>>1) << 2));
 		read_value= (*(volatile uint32_t *)(( unsigned long )(addr_t)));
@@ -129,8 +118,7 @@ static uint32_t ddr_wr_8_16bit_on_32reg(uint32_t base_addr,uint32_t size,uint32_
 }
 typedef struct ddr_set{
 	unsigned	int		magic;
-	unsigned	char	fast_boot[4];// 0   fastboot enable  1 window test margin(bit0-3 read bit 4-7 write)  2 auto offset after window test (bit0-3 read bit 4-7 write)    3 auto window test index(bit 7 use for if enable usb download do window test ,bit 6 use for flash)
-//	unsigned	int		rsv_int0;
+	unsigned	int		rsv_int0;
 	unsigned	char	board_id;
 	//board id reserve,,do not modify
 	unsigned	char	version;
@@ -188,9 +176,7 @@ typedef struct ddr_set{
 
 	unsigned	short	training_SequenceCtrl[2];
 	//system reserve,do not modify
-	unsigned	char	phy_odt_config_rank[2];
-	unsigned	char	 rever1;
-	unsigned	char	 rever2;
+	unsigned	char	phy_odt_config_rank[4];
 	//training odt config ,only use for training
 	// [0]Odt pattern for accesses targeting rank 0. [3:0] is used for write ODT [7:4] is used for read ODT
 	// [1]Odt pattern for accesses targeting rank 1. [3:0] is used for write ODT [7:4] is used for read ODT
@@ -278,23 +264,19 @@ typedef struct ddr_set{
 	//soc init SOC receiver vref ,config like 500 means 0.5VDDQ,take care ,please follow SI
 	unsigned	short	vref_dram_permil;
 	//soc init DRAM receiver vref ,config like 500 means 0.5VDDQ,take care ,please follow SI
-	unsigned	short	max_core_timmming_frequency;
-	//use for limited ddr speed core timmming parameter,for some old dram maybe have no over speed register
+	unsigned	short	vref_reverse;
+	//system reserve,do not modify
 	/* align8 */
 
-	unsigned	char	ac_trace_delay[10];
-	unsigned	char	lpddr4_dram_vout_voltage_1_3_2_5_setting;
-	unsigned	char	lpddr4_x8_mode;
+	unsigned	char	ac_trace_delay[12];
 	//system reserve,do not modify ,take care ,please follow SI
 	unsigned	char	ac_pinmux[DWC_AC_PINMUX_TOTAL];
 	//use for lpddr3 /lpddr4 ca pinmux remap
 	unsigned	char	dfi_pinmux[DWC_DFI_PINMUX_TOTAL];
-	unsigned	char	slt_test_function[2];  //[0] slt test function enable,bit 0 enable 4 frequency scan,bit 1 enable force delay line offset ,bit 7 enable skip training function
-	//[1],slt test parameter ,use for force delay line offset
-	//system reserve,do not modify
-	unsigned	short	tdqs2dq;//dq_bdlr_org;
-	unsigned	char  dram_data_wr_odt_ohm;
-	unsigned	char	bitTimeControl_2d;
+	unsigned	char	slt_test_function[2];  //[0] slt test function enable,bit 0 enable 4 frequency scan,bit 1 enable force delay line offset ,[1],slt test parameter ,use for force delay line offset
+		//system reserve,do not modify
+	unsigned	short	dq_bdlr_org;
+	unsigned	char	rsv_char1[2];
 	//system reserve,do not modify
 	/* align8 */
 
@@ -311,29 +293,14 @@ typedef struct ddr_set{
 	//system reserve,do not modify
 	/* align8 */
 
-	//unsigned	long	rsv_long0[2];
+	unsigned	long	rsv_long0[2];
 	/* v1 end */
-//	/*
-	unsigned	char	read_dqs_delay[16];
-	unsigned	char	read_dq_bit_delay[72];
-	unsigned	short	write_dqs_delay[16];
-//	*/
-	unsigned	short	write_dq_bit_delay[72];
-	unsigned	short	read_dqs_gate_delay[16];
-	unsigned	char	soc_bit_vref[32];
-	unsigned	char	dram_bit_vref[32];
-	///*
-	unsigned	char	rever3;//read_dqs  read_dq,write_dqs, write_dq
-	unsigned	char	dfi_mrl;
-	unsigned	char	dfi_hwtmrl;
-	unsigned	char	ARdPtrInitVal;
-	unsigned	char	retraining[16];
+	unsigned	char	dqs_adjust[16]; //rank 0 --lane 0 1 2 3  rank 1--4 5 6 7 write  //rank 0 --lane 0 1 2 3  rank 1--4 5 6 7 read
+	/* v2 start */
+	unsigned	char	dq_bit_delay[72];
 	//override read bit delay
-
-	//extra
-//	unsigned	short	dmc_test_worst_window_tx;
-//	unsigned	short	dmc_test_worst_window_rx;
-//	*/
+//	unsigned	short	dq_bdlr_org[2];
+//	unsigned	char	dqs_adjust_line[16]; //rank 0 --lane 0 1 2 3  rank 1--4 5 6 7 write  //rank 0 --lane 0 1 2 3  rank 1--4 5 6 7 read
 }ddr_set_t;
 
 ddr_set_t p_ddr_set_t;
@@ -372,7 +339,7 @@ char* itoa_ddr_test(int num,char*str,int radix)
 	if (str[0] == '-')
 		k = 1;/*十进制负数*/
 	else
-	   	k = 0;
+		k = 0;
 	printf("\nitoa_ddr_test 4\n");
 	for (j = k;j <= (i-1)/2;j++)
 	{
@@ -407,7 +374,7 @@ char *strsep(char **stringp, const char *delim)
             }
         } while (sc != 0);
     }
-  
+
 }
 */
 int TOLOWER(int ch)
@@ -428,7 +395,7 @@ int isxdigit(int ch)
 int isdigit(int ch)
 {
     return (unsigned int)(ch - '0') < 10u;
-}//判断字符c是否为数字 
+}//判断字符c是否为数字
 unsigned int simple_guess_base(const char *cp)
 {
 	if (cp[0] == '0') {
@@ -445,14 +412,14 @@ unsigned int simple_strtoull_ddr(const char *cp, char **endp, unsigned int base)
 {
 	unsigned int  result = 0;
 	//printf("test sizeof(str_buf)==%d\n",1);
-	if(cp == NULL) //jiaxing add 20170616
+	if (cp == NULL) //jiaxing add 20170616
 		return 0;
 	if (!base)
 		base = simple_guess_base(cp);
 	if (base == 16 && cp[0] == '0' && TOLOWER(cp[1]) == 'x')
 		cp += 2;
 	if (base == 10) {
-		while ((*cp)== '0') 
+		while ((*cp)== '0')
 			cp++;
 	}
 	while (isxdigit(*cp)) {//检查当前cp是否是个十六进制数值，不是直接返回0
@@ -466,7 +433,7 @@ unsigned int simple_strtoull_ddr(const char *cp, char **endp, unsigned int base)
 	if (endp)
 		*endp = (char *)cp;
 	return result;
-}	
+}
 unsigned int env_to_a_num(const char *env_name)
 {
 	char *str_buf = NULL;
@@ -474,7 +441,7 @@ unsigned int env_to_a_num(const char *env_name)
 	str_buf = (char *)(&buf);
 	memset(str_buf, 0, sizeof(buf));
 	printf("sizeof(str_buf)==%d\n",(unsigned int)(sizeof(buf)));
-	str_buf = getenv(env_name);
+	str_buf = env_get(env_name);
 	unsigned int a_num = 0;
 	char *endp;
 
@@ -494,14 +461,14 @@ unsigned int a_num_to_env(const char *env_name ,unsigned int *a_num)
 	str_buf = (char *)(&buf);
 	memset(str_buf, 0, sizeof(buf));
 	printf("sizeof(str_buf)==%d\n",(unsigned int)(sizeof(buf)));
-	str_buf = getenv(env_name);
+	str_buf = env_get(env_name);
 
 	printf("str==%s\n",str_buf);
 
 	sprintf(buf, "0x%08x", *a_num);
 
 	printf( "%s==0x%08x", buf,*a_num);
-	setenv(env_name, buf);
+	env_set(env_name, buf);
 
 	run_command("save",0);
 	return 1;
@@ -515,7 +482,7 @@ unsigned int env_to_num(const char *env_name,unsigned int *num_arry)
 	str_buf = (char *)(&buf);
 	memset(str_buf, 0, sizeof(buf));
 	printf("sizeof(str_buf)==%d\n",(unsigned int)(sizeof(buf)));
-	str_buf = getenv(env_name);
+	str_buf = env_get(env_name);
 
 	char * str[48];
 	char *endp;
@@ -526,7 +493,7 @@ unsigned int env_to_num(const char *env_name,unsigned int *num_arry)
 	for (i = 0; i < 48; i++) {
 		str[i] = strsep(&str_buf, ";");
 		//str[i] = strsep(&str_buf, " ");
-		if(str[i] == NULL)
+		if (str[i] == NULL)
 			break;
 		str_to_numarry[i] = simple_strtoull_ddr(str[i], &endp, 0);
 		//printf("str_to_numarry[%d]==%d\n",i,str_to_numarry[i]);
@@ -550,7 +517,7 @@ unsigned int num_to_env(const char *env_name,unsigned int *num_arry)
 	str_buf = (char *)(&buf);
 	memset(str_buf, 0, sizeof(buf));
 	printf("sizeof(str_buf)==%d\n",(unsigned int)(sizeof(buf)));
-	str_buf = getenv(env_name);
+	str_buf = env_get(env_name);
 
 	//char * str[48];
 	printf("str==%s\n",str_buf);
@@ -564,7 +531,7 @@ unsigned int num_to_env(const char *env_name,unsigned int *num_arry)
 	}
 	//sprintf(str, "%lx", value);
 	printf( "%s", buf);
-	setenv(env_name, buf);
+	env_set(env_name, buf);
 
 	run_command("save",0);
 	//num_arry=(unsigned int *)(&str_to_numarry);
@@ -651,7 +618,7 @@ unsigned int  bdlr0_9_reg_hold_time[24*4];
 //#define CONFIG_DDR_CMD_BDL_TUNE
 //#define  CONFIG_CMD_DDR_TEST
 
-#ifndef CONFIG_CHIP 
+#ifndef CONFIG_CHIP
 //#define CONFIG_CHIP    CHIP_OLD //CHIP_OLD// //#define CHIP_OLD           0  //#define CHIP_TXLX           1
 #define CHIP_OLD           0
 #define CHIP_TXLX           1
@@ -670,7 +637,7 @@ unsigned int  bdlr0_9_reg_hold_time[24*4];
 
 #if (CONFIG_CHIP>=CHIP_G12)
 #define CONFIG_DDR_PHY   P_DDR_PHY_G12
-#else 
+#else
 //#define CONFIG_CHIP    CHIP_OLD//
 //#define CONFIG_DDR_PHY    P_DDR_PHY_905X//P_DDR_PHY_GX_BABY//P_DDR_PHY_905X// P_DDR_PHY_GX_BABY
 //#define CONFIG_DDR_PHY   P_DDR_PHY_G12//P_DDR_PHY_DEFAULT// P_DDR_PHY_905X//P_DDR_PHY_GX_BABY//P_DDR_PHY_905X// P_DDR_PHY_GX_BABY
@@ -969,7 +936,7 @@ unsigned int  bdlr0_9_reg_hold_time[24*4];
 // at the test period,  the whole MMC granted data cycles. 64bits unit.
 #define DMC_MON_ONE_GRANT_CNT				(DMC_REG_BASE + (0x2a <<2 ))
 // at the test period,  the granted data cycles for the selected channel and ports.
-#endif 
+#endif
 
 #elif (CONFIG_DDR_PHY ==  P_DDR_PHY_DEFAULT)
 
@@ -1090,7 +1057,7 @@ unsigned int  bdlr0_9_reg_hold_time[24*4];
   // at the test period,  the whole MMC granted data cycles. 64bits unit.
 #define DMC_MON_ONE_GRANT_CNT				(DMC_REG_BASE + (0x2a <<2 ))
   // at the test period,  the granted data cycles for the selected channel and ports.
-#endif 
+#endif
 
 #if (CONFIG_DDR_PHY ==  P_DDR_PHY_905X)
 #define DDR0_PUB_PIR						(DDR0_PUB_REG_BASE+(0x01<<2))
@@ -1930,7 +1897,7 @@ pattern_6[3][7] =	0xcae4cd7f	;
 #define     PERIPHS_PIN_MUX_12                                 (0xff634400 + (0x38 << 2))
 #define SEC_PERIPHS_PIN_MUX_12                                 (0xff634400 + (0x38 << 2))
 #define   P_PERIPHS_PIN_MUX_12                                 (volatile uint32_t *)(0xff634400 + (0x38 << 2))
-#endif 
+#endif
 #define P_PIN_MUX_REG1        P_PERIPHS_PIN_MUX_1// (((volatile unsigned *)(0xda834400 + (0x2d << 2))))
 #define P_PIN_MUX_REG2       P_PERIPHS_PIN_MUX_2//  (((volatile unsigned *)(0xda834400 + (0x2e << 2))))
 #define P_PIN_MUX_REG3		P_PERIPHS_PIN_MUX_3//(((volatile unsigned *)(0xda834400 + (0x2f << 2))))
@@ -2021,10 +1988,10 @@ void ddr_udelay(unsigned int us)
 //#endif
 }
 
-#define DDR_PARAMETER_SOURCE_FROM_DMC_STICKY  1 
-#define DDR_PARAMETER_SOURCE_FROM_UBOOT_ENV    2 
-#define DDR_PARAMETER_SOURCE_FROM_UBOOT_IDME  3 
-#define DDR_PARAMETER_SOURCE_FROM_ORG_STICKY  4 
+#define DDR_PARAMETER_SOURCE_FROM_DMC_STICKY  1
+#define DDR_PARAMETER_SOURCE_FROM_UBOOT_ENV    2
+#define DDR_PARAMETER_SOURCE_FROM_UBOOT_IDME  3
+#define DDR_PARAMETER_SOURCE_FROM_ORG_STICKY  4
 
 #define 	DDR_PARAMETER_READ		1
 #define 	DDR_PARAMETER_WRITE		2
@@ -2032,31 +1999,31 @@ void ddr_udelay(unsigned int us)
 #define 	DDR_PARAMETER_RIGHT		2
 
 typedef struct ddr_test_struct {
-	unsigned	int	ddr_data_source	;  
-	unsigned	int	ddr_data_test_size	;  
-	unsigned	int	ddr_address_test_size	;  
-	unsigned	int	ddr_test_watchdog_times_s	;  
-	unsigned	int	ddr_test_lane_disable	;  
+	unsigned	int	ddr_data_source	;
+	unsigned	int	ddr_data_test_size	;
+	unsigned	int	ddr_address_test_size	;
+	unsigned	int	ddr_test_watchdog_times_s	;
+	unsigned	int	ddr_test_lane_disable	;
 
-	unsigned	int	ddr_test_window_flag[8]	;  
-	unsigned	int	ddr_test_window_data[100]	;  
-}  ddr_test_struct_t;			
-ddr_test_struct_t *g_ddr_test_struct;			
+	unsigned	int	ddr_test_window_flag[8]	;
+	unsigned	int	ddr_test_window_data[100]	;
+}  ddr_test_struct_t;
+ddr_test_struct_t *g_ddr_test_struct;
 
 unsigned int  read_write_window_test_parameter(unsigned int source_index, unsigned int parameter_index ,unsigned int parameter_value,unsigned int read_write_flag )
 {
 
-	if(source_index == DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
+	if (source_index == DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
 	{
 		sticky_reg_base_add = (DDR0_PUB_REG_BASE&0xffff0000)+((DMC_STICKY_0)&0xffff);
 
-		if(read_write_flag == DDR_PARAMETER_WRITE)
+		if (read_write_flag == DDR_PARAMETER_WRITE)
 			wr_reg((sticky_reg_base_add+(parameter_index<<2)), parameter_value);
-		if(read_write_flag == DDR_PARAMETER_READ)
+		if (read_write_flag == DDR_PARAMETER_READ)
 			parameter_value = rd_reg((sticky_reg_base_add+(parameter_index<<2)));
 	}
 
-	if(source_index == DDR_PARAMETER_SOURCE_FROM_UBOOT_ENV)
+	if (source_index == DDR_PARAMETER_SOURCE_FROM_UBOOT_ENV)
 	{
 		char *pre_env_name = "ddr_test_data_num";
 		char *env_name = "ddr_test_data_num_0000";
@@ -2069,28 +2036,28 @@ unsigned int  read_write_window_test_parameter(unsigned int source_index, unsign
 		sprintf(env_name,"%s_%04d",pre_env_name,parameter_index);
 		sprintf(buf, "0x%08x", parameter_value);
 
-		if(read_write_flag == DDR_PARAMETER_WRITE)
-		{ 
-			setenv(env_name, buf);
+		if (read_write_flag == DDR_PARAMETER_WRITE)
+		{
+			env_set(env_name, buf);
 			run_command("save",0);
 		}
-		if(read_write_flag == DDR_PARAMETER_READ)
-		{ 
-			temp_s = getenv(env_name);
-			if(temp_s)
+		if (read_write_flag == DDR_PARAMETER_READ)
+		{
+			temp_s = env_get(env_name);
+			if (temp_s)
 				parameter_value = simple_strtoull_ddr(temp_s, &endp, 0);
 			else
 				parameter_value = 0;
 		}
 	}
 
-	if(source_index == DDR_PARAMETER_SOURCE_FROM_ORG_STICKY)
+	if (source_index == DDR_PARAMETER_SOURCE_FROM_ORG_STICKY)
 	{
 		sticky_reg_base_add=(PREG_STICKY_REG0);
 
-		if(read_write_flag==DDR_PARAMETER_WRITE)
+		if (read_write_flag == DDR_PARAMETER_WRITE)
 			wr_reg((sticky_reg_base_add+(parameter_index<<2)), parameter_value);
-		if(read_write_flag==DDR_PARAMETER_READ)
+		if (read_write_flag == DDR_PARAMETER_READ)
 			parameter_value=rd_reg((sticky_reg_base_add+(parameter_index<<2)));
 	}
 	return parameter_value;
@@ -2135,13 +2102,13 @@ unsigned int  read_write_window_test_flag(unsigned int source_index, unsigned in
 
 		if (read_write_flag == DDR_PARAMETER_WRITE)
 		{
-			setenv(env_name, buf);
+			env_set(env_name, buf);
 			run_command("save",0);
 		}
-		if(read_write_flag == DDR_PARAMETER_READ)
-		{ 
-			temp_s = getenv(env_name);
-			if(temp_s)
+		if (read_write_flag == DDR_PARAMETER_READ)
+		{
+			temp_s = env_get(env_name);
+			if (temp_s)
 				parameter_value = simple_strtoull_ddr(temp_s, &endp, 0);
 			else
 				parameter_value = 0;
@@ -2191,7 +2158,7 @@ void ddr_test_watchdog_enable(uint32_t sec)
 	// set timeout
 	//*P_WATCHDOG_TCNT = msec;
 	//	writel(msec,(unsigned int )P_WATCHDOG_CNTL); //bit0-15
-	if(sec*100>0xffff)
+	if (sec*100>0xffff)
 		*P_WATCHDOG_TCNT=0xffff;
 	else
 		*P_WATCHDOG_TCNT=sec*100;  //max 655s
@@ -2306,7 +2273,7 @@ void ddr_test_watchdog_reset_system(void)
 	//WRITE_CBUS_REG(WATCHDOG_TC, 0xf080000 | 2000);
 	*P_WATCHDOG_CNTL=(0xf080000 | 2000);
 #endif
-	while(1);
+	while (1) ;
 }
 
 
@@ -2321,7 +2288,7 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 	//    goto DDR_TUNE_DQS_START;
 	int i = 0;
 	printf("\nargc== 0x%08x\n", argc);
-	for(i = 0; i<argc; i++)
+	for (i = 0; i<argc; i++)
 	{
 		printf("\nargv[%d]=%s\n",i,argv[i]);
 	}
@@ -2366,23 +2333,23 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 		100	,
 		100	,
 	};
-	if(argc == 1)
+	if (argc == 1)
 		printf("\nplease read help\n");
 
-	if(argc >= 2)
+	if (argc >= 2)
 	{
 		wr_rd_adj_input_src = simple_strtoull_ddr(argv[1], &endp, 10);
 
-		unsigned int i=0; 	
-		if(wr_rd_adj_input_src==WR_RD_ADJ_USE_UART_INPUT)
+		unsigned int i=0;
+		if (wr_rd_adj_input_src == WR_RD_ADJ_USE_UART_INPUT)
 		{
 			printf("\ntune ddr lcdlr use uart input\n");
 			if (argc>24+2)
 				argc=24+2;
 
-			for(i = 2;i<argc;i++)
+			for (i = 2;i<argc;i++)
 			{
-				if(i<(2+12))
+				if (i<(2+12))
 					wr_adj_per[i-2]=simple_strtoull_ddr(argv[i], &endp, 10);
 				else
 					rd_adj_per[i-14]=simple_strtoull_ddr(argv[i], &endp, 10);
@@ -2390,7 +2357,7 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 		}
 
 		// unsigned int = 0, max = 0xff, min = 0x00;
-		if(wr_rd_adj_input_src==WR_RD_ADJ_USE_ENV)
+		if (wr_rd_adj_input_src == WR_RD_ADJ_USE_ENV)
 		{
 			printf("\ntune ddr lcdlr use uboot env\n");
 			//char str[24];
@@ -2400,7 +2367,7 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 			int value=0;
 
 			//*varname="env_ddrtest";
-			s = getenv("env_wr_lcdlr_pr");
+			s = env_get("env_wr_lcdlr_pr");
 			if (s)
 			{//i=0;
 				//while(s_temp)
@@ -2413,7 +2380,7 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 				value = simple_strtoull_ddr(s, &endp, 16);
 				printf("%d",value);
 			}
-			s = getenv("env_rd_lcdlr_pr");
+			s = env_get("env_rd_lcdlr_pr");
 
 			if (s)
 			{//i=0;
@@ -2427,25 +2394,25 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 			}
 
 			//sprintf(str, "%lx", value);
-			//  setenv("env_ddrtest", str);
+			//  env_set("env_ddrtest", str);
 			//run_command("save",0);
 
 			if (argc>24+2)
 				argc=24+2;
-			for(i = 2;i<argc;i++)
+			for (i = 2;i<argc;i++)
 			{
-				if(i<(2+12))
+				if (i<(2+12))
 					wr_adj_per[i-2]=simple_strtoull_ddr(argv[i], &endp, 16);
 				else
 					rd_adj_per[i-14]=simple_strtoull_ddr(argv[i], &endp, 16);
 			}
 		}
 		printf(" int wr_adj_per[12]={\n");
-		for(i = 0;i<12;i++)
+		for (i = 0;i<12;i++)
 			printf("%04d ,\n",wr_adj_per[i]);
 		printf("};\n");
 		printf(" int rd_adj_per[12]={\n");
-		for(i = 0;i<12;i++)
+		for (i = 0;i<12;i++)
 			printf("%04d ,\n",rd_adj_per[i]);
 		printf("};\n");
 
@@ -2464,17 +2431,17 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 		int lcdlr_w=0,lcdlr_r=0;
 		unsigned temp_reg=0;
 		int temp_count=0;
-		for( temp_count=0;temp_count<2;temp_count++)
+		for ( temp_count=0;temp_count<2;temp_count++)
 		{     temp_reg=(unsigned)(DDR0_PUB_ACLCDLR+(temp_count<<2));
 			lcdlr_w=(int)((rd_reg((uint64_t)(temp_reg)))&ACLCDLR_MAX);
 			lcdlr_w=lcdlr_w?lcdlr_w:1;
 			lcdlr_w=(lcdlr_w*(wr_adj_per[temp_count]))/100;
-			if(temp_count==1)
+			if (temp_count == 1)
 				lcdlr_w=lcdlr_w&ACBDLR_MAX;
 			wr_reg(((uint64_t)(temp_reg)),((lcdlr_w)&ACLCDLR_MAX));
 		}
 #if (CONFIG_DDR_PHY ==  P_DDR_PHY_905X)
-		for( temp_count=2;temp_count<6;temp_count++)
+		for ( temp_count=2;temp_count<6;temp_count++)
 		{     temp_reg=(unsigned)(DDR0_PUB_DX0LCDLR1+(DDR0_PUB_DX1LCDLR1-DDR0_PUB_DX0LCDLR1)*(temp_count-2));
 			lcdlr_w=(int)((rd_reg((uint64_t)(temp_reg)))&DQLCDLR_MAX);
 			lcdlr_w=lcdlr_w?lcdlr_w:1;
@@ -2498,18 +2465,18 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 			wr_reg(((uint64_t)(temp_reg)),(((lcdlr_r<<16)|(lcdlr_r<<8)|(lcdlr_w))));
 		}
 #endif
-		for( temp_count=6;temp_count<8;temp_count++) {
+		for ( temp_count=6;temp_count<8;temp_count++) {
 			temp_reg=(unsigned)(DDR1_PUB_ACLCDLR+((temp_count-6)<<2));
 
 			lcdlr_w=(int)((rd_reg((uint64_t)(temp_reg)))&ACLCDLR_MAX);
 			lcdlr_w=lcdlr_w?lcdlr_w:1;
 			lcdlr_w=(lcdlr_w*(wr_adj_per[temp_count]))/100;
-			if(temp_count==7)
+			if (temp_count == 7)
 				lcdlr_w=lcdlr_w&ACBDLR_MAX;
 			wr_reg(((uint64_t)(temp_reg)),((lcdlr_w)&ACLCDLR_MAX));
 		}
 #if (CONFIG_DDR_PHY ==  P_DDR_PHY_905X)
-		for( temp_count=8;temp_count<12;temp_count++) {
+		for ( temp_count=8;temp_count<12;temp_count++) {
 			temp_reg=(unsigned)(DDR1_PUB_DX0LCDLR1+(DDR1_PUB_DX1LCDLR1-DDR1_PUB_DX0LCDLR1)*(temp_count-2));
 			lcdlr_w=(int)((rd_reg((uint64_t)(temp_reg)))&DQLCDLR_MAX);
 			lcdlr_w=lcdlr_w?lcdlr_w:1;
@@ -2522,7 +2489,7 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 			wr_reg(((uint64_t)(temp_reg+DDR1_PUB_DX0LCDLR4-DDR1_PUB_DX0LCDLR1)),(lcdlr_r));
 		}
 #else
-		for( temp_count=8;temp_count<12;temp_count++) {
+		for ( temp_count=8;temp_count<12;temp_count++) {
 			temp_reg=(unsigned)(DDR1_PUB_DX0LCDLR1+(DDR1_PUB_DX1LCDLR1-DDR1_PUB_DX0LCDLR1)*(temp_count-8));
 			lcdlr_w=(int)((rd_reg((uint64_t)(temp_reg)))&0xff);
 			lcdlr_w=lcdlr_w?lcdlr_w:1;
@@ -2532,7 +2499,7 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 			lcdlr_r=(lcdlr_r*(rd_adj_per[temp_count]))/100;
 			wr_reg(((uint64_t)(temp_reg)),(((lcdlr_r<<16)|(lcdlr_r<<8)|(lcdlr_w))));
 		}
-#endif	
+#endif
 
 #if (CONFIG_DDR_PHY ==  P_DDR_PHY_905X)
 		wr_reg(DDR0_PUB_PGCR6, (rd_reg(DDR0_PUB_PGCR6))&(~(1<<0)));
@@ -2558,7 +2525,7 @@ int do_ddr_fine_tune_lcdlr_env1(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 U_BOOT_CMD(
 	ddr_test_tune_dqs_env,	30,	1,	do_ddr_fine_tune_lcdlr_env1,
 	"do_ddr_fine_tune_lcdlr_env arg1 arg2 arg3...",
-	"do_ddr_fine_tune_lcdlr_env arg1 arg2 arg3... \n dcache off ? \n" 
+	"do_ddr_fine_tune_lcdlr_env arg1 arg2 arg3... \n dcache off ? \n"
 );
 
 #endif
@@ -2994,7 +2961,7 @@ static void ddr_read_full(void *buff,  unsigned int  m_length,unsigned int  star
 		}
 		if ((*(p+i)) !=(start_pattern+pattern_offset*i))
 		{error_count++;
-			printf("Error data [0x%08x] at offset 0x%08x[0x%08x]\n", *(p+i), p_convter_int(p + i), 
+			printf("Error data [0x%08x] at offset 0x%08x[0x%08x]\n", *(p+i), p_convter_int(p + i),
 					(start_pattern+pattern_offset*i));
 		}
 		break;
@@ -7379,14 +7346,14 @@ int do_ddr_test_dqs_window_step(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 	unsigned int lcdlr_temp_count=0;
 	env_lcdlr_temp_count="lcdlr_temp_count";
 
-	if(test_temp_value_use_sticky_register)
+	if (test_temp_value_use_sticky_register)
 	{
 		lcdlr_temp_count=readl((sticky_reg_base_add+(6<<2)));
 	}
 	else
 	{
-		temp_s= getenv(env_lcdlr_temp_count);
-		if(temp_s)
+		temp_s= env_get(env_lcdlr_temp_count);
+		if (temp_s)
 		{
 			lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 		}
@@ -7395,7 +7362,7 @@ int do_ddr_test_dqs_window_step(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 			lcdlr_temp_count=0;
 		}
 	}
-			
+
 	//if ( channel_a_en)
 	{
 		//writel((0), 0xc8836c00);
@@ -7429,7 +7396,7 @@ for (test_times=0;(test_times<test_loop);(test_times++))
 			printf("\nshould pause ddl pir== 0x%08x,if no pause ddl ,write lcdlr some time may occour error\n", readl(DDR0_PUB_REG_BASE+4));
 			writel((readl(DDR0_PUB_REG_BASE+4))|(1<<29),(DDR0_PUB_REG_BASE+4));
 			printf("\n pause ddl pir== 0x%08x\n", readl(DDR0_PUB_REG_BASE+4));
-			if( channel_b_en)
+			if ( channel_b_en)
 			{
 				printf("\nddr1 should pause ddl pir== 0x%08x,if no pause ddl ,write lcdlr some time may occour error\n", readl(DDR1_PUB_REG_BASE+4));
 				writel((readl(DDR1_PUB_REG_BASE+4))|(1<<29),(DDR1_PUB_REG_BASE+4));
@@ -7460,7 +7427,7 @@ for (test_times=0;(test_times<test_loop);(test_times++))
 			}
 			#endif
 
-			if ((test_min_max_flag == 0)||( (test_min_max_flag == 2)))
+			if ((test_min_max_flag == 0) || ( (test_min_max_flag == 2)))
 			{
 				while (dq_lcd_bdl_temp_reg_value>0)
 				{
@@ -7472,13 +7439,13 @@ for (test_times=0;(test_times<test_loop);(test_times++))
 						lcdlr_temp_count=dq_lcd_bdl_temp_reg_value;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s\n", buf);
-						if(test_temp_value_use_sticky_register)
+						if (test_temp_value_use_sticky_register)
 						{
 							writel(lcdlr_temp_count,(sticky_reg_base_add+(6<<2)));
 						}
 						else
 						{
-							setenv(env_lcdlr_temp_count, buf);
+							env_set(env_lcdlr_temp_count, buf);
 							run_command("save",0);
 						}
 					}
@@ -7518,7 +7485,7 @@ for (test_times=0;(test_times<test_loop);(test_times++))
 				{
 					dq_lcd_bdl_reg_left_min=dq_lcd_bdl_reg_left	;
 				}
-			} 
+			}
 			else
 			{
 				printf("\n left edge skip \n");
@@ -7560,13 +7527,13 @@ for (test_times=0;(test_times<test_loop);(test_times++))
 					lcdlr_temp_count=dq_lcd_bdl_temp_reg_value;
 					sprintf(buf, "0x%08x", lcdlr_temp_count);
 					printf( "%s\n", buf);
-					if(test_temp_value_use_sticky_register)
+					if (test_temp_value_use_sticky_register)
 					{
 						writel(lcdlr_temp_count,(sticky_reg_base_add+(6<<2)));
 					}
 					else
 					{
-						setenv(env_lcdlr_temp_count, buf);
+						env_set(env_lcdlr_temp_count, buf);
 						run_command("save",0);
 					}
 
@@ -7638,7 +7605,7 @@ for (test_times=0;(test_times<test_loop);(test_times++))
 	dq_lcd_bdl_temp_reg_value=(dq_lcd_bdl_reg_right_min<<16)|dq_lcd_bdl_reg_left_min;
 	if (!test_lane_step_rdqs_flag)
 	{
-		if(channel_a_en)
+		if (channel_a_en)
 		{
 			dq_lcd_bdl_value_wdq_org_a[testing_lane]=dq_lcd_bdl_reg_org;
 			if (test_min_max_flag != 1)
@@ -8432,14 +8399,14 @@ int do_ddr_test_dqs_window_step(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 	unsigned int lcdlr_temp_count=0;
 	env_lcdlr_temp_count="lcdlr_temp_count";
 
-	if(test_temp_value_use_sticky_register)
+	if (test_temp_value_use_sticky_register)
 	{lcdlr_temp_count=readl((sticky_reg_base_add+(6<<2)));
 	}
 	else
 	{
 
-		temp_s= getenv(env_lcdlr_temp_count);
-		if(temp_s)
+		temp_s= env_get(env_lcdlr_temp_count);
+		if (temp_s)
 		{
 			lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 		}
@@ -8498,7 +8465,7 @@ int do_ddr_test_dqs_window_step(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 					printf("\nshould pause ddl pir== 0x%08x,if no pause ddl ,write lcdlr some time may occour error\n", readl(DDR0_PUB_REG_BASE+4));
 					writel((readl(DDR0_PUB_REG_BASE+4))|(1<<29),(DDR0_PUB_REG_BASE+4));
 					printf("\n pause ddl pir== 0x%08x\n", readl(DDR0_PUB_REG_BASE+4));
-					if( channel_b_en)
+					if ( channel_b_en)
 					{	printf("\nddr1 should pause ddl pir== 0x%08x,if no pause ddl ,write lcdlr some time may occour error\n", readl(DDR1_PUB_REG_BASE+4));
 						writel((readl(DDR1_PUB_REG_BASE+4))|(1<<29),(DDR1_PUB_REG_BASE+4));
 						printf("\n ddr1 pause ddl pir== 0x%08x\n", readl(DDR1_PUB_REG_BASE+4));
@@ -8537,7 +8504,7 @@ int do_ddr_test_dqs_window_step(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 					}
 #endif
 
-					if ((test_min_max_flag == 0)||( (test_min_max_flag == 2)))
+					if ((test_min_max_flag == 0) || ( (test_min_max_flag == 2)))
 					{
 						while (dq_lcd_bdl_temp_reg_value>0)
 						{
@@ -8549,13 +8516,13 @@ int do_ddr_test_dqs_window_step(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 								lcdlr_temp_count=dq_lcd_bdl_temp_reg_value;
 								sprintf(buf, "0x%08x", lcdlr_temp_count);
 								printf( "%s\n", buf);
-								if(test_temp_value_use_sticky_register)
+								if (test_temp_value_use_sticky_register)
 								{
 									writel(lcdlr_temp_count,(sticky_reg_base_add+(6<<2)));
 								}
 								else
 								{
-									setenv(env_lcdlr_temp_count, buf);
+									env_set(env_lcdlr_temp_count, buf);
 									run_command("save",0);
 								}
 							}
@@ -8645,13 +8612,13 @@ int do_ddr_test_dqs_window_step(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 								lcdlr_temp_count=dq_lcd_bdl_temp_reg_value;
 								sprintf(buf, "0x%08x", lcdlr_temp_count);
 								printf( "%s\n", buf);
-								if(test_temp_value_use_sticky_register)
+								if (test_temp_value_use_sticky_register)
 								{
 									writel(lcdlr_temp_count,(sticky_reg_base_add+(6<<2)));
 								}
 								else
 								{
-									setenv(env_lcdlr_temp_count, buf);
+									env_set(env_lcdlr_temp_count, buf);
 									run_command("save",0);
 								}
 							}
@@ -8923,14 +8890,14 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	unsigned int lcdlr_temp_count=0;
 	env_lcdlr_temp_count="lcdlr_temp_count_a";
 	unsigned int lcdlr_max=0;
-	if(test_temp_value_use_sticky_register)
+	if (test_temp_value_use_sticky_register)
 	{lcdlr_temp_count=readl((sticky_reg_base_add+(6<<2)));
 	}
 	else
 	{
 
-		temp_s= getenv(env_lcdlr_temp_count);
-		if(temp_s)
+		temp_s= env_get(env_lcdlr_temp_count);
+		if (temp_s)
 		{
 			lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 		}
@@ -8989,7 +8956,7 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					printf("\nshould pause ddl pir== 0x%08x,if no pause ddl ,write lcdlr some time may occour error\n", readl(DDR0_PUB_REG_BASE+4));
 					writel((readl(DDR0_PUB_REG_BASE+4))|(1<<29),(DDR0_PUB_REG_BASE+4));
 					printf("\n pause ddl pir== 0x%08x\n", readl(DDR0_PUB_REG_BASE+4));
-					if( channel_b_en)
+					if ( channel_b_en)
 					{	printf("\nddr1 should pause ddl pir== 0x%08x,if no pause ddl ,write lcdlr some time may occour error\n", readl(DDR1_PUB_REG_BASE+4));
 						writel((readl(DDR1_PUB_REG_BASE+4))|(1<<29),(DDR1_PUB_REG_BASE+4));
 						printf("\n ddr1 pause ddl pir== 0x%08x\n", readl(DDR1_PUB_REG_BASE+4));
@@ -8997,11 +8964,11 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					if (test_lane_step>2)
 						test_lane_step=0;
 					printf("\ntest_lane_step==0x%08x\n ",test_lane_step);
-					if(test_lane_step==0)
+					if (test_lane_step == 0)
 					{reg_add=DDR0_PUB_ACLCDLR+reg_base_adj;
 						lcdlr_max=ACLCDLR_MAX;
 					}
-					if(test_lane_step==1)
+					if (test_lane_step == 1)
 					{reg_add=DDR0_PUB_ACBDLR0+reg_base_adj;
 						lcdlr_max=ACBDLR_MAX;
 					}
@@ -9011,17 +8978,17 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					dq_lcd_bdl_reg_org=dq_lcd_bdl_temp_reg_value;
 					printf("\nreg_add_0x%08x==0x%08x\n ",reg_add,dq_lcd_bdl_temp_reg_value);
 
-					if(test_lane_step==0)
+					if (test_lane_step == 0)
 					{dq_lcd_bdl_temp_reg_value=(((readl(reg_add))&ACLCDLR_MAX));
 						dq_lcd_bdl_reg_org=dq_lcd_bdl_temp_reg_value;
 					}
-					if(test_lane_step==1)
+					if (test_lane_step == 1)
 					{dq_lcd_bdl_temp_reg_value=(((readl(reg_add))&ACBDLR_MAX));
 						dq_lcd_bdl_reg_org=dq_lcd_bdl_temp_reg_value;
 					}
 
 
-					if ((test_min_max_flag == 0)||( (test_min_max_flag == 2)))
+					if ((test_min_max_flag == 0) || ( (test_min_max_flag == 2)))
 					{
 						while (dq_lcd_bdl_temp_reg_value>0)
 						{
@@ -9033,13 +9000,13 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 								lcdlr_temp_count=dq_lcd_bdl_temp_reg_value;
 								sprintf(buf, "0x%08x", lcdlr_temp_count);
 								printf( "%s\n", buf);
-								if(test_temp_value_use_sticky_register)
+								if (test_temp_value_use_sticky_register)
 								{
 									writel(lcdlr_temp_count,(sticky_reg_base_add+(6<<2)));
 								}
 								else
 								{
-									setenv(env_lcdlr_temp_count, buf);
+									env_set(env_lcdlr_temp_count, buf);
 									run_command("save",0);
 								}
 
@@ -9111,13 +9078,13 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 								lcdlr_temp_count=dq_lcd_bdl_temp_reg_value;
 								sprintf(buf, "0x%08x", lcdlr_temp_count);
 								printf( "%s\n", buf);
-								if(test_temp_value_use_sticky_register)
+								if (test_temp_value_use_sticky_register)
 								{
 									writel(lcdlr_temp_count,(sticky_reg_base_add+(6<<2)));
 								}
 								else
 								{
-									setenv(env_lcdlr_temp_count, buf);
+									env_set(env_lcdlr_temp_count, buf);
 									run_command("save",0);
 								}
 							}
@@ -9169,7 +9136,7 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	dq_lcd_bdl_temp_reg_value=(dq_lcd_bdl_reg_right_min<<16)|dq_lcd_bdl_reg_left_min;
 
 	{if(channel_a_en){
-						 if(test_lane_step==0)
+						 if (test_lane_step == 0)
 						 {
 							 dq_lcd_bdl_value_aclcdlr_org_a=dq_lcd_bdl_reg_org;
 							 if (test_min_max_flag != 1)
@@ -9177,7 +9144,7 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 							 if (test_min_max_flag != 2)
 								 dq_lcd_bdl_value_aclcdlr_max_a=dq_lcd_bdl_reg_right_min;
 						 }
-						 if(test_lane_step==1)
+						 if (test_lane_step == 1)
 						 {
 							 dq_lcd_bdl_value_bdlr0_org_a=dq_lcd_bdl_reg_org;
 							 if (test_min_max_flag != 1)
@@ -9188,7 +9155,7 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					 }
 	if (channel_b_en)
 	{
-		if(test_lane_step==0)
+		if (test_lane_step == 0)
 		{
 			dq_lcd_bdl_value_aclcdlr_org_b=dq_lcd_bdl_reg_org;
 			if (test_min_max_flag != 1)
@@ -9196,7 +9163,7 @@ int do_ddr_test_lcdlr_clk_step(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			if (test_min_max_flag != 2)
 				dq_lcd_bdl_value_aclcdlr_max_b=dq_lcd_bdl_reg_right_min;
 		}
-		if(test_lane_step==1)
+		if (test_lane_step == 1)
 		{
 			dq_lcd_bdl_value_bdlr0_org_b=dq_lcd_bdl_reg_org;
 			if (test_min_max_flag != 1)
@@ -9281,7 +9248,7 @@ int do_ddr_test_dqs_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 	//argv2[2]=argv[3];
 	//#include <stdio.h>
 	//   unsigned int   wr_adj_per[24] ;
-	if(1)
+	if (1)
 	{
 		printf("\ntest use uboot env\n");
 		{
@@ -9297,7 +9264,7 @@ int do_ddr_test_dqs_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 			// int value=0;
 
 			///varname="env_ddrtest";
-			s = getenv("env_wr_lcdlr_pr");
+			s = env_get("env_wr_lcdlr_pr");
 			if (s)
 			{//i=0;
 				//while(s_temp)
@@ -9313,18 +9280,18 @@ int do_ddr_test_dqs_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 					//sscanf(s,"d%,",wr_adj_per);
 					//sprintf(str,"d%",s);
 					//getc
-					//       if (strlen(s) > 16) 
+					//       if (strlen(s) > 16)
 					{
 						//   sscanf(s, "%08x, %08x, %08x, \n",
 						//          &wr_adj_per[0], &wr_adj_per[1], &wr_adj_per[2]);
-					} 
+					}
 				}
 			}
 		}
 	}
 	// unsigned int = 0, max = 0xff, min = 0x00;
 	/*
-	   if(0)
+	   if (0)
 	   {
 	   {printf("\ntest use uboot env\n");
 	   {
@@ -9335,7 +9302,7 @@ int do_ddr_test_dqs_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 	int value=0;
 
 	///varname="env_ddrtest";
-	s = getenv("env_wr_lcdlr_pr");
+	s = env_get("env_wr_lcdlr_pr");
 	if (s)
 	{//i=0;
 	//while(s_temp)
@@ -9356,7 +9323,7 @@ int do_ddr_test_dqs_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 	value = simple_strtoull_ddr(s, &endp, 16);
 	printf("%d",value);
 	}
-	s = getenv("env_rd_lcdlr_pr");
+	s = env_get("env_rd_lcdlr_pr");
 
 	if (s)
 	{//i=0;
@@ -9370,7 +9337,7 @@ int do_ddr_test_dqs_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 	}
 
 	//sprintf(str, "%lx", value);
-	//  setenv("env_ddrtest", str);
+	//  env_set("env_ddrtest", str);
 
 
 	//run_command("save",0);
@@ -9378,9 +9345,9 @@ int do_ddr_test_dqs_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 
 	if (argc>24+2)
 	argc=24+2;
-	for(i = 2;i<argc;i++)
+	for (i = 2;i<argc;i++)
 	{
-	if(i<(2+12)){
+	if (i<(2+12)) {
 	wr_adj_per[i-2]=simple_strtoull_ddr(argv[i], &endp, 16);
 	}
 	else
@@ -9392,13 +9359,13 @@ int do_ddr_test_dqs_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 
 	}
 	printf(" int wr_adj_per[12]={\n");
-	for(i = 0;i<12;i++)
+	for (i = 0;i<12;i++)
 	{
 	printf("%04d ,\n",wr_adj_per[i]);
 }
 printf("};\n");
 printf(" int rd_adj_per[12]={\n");
-for(i = 0;i<12;i++)
+for (i = 0;i<12;i++)
 {
 	printf("%04d ,\n",rd_adj_per[i]);
 }
@@ -9796,7 +9763,7 @@ int do_ddr_test_fine_tune_dqs_step(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 							while (dq_lcd_bdl_temp_reg_value_wdqd>0)
 							{
-								if(test_min_max)
+								if (test_min_max)
 								{break;
 								}
 								temp_test_error=0;
@@ -10208,10 +10175,10 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	unsigned int *num_arry_lane1=NULL;
 	unsigned int *num_arry_lane2=NULL;
 	unsigned int *num_arry_lane3=NULL;
-	char *name_lane0; 
-	char *name_lane1; 
-	char *name_lane2; 
-	char *name_lane3; 
+	char *name_lane0;
+	char *name_lane1;
+	char *name_lane2;
+	char *name_lane3;
 	num_arry = (unsigned int *)(&str_to_numarry);
 	int i;
 	char *varname;  char *env_lcdlr_temp_count;
@@ -10225,14 +10192,14 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	name_lane2="ddr_test_data_lane2";
 	name_lane3="ddr_test_data_lane3";
 	env_lcdlr_temp_count="lcdlr_temp_count";
-	s = getenv(varname);
+	s = env_get(varname);
 	if (s)
 	{//i=0;
 		//while(s_temp)
 		{
 			env_to_num(varname,num_arry);//unsigned int *num_arry
-			temp_s= getenv(env_lcdlr_temp_count);
-			if(temp_s)
+			temp_s= env_get(env_lcdlr_temp_count);
+			if (temp_s)
 			{
 				lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 			}
@@ -10240,7 +10207,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			{lcdlr_temp_count=0;
 			}
 
-			if(0){
+			if (0) {
 				env_to_num(name_lane0,num_arry_lane0);//unsigned int *num_arry
 				env_to_num(name_lane1,num_arry_lane1);//unsigned int *num_arry
 				env_to_num(name_lane2,num_arry_lane2);//unsigned int *num_arry
@@ -10252,7 +10219,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				printf("str_to_numarry[%d]==%d\n",i,num_arry[i]);
 			}
 			//for (lane_step = 0;lane_step< 4;lane_step++)
-			if(0)
+			if (0)
 			{
 				for (i = 0; i < 8; i++) {
 
@@ -10275,18 +10242,18 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			//sscanf(s,"d%,",wr_adj_per);
 			//sprintf(str,"d%",s);
 			//getc
-			//       if (strlen(s) > 16) 
+			//       if (strlen(s) > 16)
 			{
 				//   sscanf(s, "%08x, %08x, %08x, \n",
 				//          &wr_adj_per[0], &wr_adj_per[1], &wr_adj_per[2]);
-			} 
+			}
 		}
 	}
 	else
 	{
 		printf("no env set,exit\n");
 		return 0;}
-	s = getenv(varname);//for debug display env   should add
+	s = env_get(varname);//for debug display env   should add
 
 
 	///*
@@ -10312,18 +10279,18 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	printf("test_arg_3_freq==%d\n",test_arg_3_freq);
 	printf("test_arg_4_step_status==%d\n",test_arg_4_step_status);
 
-	if(test_arg_2_step)
+	if (test_arg_2_step)
 	{
-		if(test_arg_3_freq!=global_ddr_clk)
+		if (test_arg_3_freq != global_ddr_clk)
 		{
 			printf("running ddr freq==%d,but test freq is%d,will reboot use d2pll \n",global_ddr_clk,test_arg_3_freq);
 			sprintf(str,"d2pll  %d",test_arg_3_freq);
 			printf("\nstr=%s\n",str);
 			run_command(str,0);
-			while(1);
+			while (1) ;
 		}
 	}
-	if(test_arg_2_step==0)
+	if (test_arg_2_step == 0)
 	{
 		{
 			test_arg_0_cmd0=0x22;
@@ -10414,39 +10381,39 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			printf("DDR0_PUB_DX1GCR0==%x\n",(readl(DDR0_PUB_DX1GCR0)));
 			printf("DDR0_PUB_DX2GCR0==%x\n",(readl(DDR0_PUB_DX2GCR0)));
 			printf("DDR0_PUB_DX3GCR0==%x\n",(readl(DDR0_PUB_DX3GCR0)));
-			if(((readl(DDR0_PUB_DX0GCR0))&1)==0)
-				lane_disable=   lane_disable|1;      
-			if(((readl(DDR0_PUB_DX1GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<1);   
-			if(((readl(DDR0_PUB_DX2GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<2);   
-			if(((readl(DDR0_PUB_DX3GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<3);   
+			if (((readl(DDR0_PUB_DX0GCR0))&1) == 0)
+				lane_disable=   lane_disable|1;
+			if (((readl(DDR0_PUB_DX1GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<1);
+			if (((readl(DDR0_PUB_DX2GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<2);
+			if (((readl(DDR0_PUB_DX3GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<3);
 
 #endif
-			if(lane_disable)
+			if (lane_disable)
 			{if(lane_disable&0x1){
 									 dq_lcd_bdl_value_wdq_status_a[0]=4;
 									 dq_lcd_bdl_value_rdqs_status_a[0]=4;
 								 }
-			if(lane_disable&0x2){
+			if (lane_disable&0x2) {
 				dq_lcd_bdl_value_wdq_status_a[1]=4;
 				dq_lcd_bdl_value_rdqs_status_a[1]=4;
 			}
-			if(lane_disable&0x4){
+			if (lane_disable&0x4) {
 				dq_lcd_bdl_value_wdq_status_a[2]=4;
 				dq_lcd_bdl_value_rdqs_status_a[2]=4;
 			}
-			if(lane_disable&0x8){
+			if (lane_disable&0x8) {
 				dq_lcd_bdl_value_wdq_status_a[3]=4;
 				dq_lcd_bdl_value_rdqs_status_a[3]=4;
 			}
 			printf("lane_disable==%x\n",lane_disable);
-			if(lane_disable&0x10){
+			if (lane_disable&0x10) {
 				dq_lcd_bdl_value_aclcdlr_status_a=4;
 				printf("dq_lcd_bdl_value_aclcdlr_status_a==%x\n",dq_lcd_bdl_value_aclcdlr_status_a);
 			}
-			if(lane_disable&0x20){
+			if (lane_disable&0x20) {
 				dq_lcd_bdl_value_bdlr0_status_a=4;
 				printf("dq_lcd_bdl_value_bdlr0_status_a==%x\n",dq_lcd_bdl_value_bdlr0_status_a);
 
@@ -10484,7 +10451,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				}
 			}
 
-			if(0){
+			if (0) {
 				for (i = 0; i < 8; i++) {
 					num_arry_lane0[i]=num_arry[8+i];
 				}
@@ -10512,7 +10479,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 		for (i = 0; i < 48; i++) {
 			sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 			sprintf(str_temp2,"0x%08x",num_arry[i]);
-			setenv(str_temp1, str_temp2);
+			env_set(str_temp1, str_temp2);
 			run_command("save",0);
 		}
 
@@ -10532,20 +10499,20 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	}
 	//sprintf(str, "%lx", value);
 	printf("%s", str);
-	setenv(varname, str);
+	env_set(varname, str);
 	run_command("save",0);
 
 
 	i=2;
 	sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 	sprintf(str_temp2,"0x%08x",num_arry[i]);
-	setenv(str_temp1, str_temp2);
+	env_set(str_temp1, str_temp2);
 	run_command("save",0);
 
 	for (i = 8; i < 48; i++) {
 		sprintf(str_temp1,"ddr_test_data_num_%04d",i);
-		temp_s1= getenv(str_temp1);
-		if(temp_s1)
+		temp_s1= env_get(str_temp1);
+		if (temp_s1)
 		{
 			num_arry[i]= simple_strtoull_ddr(temp_s1, &endp, 0);
 		}
@@ -10607,16 +10574,16 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			   lcdlr_temp_count=dq_lcd_bdl_temp_reg_value;
 			   sprintf(buf, "0x%08x", lcdlr_temp_count);
 			   printf( "%s", buf);
-			   setenv(env_lcdlr_temp_count, buf);
+			   env_set(env_lcdlr_temp_count, buf);
 			   run_command("save",0);
 			   }
 			   */
-			if((dq_lcd_bdl_value_wdq_status_a[lane_step]==0xffff)
+			if ((dq_lcd_bdl_value_wdq_status_a[lane_step] == 0xffff)
 					||(dq_lcd_bdl_value_wdq_status_a[lane_step]==0)
 					||(dq_lcd_bdl_value_wdq_status_a[lane_step]==1)
 			  )
 			{
-				if((dq_lcd_bdl_value_wdq_status_a[lane_step]==0xffff)
+				if ((dq_lcd_bdl_value_wdq_status_a[lane_step] == 0xffff)
 						||(dq_lcd_bdl_value_wdq_status_a[lane_step]==0))
 				{		dq_lcd_bdl_value_wdq_status_a[lane_step]=1;
 					{
@@ -10625,13 +10592,13 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 							i=8+lane_step*8+3;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 						lcdlr_temp_count=0;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s", buf);
-						setenv(env_lcdlr_temp_count, buf);
+						env_set(env_lcdlr_temp_count, buf);
 						run_command("save",0);
 					}
 
@@ -10648,8 +10615,8 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				}
 				else if (dq_lcd_bdl_value_wdq_status_a[lane_step]==1)
 				{
-					temp_s= getenv(env_lcdlr_temp_count);
-					if(temp_s)
+					temp_s= env_get(env_lcdlr_temp_count);
+					if (temp_s)
 					{
 						lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 					}
@@ -10668,12 +10635,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					i=8+lane_step*8+1;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 					i=8+lane_step*8+3;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 				}
 
@@ -10681,7 +10648,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_wdq_status_a[lane_step]==2)||
+			if ((dq_lcd_bdl_value_wdq_status_a[lane_step] == 2) ||
 					(dq_lcd_bdl_value_wdq_status_a[lane_step]==3))
 			{
 				//	if((dq_lcd_bdl_value_wdq_min_a[lane_step])==0xffff)
@@ -10691,21 +10658,21 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				//		}
 
 				{
-					if(dq_lcd_bdl_value_wdq_status_a[lane_step]==2)
+					if (dq_lcd_bdl_value_wdq_status_a[lane_step] == 2)
 					{		dq_lcd_bdl_value_wdq_status_a[lane_step]=3;
 						{
 							num_arry[8+lane_step*4*2+3]=dq_lcd_bdl_value_wdq_status_a[lane_step];
 							i=8+lane_step*8+3;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 						{
 							lcdlr_temp_count=0;
 							sprintf(buf, "0x%08x", lcdlr_temp_count);
 							printf( "%s", buf);
-							setenv(env_lcdlr_temp_count, buf);
+							env_set(env_lcdlr_temp_count, buf);
 							run_command("save",0);
 						}
 
@@ -10722,8 +10689,8 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					}
 					else if (dq_lcd_bdl_value_wdq_status_a[lane_step]==3)
 					{
-						temp_s= getenv(env_lcdlr_temp_count);
-						if(temp_s)
+						temp_s= env_get(env_lcdlr_temp_count);
+						if (temp_s)
 						{
 							lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 						}
@@ -10741,12 +10708,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 						i=8+lane_step*8+2;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 						i=8+lane_step*8+3;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 					}
 
@@ -10756,12 +10723,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			}
 
 
-			if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==0xffff)
+			if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 0xffff)
 					||(dq_lcd_bdl_value_rdqs_status_a[lane_step]==0)
 					||(dq_lcd_bdl_value_rdqs_status_a[lane_step]==1)
 			  )
 			{
-				if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==0xffff)
+				if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 0xffff)
 						||(dq_lcd_bdl_value_rdqs_status_a[lane_step]==0))
 				{		dq_lcd_bdl_value_rdqs_status_a[lane_step]=1;
 					{
@@ -10769,14 +10736,14 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 						i=8+lane_step*8+7;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 					}
 					{
 						lcdlr_temp_count=0;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s", buf);
-						setenv(env_lcdlr_temp_count, buf);
+						env_set(env_lcdlr_temp_count, buf);
 						run_command("save",0);
 					}
 
@@ -10793,8 +10760,8 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				}
 				else if (dq_lcd_bdl_value_rdqs_status_a[lane_step]==1)
 				{
-					temp_s= getenv(env_lcdlr_temp_count);
-					if(temp_s)
+					temp_s= env_get(env_lcdlr_temp_count);
+					if (temp_s)
 					{
 						lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 					}
@@ -10812,25 +10779,25 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					i=8+lane_step*8+5;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 					i=8+lane_step*8+7;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 				}
 
 				run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==2)||
+			if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 2) ||
 					(dq_lcd_bdl_value_rdqs_status_a[lane_step]==3))
 			{
 
 				{
-					if(dq_lcd_bdl_value_rdqs_status_a[lane_step]==2)
-					{	
+					if (dq_lcd_bdl_value_rdqs_status_a[lane_step] == 2)
+					{
 
 						dq_lcd_bdl_value_rdqs_status_a[lane_step]=3;
 						{
@@ -10838,7 +10805,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 							i=8+lane_step*8+7;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 
@@ -10846,7 +10813,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 							lcdlr_temp_count=0;
 							sprintf(buf, "0x%08x", lcdlr_temp_count);
 							printf( "%s", buf);
-							setenv(env_lcdlr_temp_count, buf);
+							env_set(env_lcdlr_temp_count, buf);
 							run_command("save",0);
 						}
 
@@ -10863,8 +10830,8 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					}
 					else if (dq_lcd_bdl_value_rdqs_status_a[lane_step]==3)
 					{
-						temp_s= getenv(env_lcdlr_temp_count);
-						if(temp_s)
+						temp_s= env_get(env_lcdlr_temp_count);
+						if (temp_s)
 						{
 							lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 						}
@@ -10883,12 +10850,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 						i=8+lane_step*8+6;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 						i=8+lane_step*8+7;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 					}
 					run_command("reset",0);
@@ -10897,7 +10864,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			}
 
 			/*
-			   if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==0xffff)||
+			   if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 0xffff) ||
 			   (dq_lcd_bdl_value_rdqs_status_a[lane_step]==0))
 			   {dq_lcd_bdl_value_rdqs_status_a[lane_step]=0;
 			   sprintf(str,"ddr_tune_dqs_step  a 0 0x%08x %d %d",ddr_test_size,( lane_step*2+1),2);
@@ -10916,7 +10883,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==1)||
+			if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 1) ||
 			(dq_lcd_bdl_value_rdqs_status_a[lane_step]==2))
 			{dq_lcd_bdl_value_rdqs_status_a[lane_step]=2;
 			sprintf(str,"ddr_tune_dqs_step  a 0 0x%08x %d %d",ddr_test_size,( lane_step*2+1),1);
@@ -10934,7 +10901,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			num_to_env(varname,num_arry);
 			run_command("reset",0);
 			}
-			*/	
+			*/
 
 
 			ddr_test_watchdog_disable(); //s
@@ -10961,12 +10928,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			printf("\ndq_lcd_bdl_value_aclcdlr_status_a %d \n",dq_lcd_bdl_value_aclcdlr_status_a);
 			lane_step=4;
 			env_lcdlr_temp_count="lcdlr_temp_count_a";
-			if((dq_lcd_bdl_value_aclcdlr_status_a>=0xffff)
+			if ((dq_lcd_bdl_value_aclcdlr_status_a >= 0xffff)
 					||(dq_lcd_bdl_value_aclcdlr_status_a==0)
 					||(dq_lcd_bdl_value_aclcdlr_status_a==1)
 			  )
 			{
-				if((dq_lcd_bdl_value_aclcdlr_status_a>=0xffff)
+				if ((dq_lcd_bdl_value_aclcdlr_status_a >= 0xffff)
 						||(dq_lcd_bdl_value_aclcdlr_status_a==0))
 				{		dq_lcd_bdl_value_aclcdlr_status_a=1;
 					{
@@ -10976,14 +10943,14 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 							printf("aclcdlr_status_a==0x%08x\n",num_arry[i]);
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 						printf("\n222test lcdlr ac bdlr window lane a...\n");
 						lcdlr_temp_count=0;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s", buf);
-						setenv(env_lcdlr_temp_count, buf);
+						env_set(env_lcdlr_temp_count, buf);
 						run_command("save",0);
 					}
 
@@ -11003,8 +10970,8 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				}
 				else if (dq_lcd_bdl_value_aclcdlr_status_a==1)
 				{
-					temp_s= getenv(env_lcdlr_temp_count);
-					if(temp_s)
+					temp_s= env_get(env_lcdlr_temp_count);
+					if (temp_s)
 					{
 						lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 					}
@@ -11023,12 +10990,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					i=8+lane_step*8+1;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 					i=8+lane_step*8+3;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 				}
 
@@ -11036,7 +11003,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_aclcdlr_status_a==2)||
+			if ((dq_lcd_bdl_value_aclcdlr_status_a == 2) ||
 					(dq_lcd_bdl_value_aclcdlr_status_a==3))
 			{
 				//	if((dq_lcd_bdl_value_wdq_min_a[lane_step])==0xffff)
@@ -11046,21 +11013,21 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				//		}
 
 				{
-					if(dq_lcd_bdl_value_aclcdlr_status_a==2)
+					if (dq_lcd_bdl_value_aclcdlr_status_a == 2)
 					{		dq_lcd_bdl_value_aclcdlr_status_a=3;
 						{
 							num_arry[8+lane_step*4*2+3]=dq_lcd_bdl_value_aclcdlr_status_a;
 							i=8+lane_step*8+3;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 						{
 							lcdlr_temp_count=0;
 							sprintf(buf, "0x%08x", lcdlr_temp_count);
 							printf( "%s", buf);
-							setenv(env_lcdlr_temp_count, buf);
+							env_set(env_lcdlr_temp_count, buf);
 							run_command("save",0);
 						}
 
@@ -11077,8 +11044,8 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					}
 					else if (dq_lcd_bdl_value_aclcdlr_status_a==3)
 					{
-						temp_s= getenv(env_lcdlr_temp_count);
-						if(temp_s)
+						temp_s= env_get(env_lcdlr_temp_count);
+						if (temp_s)
 						{
 							lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 						}
@@ -11096,12 +11063,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 						i=8+lane_step*8+2;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 						i=8+lane_step*8+3;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 					}
 
@@ -11111,12 +11078,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			}
 
 
-			if((dq_lcd_bdl_value_bdlr0_status_a==0xffff)
+			if ((dq_lcd_bdl_value_bdlr0_status_a == 0xffff)
 					||(dq_lcd_bdl_value_bdlr0_status_a==0)
 					||(dq_lcd_bdl_value_bdlr0_status_a==1)
 			  )
 			{
-				if((dq_lcd_bdl_value_bdlr0_status_a==0xffff)
+				if ((dq_lcd_bdl_value_bdlr0_status_a == 0xffff)
 						||(dq_lcd_bdl_value_bdlr0_status_a==0))
 				{		dq_lcd_bdl_value_bdlr0_status_a=1;
 					{
@@ -11124,14 +11091,14 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 						i=8+lane_step*8+7;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 					}
 					{
 						lcdlr_temp_count=0;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s", buf);
-						setenv(env_lcdlr_temp_count, buf);
+						env_set(env_lcdlr_temp_count, buf);
 						run_command("save",0);
 					}
 
@@ -11148,8 +11115,8 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				}
 				else if (dq_lcd_bdl_value_bdlr0_status_a==1)
 				{
-					temp_s= getenv(env_lcdlr_temp_count);
-					if(temp_s)
+					temp_s= env_get(env_lcdlr_temp_count);
+					if (temp_s)
 					{
 						lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 					}
@@ -11167,25 +11134,25 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					i=8+lane_step*8+5;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 					i=8+lane_step*8+7;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 				}
 
 				run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_bdlr0_status_a==2)||
+			if ((dq_lcd_bdl_value_bdlr0_status_a == 2) ||
 					(dq_lcd_bdl_value_bdlr0_status_a==3))
 			{
 
 				{
-					if(dq_lcd_bdl_value_bdlr0_status_a==2)
-					{	
+					if (dq_lcd_bdl_value_bdlr0_status_a == 2)
+					{
 
 						dq_lcd_bdl_value_bdlr0_status_a=3;
 						{
@@ -11193,7 +11160,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 							i=8+lane_step*8+7;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 
@@ -11201,7 +11168,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 							lcdlr_temp_count=0;
 							sprintf(buf, "0x%08x", lcdlr_temp_count);
 							printf( "%s", buf);
-							setenv(env_lcdlr_temp_count, buf);
+							env_set(env_lcdlr_temp_count, buf);
 							run_command("save",0);
 						}
 
@@ -11218,8 +11185,8 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					}
 					else if (dq_lcd_bdl_value_bdlr0_status_a==3)
 					{
-						temp_s= getenv(env_lcdlr_temp_count);
-						if(temp_s)
+						temp_s= env_get(env_lcdlr_temp_count);
+						if (temp_s)
 						{
 							lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 						}
@@ -11238,12 +11205,12 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 						i=8+lane_step*8+6;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 						i=8+lane_step*8+7;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						setenv(str_temp1, str_temp2);
+						env_set(str_temp1, str_temp2);
 						run_command("save",0);
 					}
 					run_command("reset",0);
@@ -11252,7 +11219,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			}
 
 			/*
-			   if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==0xffff)||
+			   if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 0xffff) ||
 			   (dq_lcd_bdl_value_rdqs_status_a[lane_step]==0))
 			   {dq_lcd_bdl_value_rdqs_status_a[lane_step]=0;
 			   sprintf(str,"ddr_tune_dqs_step  a 0 0x%08x %d %d",ddr_test_size,( lane_step*2+1),2);
@@ -11271,7 +11238,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==1)||
+			if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 1) ||
 			(dq_lcd_bdl_value_rdqs_status_a[lane_step]==2))
 			{dq_lcd_bdl_value_rdqs_status_a[lane_step]=2;
 			sprintf(str,"ddr_tune_dqs_step  a 0 0x%08x %d %d",ddr_test_size,( lane_step*2+1),1);
@@ -11289,7 +11256,7 @@ int do_ddr_test_dqs_window_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 			num_to_env(varname,num_arry);
 			run_command("reset",0);
 			}
-			*/	
+			*/
 
 
 			ddr_test_watchdog_disable(); //s
@@ -11473,7 +11440,7 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #define DDR3_ODT_20OHM		4
 #define DDR3_ODT_30OHM		5
 
-	// lpddr2 drv odt 
+	// lpddr2 drv odt
 #define LPDDR2_DRV_34OHM	1
 #define LPDDR2_DRV_40OHM	2
 #define LPDDR2_DRV_48OHM	3
@@ -11482,7 +11449,7 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #define LPDDR2_DRV_120OHM	7
 #define LPDDR2_ODT_0OHM		0
 
-	// lpddr3 drv odt 
+	// lpddr3 drv odt
 #define LPDDR3_DRV_34OHM	1
 #define LPDDR3_DRV_40OHM	2
 #define LPDDR3_DRV_48OHM	3
@@ -11538,7 +11505,7 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		zqcr = 0;
 	}
 
-	if(zqcr==0xffffffff)
+	if (zqcr == 0xffffffff)
 	{
 		ddr_full_test_enable=1;
 		zqcr=0;}
@@ -11622,25 +11589,25 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			soc_dram_drv_odt_use_vlaue = 0;
 		}
 	}
-	if(soc_dram_drv_odt_use_vlaue)
+	if (soc_dram_drv_odt_use_vlaue)
 	{if(zqcr)
 		{printf("zqcr[0x%08x],\n", zqcr);
 			{
 				soc_ac_drv=zqcr%100;
-				if(soc_ac_drv>100)
+				if (soc_ac_drv>100)
 				{soc_ac_drv=0;}
-				if(soc_ac_drv==0)
+				if (soc_ac_drv == 0)
 				{soc_ac_drv=1;}
 				soc_ac_drv=(480/soc_ac_drv)-1;
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
-					if(soc_ac_drv>0xf)
+					if (soc_ac_drv>0xf)
 					{soc_ac_drv=zq0pr_org&0xf;}
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
-					if(soc_ac_drv>0xf)
+					if (soc_ac_drv>0xf)
 					{soc_ac_drv=(zq0pr_org>>8)&0xf;}
 				}
 			}
@@ -11648,22 +11615,22 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 			{
 				soc_ac_odt=zqcr/100;
-				if(soc_ac_odt>240)
+				if (soc_ac_odt>240)
 				{soc_ac_odt=480;}
-				if(soc_ac_odt==0)
+				if (soc_ac_odt == 0)
 				{soc_ac_odt=1;}
 
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
 					soc_ac_odt=(360/soc_ac_odt)-1;
-					if(soc_ac_odt>0xf)
+					if (soc_ac_odt>0xf)
 					{soc_ac_odt=(zq0pr_org>>4)&0xf;}
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
 					soc_ac_odt=(480/soc_ac_odt)-1;
-					if(soc_ac_odt>0xf)
+					if (soc_ac_odt>0xf)
 					{soc_ac_odt=(zq0pr_org>>16)&0xf;}
 				}
 			}
@@ -11671,16 +11638,16 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			zqcr=(soc_ac_odt<<16)|(soc_ac_drv<<12)|(soc_ac_drv<<8)|(soc_ac_odt<<4)|(soc_ac_drv);
 			printf("zqcr[0x%08x],soc_ac_odt [0x%08x],soc_ac_drv [0x%08x]\n", zqcr,soc_ac_odt,soc_ac_drv);
 		}
-		if(zqpr_soc_dram)
+		if (zqpr_soc_dram)
 		{printf("zqpr_soc_dram[0x%08x],\n", zqpr_soc_dram);
 			{
 				soc_data_drv=zqpr_soc_dram%100;
 				printf("soc_data_drv[%d],\n", soc_data_drv);
-				if(soc_data_drv>100)
+				if (soc_data_drv>100)
 				{soc_data_drv=0;
 
 				}
-				if(soc_data_drv==0)
+				if (soc_data_drv == 0)
 				{soc_data_drv=1;
 					//soc_data_drv_odt_adj_enable=0;
 				}
@@ -11689,14 +11656,14 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				}
 				soc_data_drv=(480/soc_data_drv)-1;
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
-					if(soc_data_drv>0xf)
+					if (soc_data_drv>0xf)
 					{soc_data_drv=zq1pr_org&0xf;}
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
-					if(soc_data_drv>0xf)
+					if (soc_data_drv>0xf)
 					{soc_data_drv=(zq1pr_org>>8)&0xf;}
 				}
 			}
@@ -11705,22 +11672,22 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			{
 				soc_data_odt=(zqpr_soc_dram/100)%1000;
 				printf("soc_data_odt[%d],\n", soc_data_odt);
-				if(soc_data_odt>240)
+				if (soc_data_odt>240)
 				{soc_data_odt=360;}
-				if(soc_data_odt==0)
+				if (soc_data_odt == 0)
 				{soc_data_odt=1;}
 
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
 					soc_data_odt=(360/soc_data_odt)-1;
-					if(soc_data_odt>0xf)
+					if (soc_data_odt>0xf)
 					{soc_data_odt=(zq1pr_org>>4)&0xf;}
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
 					soc_data_odt=(480/soc_data_odt)-1;
-					if(soc_data_odt>0xf)
+					if (soc_data_odt>0xf)
 					{soc_data_odt=(zq1pr_org>>16)&0xf;}
 				}
 
@@ -11732,18 +11699,18 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				dram_drv=(zqpr_soc_dram/100000)%100;
 				printf("dram_drv[%d],\n", dram_drv);
 
-				if(dram_drv>100)
+				if (dram_drv>100)
 				{dram_drv=0;}
-				if(dram_drv==0)
+				if (dram_drv == 0)
 				{
 					dram_data_drv_adj_enable=0;}
 				else
 				{dram_data_drv_adj_enable=1;
 				}
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
-					if(dram_drv>=40)
+					if (dram_drv >= 40)
 					{dram_drv=0;}
 
 					else
@@ -11752,9 +11719,9 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				}
 
 
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
-					if(dram_drv<48)
+					if (dram_drv<48)
 					{dram_drv=0;}
 
 					else
@@ -11767,9 +11734,9 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			{
 				dram_odt=(zqpr_soc_dram/100000)/100;
 				printf("dram_odt[%d],\n", dram_odt);
-				if(dram_odt>240)
+				if (dram_odt>240)
 				{dram_odt=480;}
-				if(dram_odt==0)
+				if (dram_odt == 0)
 				{
 					dram_data_odt_adj_enable=0;
 				}
@@ -11778,9 +11745,9 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				}
 
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
-					if(dram_odt>160)
+					if (dram_odt>160)
 					{dram_odt=0;}
 					else if (dram_odt>90)
 					{dram_odt=2;}
@@ -11794,9 +11761,9 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 					{dram_odt=4;}
 
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
-					if(dram_odt>280)
+					if (dram_odt>280)
 					{dram_odt=0;}
 					else if (dram_odt>180)
 					{dram_odt=4;}
@@ -11908,7 +11875,7 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	dram_odt=(zqpr_soc_dram>>24)&0xf;
 	printf("setting zqpr_soc_dram [0x%08x],..bit28 enable soc_zqpr ,   bit 29 enabe dram_drv,   bit 30 enabel dram_odt\n", zqpr_soc_dram);
 	printf("soc_data_drv_odt [0x%08x],dram_drv [0x%08x],dram_odt [0x%08x]\n", soc_data_drv_odt,dram_drv,dram_odt);
-	if(ddr_full_test_enable)
+	if (ddr_full_test_enable)
 	{
 		pll=(ddr_full_test_enable<<21)|pll;
 		printf("ddr_full_test_enable %08x,set sticky reg1 bit 21 1\n", ddr_full_test_enable);
@@ -11939,7 +11906,7 @@ int do_ddr2pll_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	// *P_WATCHDOG_RESET = 0;
 	ddr_test_watchdog_reset_system();
 #endif
-	while(1);
+	while (1) ;
 	return 0;
 
 usage:
@@ -12104,16 +12071,16 @@ int do_ddr_uboot_new_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	writel(sticky_cmd, PREG_STICKY_REG1);
 
 	uint32_t read_value = 0;
-	if(value_size)
+	if (value_size)
 	{
 		read_value=rd_reg(G12_DMC_STICKY_0+((cmd_offset/4)<<2));
-		if(value_size==1){
+		if (value_size == 1) {
 			wr_reg((G12_DMC_STICKY_0+((cmd_offset/4)<<2)), ((cmd_value<<((cmd_offset%4)*8))|(read_value&(~(0xff<<((cmd_offset%4)*8))))));
 		}
-		if(value_size==2){
+		if (value_size == 2) {
 			wr_reg((G12_DMC_STICKY_0+((cmd_offset/4)<<2)), ((cmd_value<<((cmd_offset%4)*8))|(read_value&(~(0xffff<<((cmd_offset%4)*8))))));
 		}
-		if(value_size==4){
+		if (value_size == 4) {
 			//	wr_reg((G12_DMC_STICKY_0+cmd_offset/4), ((cmd_value<<((cmd_offset%4)*8))|(read_value&(~(0xffff<<((cmd_offset%4)*8))))));
 			wr_reg((G12_DMC_STICKY_0+((cmd_offset/4)<<2)), cmd_value);
 		}
@@ -12127,11 +12094,11 @@ int do_ddr_uboot_new_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 
 	printf("PREG_STICKY_REG0== [0x%08x]\n", readl(PREG_STICKY_REG0));
 
-	if(reset_enable)
+	if (reset_enable)
 	{
 		ddr_test_watchdog_reset_system();
 
-		while(1);
+		while (1) ;
 	}
 	return 0;
 
@@ -13635,7 +13602,7 @@ int do_ddr_test_ac_windows_aclcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 						while (ac_lcdlr_temp>0)
 						{
-							if(test_min_max)
+							if (test_min_max)
 							{break;
 							}
 							temp_test_error=0;
@@ -13719,7 +13686,7 @@ int do_ddr_test_ac_windows_aclcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 							ac_bdlr0_temp=readl(reg_add);
 							while (ac_bdlr0_temp>0)
 							{
-								if(test_min_max)
+								if (test_min_max)
 								{break;
 								}
 								temp_test_error=0;
@@ -14197,7 +14164,7 @@ int do_ddr_test_ac_windows_acbdlr_ck(cmd_tbl_t *cmdtp, int flag, int argc, char 
 
 						while (ac_lcdlr_temp>0)
 						{
-							if(test_min_max)
+							if (test_min_max)
 							{break;
 							}
 							temp_test_error=0;
@@ -17516,7 +17483,7 @@ U_BOOT_CMD(
 int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	printf("watchdog_time_s==%d\n",watchdog_time_s);
-	if(watchdog_time_s==0)
+	if (watchdog_time_s == 0)
 	{
 		watchdog_time_s=50;
 		printf("test soc_vref re set watchdog_time_s==%d\n",watchdog_time_s);
@@ -17591,33 +17558,33 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 	unsigned int  soc_iovref_test_ddr_clk=0;
 	sprintf(str_temp1,"ddr_soc_iovref_test_ddr_clk");
 	soc_iovref_test_ddr_clk=env_to_a_num(str_temp1);
-	if(soc_iovref_test_ddr_clk==0)
+	if (soc_iovref_test_ddr_clk == 0)
 	{
 		soc_iovref_test_ddr_clk=global_ddr_clk;
 		{
 			sprintf(str_temp1,"ddr_soc_iovref_test_ddr_clk");
 			sprintf(str_temp2,"0x%08x",soc_iovref_test_ddr_clk);
-			setenv(str_temp1, str_temp2);
+			env_set(str_temp1, str_temp2);
 			run_command("save",0);
 		}
 	}
-	if(soc_iovref_test_ddr_clk!=global_ddr_clk)
+	if (soc_iovref_test_ddr_clk != global_ddr_clk)
 	{
 		printf("running ddr freq==%d,but test freq is %d,will reboot use d2pll \n",global_ddr_clk,soc_iovref_test_ddr_clk);
 		sprintf(str,"d2pll  %d",soc_iovref_test_ddr_clk);
 		printf("\nstr=%s\n",str);
 		run_command(str,0);
-		while(1);
+		while (1) ;
 	}
 	unsigned int  soc_iovref_test_step=0;
 	sprintf(str_temp1,"soc_iovref_test_step");
 	soc_iovref_test_step=env_to_a_num(str_temp1);
-	if(soc_iovref_test_step==0)
+	if (soc_iovref_test_step == 0)
 		iovref_temp_value=0;
 	{
 		sprintf(str_temp1,"soc_iovref_test_step");
 		sprintf(str_temp2,"0x%08x",iovref_temp_value);
-		setenv(str_temp1, str_temp2);
+		env_set(str_temp1, str_temp2);
 		run_command("save",0);
 	}
 
@@ -17888,21 +17855,21 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 
 						sprintf(str_temp1,"ddr_soc_iovref_org");
 						ddr_soc_iovref_org=env_to_a_num(str_temp1);
-						if(ddr_soc_iovref_org==0)
+						if (ddr_soc_iovref_org == 0)
 						{
 							sprintf(str_temp1,"ddr_soc_iovref_org");
 							sprintf(str_temp2,"0x%08x",iovref_temp_value);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 
 							sprintf(str_temp1,"ddr_soc_iovref_lef");
 							sprintf(str_temp2,"0x%08x",iovref_temp_value);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 
 							sprintf(str_temp1,"ddr_soc_iovref_rig");
 							sprintf(str_temp2,"0x%08x",iovref_temp_value);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 						sprintf(str_temp1,"ddr_soc_iovref_lef");
@@ -17911,7 +17878,7 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 						soc_iovref_rig=env_to_a_num(str_temp1);
 
 
-						if(soc_iovref_lef)
+						if (soc_iovref_lef)
 						{;
 						}
 
@@ -17924,15 +17891,15 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 							{
 								sprintf(str_temp1,"soc_iovref_test_step");
 								sprintf(str_temp2,"0x%08x",soc_iovref_test_step);
-								setenv(str_temp1, str_temp2);
+								env_set(str_temp1, str_temp2);
 								run_command("save",0);
 							}
 							//break;
 						}
 
-						if(soc_iovref_test_step==0)
+						if (soc_iovref_test_step == 0)
 						{//int temp=0;
-							if(soc_iovref_lef)
+							if (soc_iovref_lef)
 							{iovref_temp_value=soc_iovref_lef;
 							}
 							while (iovref_temp_value>0x0)
@@ -17947,7 +17914,7 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 								{
 									sprintf(str_temp1,"ddr_soc_iovref_lef");
 									sprintf(str_temp2,"0x%08x",iovref_temp_value);
-									setenv(str_temp1, str_temp2);
+									env_set(str_temp1, str_temp2);
 									run_command("save",0);
 								}
 
@@ -18111,7 +18078,7 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 							{
 								sprintf(str_temp1,"ddr_soc_iovref_lef");
 								sprintf(str_temp2,"0x%08x",iovref_temp_value);
-								setenv(str_temp1, str_temp2);
+								env_set(str_temp1, str_temp2);
 								run_command("save",0);
 							}
 
@@ -18119,7 +18086,7 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 								soc_iovref_test_step=1;
 								sprintf(str_temp1,"soc_iovref_test_step");
 								sprintf(str_temp2,"0x%08x",soc_iovref_test_step);
-								setenv(str_temp1, str_temp2);
+								env_set(str_temp1, str_temp2);
 								run_command("save",0);
 								run_command("reset",0);
 							}
@@ -18191,9 +18158,9 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 						iovref_temp_value=((iovref_temp_value)&0xff);
 
 						//if(soc_iovref_rig==0)
-						if(soc_iovref_test_step==1)
+						if (soc_iovref_test_step == 1)
 						{
-							if(soc_iovref_rig)
+							if (soc_iovref_rig)
 							{iovref_temp_value=soc_iovref_rig;
 							}
 							while (iovref_temp_value<0x3f)
@@ -18207,7 +18174,7 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 								{
 									sprintf(str_temp1,"ddr_soc_iovref_rig");
 									sprintf(str_temp2,"0x%08x",iovref_temp_value);
-									setenv(str_temp1, str_temp2);
+									env_set(str_temp1, str_temp2);
 									run_command("save",0);
 								}
 
@@ -18373,7 +18340,7 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 						{
 							sprintf(str_temp1,"ddr_soc_iovref_rig");
 							sprintf(str_temp2,"0x%08x",iovref_temp_value);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 
@@ -18381,7 +18348,7 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 							soc_iovref_test_step=2;
 							sprintf(str_temp1,"soc_iovref_test_step");
 							sprintf(str_temp2,"0x%08x",soc_iovref_test_step);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 							//run_command("reset",0);
 						}
@@ -18458,20 +18425,20 @@ int do_ddr4_test_phy_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 				{
 					sprintf(str_temp1,"ddr_soc_iovref_org");
 					sprintf(str_temp2,"0x%08x",iovref_org[0]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 				}
 
 				{
 					sprintf(str_temp1,"ddr_soc_iovref_lef");
 					sprintf(str_temp2,"0x%08x",iovref_lef[0]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 				}
 				{
 					sprintf(str_temp1,"ddr_soc_iovref_rig");
 					sprintf(str_temp2,"0x%08x",iovref_rig[0]);
-					setenv(str_temp1, str_temp2);
+					env_set(str_temp1, str_temp2);
 					run_command("save",0);
 				}
 
@@ -18494,7 +18461,7 @@ int do_ddr4_test_dram_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 
 
 	printf("watchdog_time_s==%d\n",watchdog_time_s);
-	if(watchdog_time_s==0)
+	if (watchdog_time_s == 0)
 	{
 		watchdog_time_s=50;
 		printf("test dram_vref re set watchdog_time_s==%d\n",watchdog_time_s);
@@ -18747,22 +18714,22 @@ int do_ddr4_test_dram_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 	unsigned int  dram_iovref_test_ddr_clk=0;
 	sprintf(str_temp1,"ddr_dram_iovref_test_ddr_clk");
 	dram_iovref_test_ddr_clk=env_to_a_num(str_temp1);
-	if(dram_iovref_test_ddr_clk==0)
+	if (dram_iovref_test_ddr_clk == 0)
 	{dram_iovref_test_ddr_clk=global_ddr_clk;
 		{
 			sprintf(str_temp1,"ddr_dram_iovref_test_ddr_clk");
 			sprintf(str_temp2,"0x%08x",dram_iovref_test_ddr_clk);
-			setenv(str_temp1, str_temp2);
+			env_set(str_temp1, str_temp2);
 			run_command("save",0);
 		}
 	}
-	if(dram_iovref_test_ddr_clk!=global_ddr_clk)
+	if (dram_iovref_test_ddr_clk != global_ddr_clk)
 	{
 		printf("running ddr freq==%d,but test freq is%d,will reboot use d2pll \n",global_ddr_clk,dram_iovref_test_ddr_clk);
 		sprintf(str,"d2pll  %d",dram_iovref_test_ddr_clk);
 		printf("\nstr=%s\n",str);
 		run_command(str,0);
-		while(1);
+		while (1) ;
 	}
 
 
@@ -18770,9 +18737,9 @@ int do_ddr4_test_dram_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 		{
 			sprintf(str_temp1,"ddr_dram_iovref_org");
 			//	sprintf(str_temp2,"0x%08x",iovref_org);
-			p_str=getenv(str_temp1);
+			p_str=env_get(str_temp1);
 
-			if(p_str)
+			if (p_str)
 			{
 				iovref_org= simple_strtoull_ddr(p_str, &endp, 0);
 			}
@@ -18780,9 +18747,9 @@ int do_ddr4_test_dram_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 
 			sprintf(str_temp1,"ddr_dram_iovref_lef");
 			//sprintf(str_temp2,"0x%08x",iovref_lef);
-			p_str=getenv(str_temp1);
+			p_str=env_get(str_temp1);
 
-			if(p_str)
+			if (p_str)
 			{
 				iovref_lef= simple_strtoull_ddr(p_str, &endp, 0);
 			}
@@ -18790,26 +18757,26 @@ int do_ddr4_test_dram_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 
 			sprintf(str_temp1,"ddr_dram_iovref_rig");
 			//sprintf(str_temp2,"0x%08x",iovref_rig);
-			p_str=getenv(str_temp1);
+			p_str=env_get(str_temp1);
 
-			if(p_str)
+			if (p_str)
 			{
 				iovref_rig= simple_strtoull_ddr(p_str, &endp, 0);
 			}
 
 			sprintf(str_temp1,"ddr_dram_vref_range");
 			//sprintf(str_temp2,"0x%08x",vref_dram_range);
-			p_str=getenv(str_temp1);
+			p_str=env_get(str_temp1);
 
 
-			if(p_str)
+			if (p_str)
 			{
 				vref_dram_range= simple_strtoull_ddr(p_str, &endp, 0);
 			}
 
 		}
 
-		if(vref_dram_range|iovref_rig|iovref_org|iovref_lef)
+		if (vref_dram_range|iovref_rig|iovref_org|iovref_lef)
 		{
 			printf("\n\ndram  iovref test clk==%d\n",dram_iovref_test_ddr_clk);
 			iovref_mid=(iovref_lef+iovref_rig)/2;
@@ -19187,25 +19154,25 @@ int do_ddr4_test_dram_vref(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 						{
 							sprintf(str_temp1,"ddr_dram_iovref_org");
 							sprintf(str_temp2,"0x%08x",iovref_org);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 						{
 							sprintf(str_temp1,"ddr_dram_iovref_lef");
 							sprintf(str_temp2,"0x%08x",iovref_lef);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 						{
 							sprintf(str_temp1,"ddr_dram_iovref_rig");
 							sprintf(str_temp2,"0x%08x",iovref_rig);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 						{
 							sprintf(str_temp1,"ddr_dram_vref_range");
 							sprintf(str_temp2,"0x%08x",vref_dram_range);
-							setenv(str_temp1, str_temp2);
+							env_set(str_temp1, str_temp2);
 							run_command("save",0);
 						}
 					}
@@ -19844,21 +19811,21 @@ int pll_convert_to_ddr_clk_g12a(unsigned int ddr_pll)
 	ddr_pll=ddr_pll&0xfffff;
 #if 1// (CONFIG_DDR_PHY ==  P_DDR_PHY_905X)
 	//unsigned int ddr_clk = 2*((((24 * ((ddr_pll>>4)&0x1ff))/((ddr_pll>>16)&0x1f))>>((((ddr_pll>>0)&0x3)==3)?(2):(((ddr_pll>>0)&0x3))))/(((ddr_pll>>2)&0x3)+1));  //od1  od
-	if(((ddr_pll>>16)&7)==0)
+	if (((ddr_pll>>16)&7) == 0)
 		od_div=2;
-	if(((ddr_pll>>16)&7)==1)
+	if (((ddr_pll>>16)&7) == 1)
 		od_div=3;
 
-	if(((ddr_pll>>16)&7)==2)
+	if (((ddr_pll>>16)&7) == 2)
 		od_div=4;
 
-	if(((ddr_pll>>16)&7)==3)
+	if (((ddr_pll>>16)&7) == 3)
 		od_div=6;
 
-	if(((ddr_pll>>16)&7)==4)
+	if (((ddr_pll>>16)&7) == 4)
 		od_div=8;
 
-	if(((ddr_pll>>10)&0x1f))
+	if (((ddr_pll>>10)&0x1f))
 		ddr_clk = 2*((((24 * ((ddr_pll>>0)&0x1ff))/((ddr_pll>>10)&0x1f))>>((((ddr_pll>>19)&0x1)==1)?(2):(1))))/od_div;
 
 #else
@@ -19954,18 +19921,18 @@ int pll_convert_to_ddr_clk(unsigned int ddr_pll)
 #endif
 #if (CONFIG_DDR_PHY ==  P_DDR_PHY_905X)
 	//unsigned int ddr_clk = 2*((((24 * ((ddr_pll>>4)&0x1ff))/((ddr_pll>>16)&0x1f))>>((((ddr_pll>>0)&0x3)==3)?(2):(((ddr_pll>>0)&0x3))))/(((ddr_pll>>2)&0x3)+1));
-	if(((ddr_pll>>16)&0x1f))
+	if (((ddr_pll>>16)&0x1f))
 
 		ddr_clk = 2*((((24 * ((ddr_pll>>4)&0x1ff))/((ddr_pll>>16)&0x1f))>>((((ddr_pll>>0)&0x3)==3)?(2):(((ddr_pll>>0)&0x3))))>>((((ddr_pll>>2)&0x3)==3)?(2):(((ddr_pll>>2)&0x3))));
 
 #else
-	if((ddr_pll>>9)&0x1f)
+	if ((ddr_pll>>9)&0x1f)
 		ddr_clk = 2*(((24 * (ddr_pll&0x1ff))/((ddr_pll>>9)&0x1f))>>((ddr_pll>>16)&0x3));
 
 #endif
 
 #if (CONFIG_DDR_PHY == P_DDR_PHY_DEFAULT)
-	if((ddr_pll>>9)&0x1f)
+	if ((ddr_pll>>9)&0x1f)
 		ddr_clk = 2*((24 * (ddr_pll&0x1ff))/((ddr_pll>>9)&0x1f))>>((ddr_pll>>16)&0x3);
 #endif
 
@@ -20115,7 +20082,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 #endif
 	//ddr_pll=ddr_pll_org;
 	printf("\nddr_pll== %08x\n", ddr_pll);
-#if  0 
+#if  0
 #else
 	unsigned int ddr_clk = pll_convert_to_ddr_clk(ddr_pll);
 	ddr_clk_org=ddr_clk;
@@ -20155,7 +20122,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 
 
 	//
-	p_char_ddr_test_step= getenv("ddr_feq_test_step");
+	p_char_ddr_test_step= env_get("ddr_feq_test_step");
 	if (p_char_ddr_test_step)
 	{
 		printf("%s",p_char_ddr_test_step);
@@ -20164,7 +20131,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 		printf("ddr_feq_test_step=%d\n",ddr_feq_test_step);
 	}
 	if (ddr_feq_test_step) {
-		p_char_freq_org= getenv("ddr_feq_org");
+		p_char_freq_org= env_get("ddr_feq_org");
 		if (p_char_freq_org)
 		{
 			printf("%s",p_char_freq_org);
@@ -20179,7 +20146,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 		ddr_clk_org=ddr_clk;
 		sprintf(char_freq_org,"%04d",ddr_clk);
 		printf("\nddr_org_freq=%s\n",char_freq_org);
-		setenv("ddr_feq_org", char_freq_org);
+		env_set("ddr_feq_org", char_freq_org);
 
 		temp_count=(DDR_TEST_MIN_FREQ_LIMITED/12);
 		while (temp_count<(DDR_TEST_MAX_FREQ/12)) {
@@ -20187,8 +20154,8 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 			// sprintf(freq_table,"%s%04d %01d %01d  ",freq_table,(temp_count*12),0,0);
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*12))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
-			setenv(char_freq_name_table, "0");
-			setenv("ddr_feq_test_step", "1");
+			env_set(char_freq_name_table, "0");
+			env_set("ddr_feq_test_step", "1");
 			temp_count++;
 		}
 		temp_count=(DDR_TEST_MIN_FREQ_LIMITED/12);
@@ -20197,8 +20164,8 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 			// sprintf(freq_table,"%s%04d %01d %01d  ",freq_table,(temp_count*12),0,0);
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*12))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
-			setenv(char_freq_name_table, "3");
-			setenv("ddr_feq_test_step", "1");
+			env_set(char_freq_name_table, "3");
+			env_set("ddr_feq_test_step", "1");
 			temp_count++;
 		}
 		while (temp_count>((end_freq)/12)) {
@@ -20206,16 +20173,16 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 			// sprintf(freq_table,"%s%04d %01d %01d  ",freq_table,(temp_count*12),0,0);
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*12))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
-			setenv(char_freq_name_table, "3");
-			setenv("ddr_feq_test_step", "1");
+			env_set(char_freq_name_table, "3");
+			env_set("ddr_feq_test_step", "1");
 			temp_count++;
 		}
 
-		p_char_store_boot= getenv("storeboot");
+		p_char_store_boot= env_get("storeboot");
 		if (p_char_store_boot)
 			printf("storeboot   %s\n",p_char_store_boot);
 		sprintf(char_cmd_table,"ddr_test_cmd 0x1c  0x%08x %d %d %d;%s;",ddr_test_size,start_freq,end_freq,test_loops,p_char_store_boot);
-		setenv("storeboot", char_cmd_table);
+		env_set("storeboot", char_cmd_table);
 
 		run_command("save",0);
 
@@ -20230,7 +20197,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*12))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
 
-			p_char_freq_name_table= getenv(char_freq_name_table);
+			p_char_freq_name_table= env_get(char_freq_name_table);
 			if (p_char_freq_name_table)
 			{
 				printf("%s\n",p_char_freq_name_table);
@@ -20255,12 +20222,12 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 					sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count_sub*12))));
 					printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
 					// freq_table_test_value[temp_count_sub] =1;
-					setenv(char_freq_name_table, "3");
+					env_set(char_freq_name_table, "3");
 					temp_count_sub++;
 				}
 				{
 					ddr_feq_test_step++;
-					setenv("ddr_feq_test_step", "2");
+					env_set("ddr_feq_test_step", "2");
 					run_command("save",0);
 
 				}
@@ -20285,7 +20252,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 					sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*12))));
 					printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
 					freq_table_test_value[temp_count] =1;
-					setenv(char_freq_name_table, "1");
+					env_set(char_freq_name_table, "1");
 					run_command("save",0);
 
 					temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
@@ -20299,12 +20266,12 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 					if (temp_test_error)
 					{
 						freq_table_test_value[temp_count] =1;
-						setenv(char_freq_name_table, "1");
+						env_set(char_freq_name_table, "1");
 					}
 					else
 					{
 						freq_table_test_value[temp_count] =2;
-						setenv(char_freq_name_table, "2");
+						env_set(char_freq_name_table, "2");
 					}
 					run_command("save",0);
 
@@ -20325,7 +20292,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 			temp_count++;
 		}
 		ddr_feq_test_step++;
-		setenv("ddr_feq_test_step", "2");
+		env_set("ddr_feq_test_step", "2");
 		run_command("save",0);
 
 	}
@@ -20339,7 +20306,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*12))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
 
-			p_char_freq_name_table= getenv(char_freq_name_table);
+			p_char_freq_name_table= env_get(char_freq_name_table);
 			if (p_char_freq_name_table)
 			{
 				printf("%s\n",p_char_freq_name_table);
@@ -20355,7 +20322,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 		while (temp_count<((DDR_TEST_MAX_FREQ)/12)) {
 
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*12))));
-			p_char_freq_name_table= getenv(char_freq_name_table);
+			p_char_freq_name_table= env_get(char_freq_name_table);
 			if (p_char_freq_name_table)
 			{
 				//	printf("%s\n",p_char_freq_name_table);
@@ -20386,7 +20353,7 @@ int do_ddr4_test_dram_clk(cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 
 
 	//sprintf(str, "%lx", value);
-	//  setenv("env_ddrtest", str);
+	//  env_set("env_ddrtest", str);
 
 
 	//run_command("save",0);
@@ -21211,7 +21178,7 @@ int do_ddr_fine_tune_lcdlr_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				int value=0;
 
 				//*varname="env_ddrtest";
-				s = getenv("env_wr_lcdlr_pr");
+				s = env_get("env_wr_lcdlr_pr");
 				if (s)
 				{//i=0;
 					//while(s_temp)
@@ -21225,7 +21192,7 @@ int do_ddr_fine_tune_lcdlr_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 					value = simple_strtoull_ddr(s, &endp, 16);
 					printf("%d",value);
 				}
-				s = getenv("env_rd_lcdlr_pr");
+				s = env_get("env_rd_lcdlr_pr");
 
 				if (s)
 				{//i=0;
@@ -21239,7 +21206,7 @@ int do_ddr_fine_tune_lcdlr_env(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 				}
 
 				//sprintf(str, "%lx", value);
-				//  setenv("env_ddrtest", str);
+				//  env_set("env_ddrtest", str);
 
 
 				//run_command("save",0);
@@ -22176,253 +22143,6 @@ int do_ddr_test_shift_ddr_clk_txl(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	return 1;
 }
 #endif
-
-void ddr_memcpy(void *dst, const void *src, uint32_t len)
-{//enable_mmu_el1_s();
-//	printf("\nlen==%d,",len);
-	//printf(len);
-	//serial_puts("\n");
-//uint32_t ddr_test_start_time_us=get_us_time();  // check cost time
-	//const char *s = src;
-	//char *d = dst;
-	len=(len>>3);
-	const long long *s = src;
-	long long *d = dst;
-	while (len)
-		{
-	//	ddr_pld_cache(s) ;
-	///1 times   len==33554432   copy time==18192 us   1.2g  bandwidth 3688M/S
-	// 4times   len==33554432   copy time==11844 us   1.2g  bandwidth 5666M/S
-	// 8times   len==33554432   copy time==11844 us   1.2g  bandwidth 5666M/S
-	*d++ = *s++;
-	*d++ = *s++;
-	*d++ = *s++;
-	*d++ = *s++;
-	len=len-4;
-		}
-//	uint32_t ddr_test_end_time_us=get_us_time();  // check cost time
-//	serial_puts("\ncopy time==");
-//	serial_put_dec(ddr_test_end_time_us-ddr_test_start_time_us);
-//	serial_puts("\n");
-//printf("\ncopy time==%d us,",(ddr_test_end_time_us-ddr_test_start_time_us));
-
-}
-#define PATTERN_MATRIX_X   (3+32+16+17)     //68*32==2176 ///2.2k -0x880-1 loop
-	#define PATTERN_MATRIX_Y  (32)
-	#define PATTERN_MATRIX_LOOP_SIZE   ((PATTERN_MATRIX_X)*(PATTERN_MATRIX_Y)*4)
-	unsigned int cpu_ddr_test_init_pattern_generater(unsigned int add_offset ) {	
-
-			unsigned int pattern_select=0;
-			unsigned int pattern_value=0;
-			//test_size=(test_size>0x10000)?test_size:0x10000;
-		//	uint32_t write_addr = start_add;
-			uint32_t martix_x_select= 0;
-			uint32_t martix_y_select= 0;
-			unsigned int pattern_value_temp_16=0;
-		{	
-		//	uint32_t test_end_add = start_add+test_size;
-		//	for((write_addr=start_add);(write_addr<test_end_add);)
-				{
-				pattern_select=((add_offset)%((PATTERN_MATRIX_Y)*(PATTERN_MATRIX_X)));
-				martix_x_select=pattern_select/(PATTERN_MATRIX_Y);
-				martix_y_select=pattern_select%(PATTERN_MATRIX_Y);
-				//write_addr_nibble_start=((((add_offset/PATTERN_MATRIX_Y)/PATTERN_MATRIX_X))*
-				//	(((PATTERN_MATRIX_Y)*PATTERN_MATRIX_X)));
-				//write_addr_nibble_start=(((add_offset)%PATTERN_MATRIX_Y)%PATTERN_MATRIX_X)
-					{	if(martix_x_select==0)
-						pattern_value=0xaaaa5555;  //for 16 bit bus pattern
-									
-						if(martix_x_select==1)
-						pattern_value=0x0000ffff; //for 16 bit bus pattern
-						
-						if(martix_x_select==2)
-						pattern_value=0;
-											
-						if((martix_x_select>2)&&(martix_x_select<(3+32)))
-							{
-							pattern_value=1<<(martix_x_select-3);
-							}
-					
-						if((martix_x_select>(2+32))&&(martix_x_select<(3+32+16)))   //for 16 bit bus pattern
-							{
-							pattern_value_temp_16=(1<<(martix_x_select-3-32));
-							pattern_value=pattern_value_temp_16|((~pattern_value_temp_16)<<16);
-										
-							}
-						if((martix_x_select>(2+32+16))&&(martix_x_select<(3+32+16+17)))   //for dbi bus pattern  17 group
-							{
-							pattern_value_temp_16=(0x0f0f+0xf0f*(martix_x_select-3-32-16));
-							pattern_value=pattern_value_temp_16|((~pattern_value_temp_16)<<16);
-										
-							}
-		
-					}
-				if(martix_y_select%2)
-					pattern_value=~pattern_value;
-				}
-
-		}
-		//	serial_puts("\ncpu_test_ddr_debug4");
-	return pattern_value;
-}
-void cpu_ddr_test_init_pattern_area(unsigned int test_init_start,unsigned int test_size,unsigned int parttern_frequency_setting ) {
-
-//	printf("\n 111");
-		if(parttern_frequency_setting==0)
-		parttern_frequency_setting=1;  //for different  frequency pattern
-	test_size=(test_size>((PATTERN_MATRIX_LOOP_SIZE)*(parttern_frequency_setting)))?test_size:((PATTERN_MATRIX_LOOP_SIZE)*(parttern_frequency_setting));
-	//unsigned int test_start=0x1080000;
-	unsigned int write_add=test_init_start;
-	unsigned int size_loop=0;
-	unsigned int size_loop_max=0;
-	//unsigned int count=0;
-	for(;(size_loop<((PATTERN_MATRIX_LOOP_SIZE)*(parttern_frequency_setting)));)
-		{
-	//serial_puts("\ncpu_test_ddr_debug5");
-
-	//	for(  count=0;count<(parttern_frequency_setting);)
-			{
-			write_add = (uint32_t)(size_loop + test_init_start);
-		wr_reg((unsigned long)write_add, cpu_ddr_test_init_pattern_generater((size_loop>>2)/parttern_frequency_setting));
-			size_loop=size_loop+4;
-			}
-	//	serial_puts("\ncpu_test_ddr_debug6");
-		
-	//	serial_puts(" ");
-	#if 0
-		serial_put_hex(size_loop,32);
-		serial_puts(" ");
-		serial_put_hex(cpu_ddr_test_init_pattern_generater(size_loop>>2),32);
-#endif
-	
-		}
-	size_loop=1;
-	size_loop_max=((test_size/(((PATTERN_MATRIX_LOOP_SIZE)*(parttern_frequency_setting))))+1);
-	for(;(size_loop<size_loop_max);)
-		{
-	//	serial_puts("\ncpu_test_ddr_debug41");
-	ddr_memcpy((void *)(uint64_t)(test_init_start+((PATTERN_MATRIX_LOOP_SIZE)*(parttern_frequency_setting))*(size_loop)), (void *)(uint64_t)test_init_start, ((PATTERN_MATRIX_LOOP_SIZE)*(parttern_frequency_setting)));
-//serial_puts("\ncpu_test_ddr_debug42");
-size_loop++;
-	}
-}
-unsigned int cpu_ddr_test(unsigned test_init_start,unsigned int start_add, unsigned int test_size, unsigned int test_data_bit_enable,unsigned int parttern_frequency_setting) {
-//printf("\n 1112");
-
-	unsigned int src_add=test_init_start;
-	unsigned int pattern_value=0;
-	unsigned int size_loop=0;
-	unsigned int ddr_test_error=0;
-	unsigned int read_add=0;
-	unsigned int read_value=0;
-	test_size=(test_size>0x2000)?(test_size):(0x2000);
-	//cpu_ddr_test_init_pattern_area(test_size);
-	uint32_t ddr_test_start_time_us=get_us_time();  // check cost time
-	ddr_memcpy((void *)(uint64_t)start_add, (void *)(uint64_t)src_add, test_size);
-uint32_t ddr_test_end_time_us=get_us_time();  // check cost time
-	printf("\ncpu_ddr_test_test_copy_bandwidth==%d Mbyte/s\n",(1*test_size*2)/(ddr_test_end_time_us-ddr_test_start_time_us));
-	
-	for(;size_loop<(test_size);)
-		{read_add = (uint32_t)(size_loop + start_add);
-	read_value=(rd_reg((unsigned long)read_add));
-	pattern_value=( cpu_ddr_test_init_pattern_generater((size_loop>>2)/parttern_frequency_setting));
-	       if(((test_data_bit_enable)&read_value)!=((test_data_bit_enable)&pattern_value))
-	       	{
-	       	#if 1
-			printf("error data  enable %08x read_value %08x  pattern_value %08x",test_data_bit_enable,read_value,pattern_value);
-			#if 0
-	       	serial_puts("\nerror data ");
-		 serial_put_hex(test_data_bit_enable,32);
-		serial_puts(" ");
-	       serial_put_hex(read_value,32);
-		serial_puts(" ");
-		 serial_put_hex(pattern_value,32);
-		 serial_puts("\n");
-		 #endif
-		 #endif
-		   	ddr_test_error++;
-			return ddr_test_error;
-	       	}
-		size_loop=size_loop+(1<<2);// use big step will fast test ,but lose accuracy.
-		}
-	//printf("\n 1114");	
-	return ddr_test_error;
-}
-
-int do_cpu_ddr_test (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{//ddr_cpu_test 0x1080000 0x10000000 0x2000000 0xffffffff 10  //size do not overlap
-		int i=0;
-		printf("\nargc== 0x%08x\n", argc);
-		for (i = 0;i<argc;i++)
-		{
-			printf("\nargv[%d]=%s\n",i,argv[i]);
-		}
-		unsigned int init_start_add=0;
-		unsigned int test_add=0;
-		unsigned int test_size=0;
-		unsigned int test_data_bit_enable=0;
-		unsigned int test_loops=0;
-		unsigned int test_loop=0;
-		unsigned int test_errors=0;
-		unsigned int parttern_frequency_setting =1;
-		char *endp;
-			if (argc == 1)
-			printf("\nplease read help\n");
-			else
-			{
-			if (argc >= 2)
-			{
-				// zq0pr0 = argv[1];
-				init_start_add= simple_strtoull_ddr(argv[1], &endp, 0);
-			}
-
-			if (argc >= 3)
-			{
-				// zq1pr0 = argv[2];
-				test_add= simple_strtoull_ddr(argv[2], &endp, 0);
-			}
-			if (argc >= 4)
-			{
-				// zq1pr0 = argv[2];
-				test_size= simple_strtoull_ddr(argv[3], &endp, 0);
-			}
-						if (argc >= 5)
-			{
-				// zq1pr0 = argv[2];
-				test_data_bit_enable= simple_strtoull_ddr(argv[4], &endp, 0);
-			}
-						if (argc >= 6)
-			{
-				// zq1pr0 = argv[2];
-				test_loops= simple_strtoull_ddr(argv[5], &endp, 0);
-				if(test_loops==0)
-					test_loops=1;
-			}
-							if (argc >= 7)
-			{
-				// zq1pr0 = argv[2];
-				parttern_frequency_setting= simple_strtoull_ddr(argv[6], &endp, 0);
-				if(parttern_frequency_setting==0)
-					parttern_frequency_setting=1;
-			}
-				}
-			uint32_t ddr_test_start_time_us=get_us_time();  // check cost time
-			cpu_ddr_test_init_pattern_area(init_start_add,test_size,parttern_frequency_setting);
-			for(test_loop=0;test_loop<test_loops;)
-				{test_errors=test_errors+cpu_ddr_test(init_start_add,test_add,test_size,test_data_bit_enable,parttern_frequency_setting);
-				test_loop++;
-				printf("\ncpu_ddr_test_test_times==%d  test_errors==%d",test_loop,test_errors);
-				}
-			uint32_t ddr_test_end_time_us=get_us_time();  // check cost time
-				printf("\ncpu_ddr_test_test_and compare_bandwidth==%d Mbyte/s\n",(test_loops*test_size*2)/(ddr_test_end_time_us-ddr_test_start_time_us));
-		return test_errors;
-}
-U_BOOT_CMD(
-	ddr_cpu_test,	30,	1,	do_cpu_ddr_test,
-	"ddr_test_cmd cmd arg1 arg2 arg3...",
-	"ddr_test_cmd cmd arg1 arg2 arg3... \n dcache off ? \n"
-	);
-
 int do_ddr_test_write_read (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	///*
@@ -22529,8 +22249,8 @@ int do_ddr_test_write_read (cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 		do
 		{
 			if (write_read == 0)
-			{ 
-				if(!no_show_info)
+			{
+				if (!no_show_info)
 					printf("\nloop:0x%08x:Start writing at 0x%08x - 0x%08x...", loop,start_addr, start_addr + test_size);
 				for (j=0;j<test_size/4;)
 				{
@@ -22542,8 +22262,8 @@ int do_ddr_test_write_read (cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 				}
 			}
 			if (write_read == 1)
-			{  
-				if(!no_show_info)
+			{
+				if (!no_show_info)
 					printf("\nloop:0x%08x:Start reading at 0x%08x - 0x%08x...", loop,start_addr, start_addr + test_size);
 				for (j=0;j<test_size/4;)
 				{
@@ -22554,14 +22274,14 @@ int do_ddr_test_write_read (cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 					j=j+4;
 				}
 				if (loop == 1) {
-					if(!no_show_info)
+					if (!no_show_info)
 						printf(" \nloop:0x%08x:Start reading read_pattern[0] 0x%08x, pattern[1] 0x%08x,pattern[2] 0x%08x,pattern[3] 0x%08x",
 								loop,read_pattern[0], read_pattern[1],read_pattern[2],read_pattern[3]
 							  );  }
 			}
 			if (write_read == 2)
-			{   
-				if(!no_show_info)
+			{
+				if (!no_show_info)
 					printf("\nloop:0x%08x:Start copying at 0x%08x - 0x%08x...", loop,start_addr, start_addr + test_size);
 				for (j=0;j<test_size/4;)
 				{
@@ -22572,7 +22292,7 @@ int do_ddr_test_write_read (cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 					j=j+4;
 				}
 			}
-			if(us_delay_counter)
+			if (us_delay_counter)
 			{
 				ddr_udelay(us_delay_counter);
 			}
@@ -22691,7 +22411,7 @@ int do_ddr_test_pwm_bdlr (cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 
 	unsigned int argc_count=1;
 	unsigned int  para_meter[30]={0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0,};
-	while(argc_count<argc)
+	while (argc_count<argc)
 	{para_meter[argc_count-1]= simple_strtoul(argv[argc_count], &endp, 0);
 		if (*argv[argc_count] == 0 || *endp != 0) {
 			para_meter[argc_count-1] = 0;
@@ -22760,7 +22480,7 @@ int do_ddr_test_pwm_bdlr (cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 			bdlr_100_max=(bdlr_100_cur>bdlr_100_max)?bdlr_100_cur:bdlr_100_max;
 			bdlr_100_average=(bdlr_100_cur+bdlr_100_average*count)/(count+1);
 			count++;
-			if(show_count_message)
+			if (show_count_message)
 				printf("%d\n",bdlr_100_cur);
 
 		}while(count<loop);
@@ -22776,15 +22496,6 @@ int do_ddr_test_pwm_bdlr (cmd_tbl_t *cmdtp, int flag, int argc, char * const arg
 	return 1;
 
 }
-
-typedef struct ddr_sha_s {
-	unsigned char sha2[SHA256_SUM_LEN];
-	ddr_set_t ddrs;
-} ddr_sha_t;
-
-ddr_sha_t ddr_sha = {{0}};
-ddr_set_t *ddr_set_t_p_arrary = &ddr_sha.ddrs;
-
 int do_ddr_display_g12_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 
@@ -22795,19 +22506,7 @@ int do_ddr_display_g12_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, cha
 	for (i = 0;i<argc;i++)
 		printf("\nargv[%d]=%s\n",i,argv[i]);
 
-	ddr_set_t *ddr_set_t_p=NULL;
-	ddr_set_t_p=(ddr_set_t *)(ddr_set_t_p_arrary);
-	//ddr_set_t_p= (ddr_set_t *)G12_DMC_STICKY_0;
-	//if (sizeof(ddr_set_t)<loop_max)
-	printf("\nddr_set_t_p==0x%08x\n",(uint32_t)(uint64_t)(ddr_set_t_p));
-	uint32_t loop=0;
-	uint32_t loop_max = (4+(0x3f<<2));//((DMC_STICKY_63-DMC_STICKY_0));
-			//	loop_max=sizeof(ddr_set_t);
-			for (loop = 0; loop <loop_max; loop+=4) {
-				wr_reg(((uint64_t)(ddr_set_t_p) + loop), rd_reg(G12_DMC_STICKY_0 + loop));
-			}
 
-			
 {
 		uint16_t	dq_bit_delay[72];
 		unsigned	char t_count=0;
@@ -22819,178 +22518,107 @@ int do_ddr_display_g12_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, cha
 		ui_1_32_100step=(1000000*100/(global_ddr_clk*2*32));
 
 		{
-
-			
 		//		dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(0<<12)|(0x20),p_dev->p_ddrs->dfi_mrl);  //DFIMRL
 		//dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(1<<12)|(0x20),p_dev->p_ddrs->dfi_mrl);  //DFIMRL
 		//dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(2<<12)|(0x20),p_dev->p_ddrs->dfi_mrl);  //DFIMRL
 		//dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(3<<12)|(0x20),p_dev->p_ddrs->dfi_mrl);  //DFIMRL
 		//dwc_ddrphy_apb_wr((0<<20)|(2<<16)|(0<<12)|(0x20),p_dev->p_ddrs->dfi_mrl);  //HwtMRL
-	//ddr_set_t_p->dfi_mrl;
-	//ddr_set_t_p->dfi_hwtmrl;
-		ddr_set_t_p->ARdPtrInitVal=0;
-		printf("\n ARdPtrInitVal");
-		add_offset=((0<<20)|(0<<16)|(0<<12)|(0x2e));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-		ddr_set_t_p->ARdPtrInitVal=delay_org;
-		printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		
+
 		printf("\n dfimrl0 dfimrl1 dfimrl2 dfimrl3 HwtMRL");
-		add_offset=((0<<20)|(1<<16)|(0<<12)|(0x20));
+		add_offset=((0<<20)|(0<<16)|(0<<12)|(0x20));
 		delay_org=dwc_ddrphy_apb_rd(add_offset);
-		ddr_set_t_p->dfi_mrl=delay_org;
 		printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(1<<12)|(0x20));
+		add_offset=((0<<20)|(0<<16)|(1<<12)|(0x20));
 		delay_org=dwc_ddrphy_apb_rd(add_offset);
 		printf("\n t_count: %04d %04d  %08x %08x",1,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(2<<12)|(0x20));
+		add_offset=((0<<20)|(0<<16)|(2<<12)|(0x20));
 		delay_org=dwc_ddrphy_apb_rd(add_offset);
 		printf("\n t_count: %04d %04d  %08x %08x",2,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(3<<12)|(0x20));
+		add_offset=((0<<20)|(0<<16)|(3<<12)|(0x20));
 		delay_org=dwc_ddrphy_apb_rd(add_offset);
 		printf("\n t_count: %04d %04d  %08x %08x",3,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
 		add_offset=((0<<20)|(2<<16)|(0<<12)|(0x20));
 		delay_org=dwc_ddrphy_apb_rd(add_offset);
-
-		ddr_set_t_p->dfi_hwtmrl=delay_org;
 		printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
 		}
 	{
 		printf("\n count_index     delay_value     register_add     register_value \n ");
 		printf("\n address delay * 1/32UIx100==%d ps bit0-4 fine tune  --step==1/32UI ,bit 6 is coarse  --step==1UI",ui_1_32_100step);
-		for(t_count=0;t_count<10;t_count++)
+		for (t_count=0;t_count<10;t_count++)
 		{
 			add_offset=((0<<20)|(0<<16)|(t_count<<12)|(0x80));
 			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
 			delay_org=dq_bit_delay[t_count];
 			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			ddr_set_t_p->ac_trace_delay[t_count]=delay_temp;
 			printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
 		}
 	}
 	{
 		printf("\n tdqs delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI ,bit 6-9 is coarse  --step==1UI",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
+		for (t_count=0;t_count<16;t_count++)
 		{
 			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0xd0+(t_count/8)+((t_count%2)<<8)));
 			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
 			delay_org=dq_bit_delay[t_count];
 			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			
-			ddr_set_t_p->write_dqs_delay[t_count]=delay_temp;
-			
 			printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
 		}
 	}
 	{
 		printf("\n rxdqs delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI,no coarse",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
+		for (t_count=0;t_count<16;t_count++)
 		{
 			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0x8c+(t_count/8)+((t_count%2)<<8)));
 			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
 			delay_org=dq_bit_delay[t_count];
 			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			ddr_set_t_p->read_dqs_delay[t_count]=delay_temp;
 			printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
 		}
 	}
 	{
 		printf("\n write dq_bit delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI ,bit 6-8 is coarse  --step==1U",ui_1_32_100step);
-			for(t_count=0;t_count<72;t_count++)
+			for (t_count=0;t_count<72;t_count++)
 			{
 				add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(0xc0+((t_count%9)<<8)+(t_count/36)));
 				dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
 				delay_org=dq_bit_delay[t_count];
 				delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-
-				ddr_set_t_p->write_dq_bit_delay[t_count]=delay_temp;
-
-				
 				printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
 			}
 	}
 	{
 		printf("\n read dq_bit delay * BDLRx100==%d ps bit0-4 fine tune --step==bdlr step size about 5ps,no coarse",bdlr_100step);
-		for(t_count=0;t_count<72;t_count++)
+		for (t_count=0;t_count<72;t_count++)
 		{
 			add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(0x68+((t_count%9)<<8)+(t_count/36)));
 			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
 			delay_org=dq_bit_delay[t_count];
 			delay_temp=((delay_org&0x3f));
-			
-			ddr_set_t_p->read_dq_bit_delay[t_count]=delay_temp;
 			printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
 		}
 	}
 	{
 		printf("\n read dqs gate delay * 1/32UIx100==%d ps bit0-4 fine tune ,bit 6-10 is coarse",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
+		for (t_count=0;t_count<16;t_count++)
 		{
 			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0x80+(t_count/8)+((t_count%2)<<8)));
 			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
 			delay_org=dq_bit_delay[t_count];
 			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-
-			ddr_set_t_p->read_dqs_gate_delay[t_count]=delay_temp;
-
-			
 			printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
 		}
 
 		printf("\n soc vref : lpddr4-- VREF = VDDQ*(0.047 + VrefDAC0[6:0]*0.00367   DDR4 --VREF = VDDQ*(0.510 + VrefDAC0[6:0]*0.00345");
-		//((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(((over_ride_sub_index%36)%9)<<8)|(0x40),over_ride_value)	
-		uint32_t vref_t_count=0;
-		for(t_count=0;t_count<72;t_count++)
+		//((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(((over_ride_sub_index%36)%9)<<8)|(0x40),over_ride_value)
+		for (t_count=0;t_count<72;t_count++)
 		{
 			add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(((t_count%36)%9)<<8)|(0x40));
 			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
 			delay_org=dq_bit_delay[t_count];
 			delay_temp=((delay_org));
-
-if(t_count<35)
-{
-			vref_t_count=((((t_count%36)/9)*8)+(t_count%9));
-
-			ddr_set_t_p->soc_bit_vref[vref_t_count]=delay_temp;
-}
-
-			
 			printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
 		}
-
-
-
-	printf("\n dram vref : lpddr4-- VREF = VDDQ*(0. + VrefDAC0[6:0]*0.   DDR4 --VREF = VDDQ*(0. + VrefDAC0[6:0]*0.");
-	add_offset=((0<<20)|(1<<16)|(0<<12)|(0x082));
-delay_temp=dwc_ddrphy_apb_rd(add_offset);
-					for(t_count=0;t_count<32;t_count++)
-		{
-
-		
-			ddr_set_t_p->dram_bit_vref[t_count]=delay_temp;
-
-
-			
-		//	printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-		printf("\n t_count: %04d %04d  %08x %08x",0,delay_temp,((((add_offset) << 1)+0xfe000000)),delay_temp);
 	}
-
-	//	if(over_ride_index ==DMC_TEST_WINDOW_INDEX_RETRAINING)
-			{	//	if (read_write==REGISTER_READ)
-							for(t_count=0;t_count<4;t_count++)
-		{//p_dev->p_ddrs->tdqs2dq=lpddr4_tdqs2dq;
-		//ddr_set_t_p->retraining[0]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xaa));  //PptCtlStatic
-		//ddr_set_t_p->retraining[1]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xae));  //PptDqsCntInvTrnTg0  ps0 rank0
-		//ddr_set_t_p->retraining[2]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xaf));  //PptDqsCntInvTrnTg0  ps0 rank1
-		ddr_set_t_p->retraining[4*t_count+0]=(dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaa)))&0xff;  //PptCtlStatic
-		ddr_set_t_p->retraining[4*t_count+1]=(dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaa)))>>8;  //PptCtlStatic
-		ddr_set_t_p->retraining[4*t_count+2]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xae));  //PptDqsCntInvTrnTg0  ps0 rank0 lane 0-3
-		ddr_set_t_p->retraining[4*t_count+3]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaf));  //PptDqsCntInvTrnTg0  ps0 rank1 lane 0-3
-		}
-	
-		
-			}
 }
 
 {
@@ -23007,9 +22635,9 @@ delay_temp=dwc_ddrphy_apb_rd(add_offset);
 		for (count=0;count<(DMC_DRAM_TDPD-DMC_DRAM_TMRD);) {
 			reg_add_offset=(DMC_DRAM_TMRD+(count));
 			//ddr_log_serial_puts("\n",p_dev->ddr_gloabl_message.stick_ddr_log_level);
-			//ddr_log_serial_put_hex(reg_add_offset,32,p_dev->ddr_gloabl_message.stick_ddr_log_level); 
+			//ddr_log_serial_put_hex(reg_add_offset,32,p_dev->ddr_gloabl_message.stick_ddr_log_level);
 			//ddr_log_serial_puts(": ",p_dev->ddr_gloabl_message.stick_ddr_log_level);
-			//ddr_log_serial_put_hex(readl(reg_add_offset),32,p_dev->ddr_gloabl_message.stick_ddr_log_level);   
+			//ddr_log_serial_put_hex(readl(reg_add_offset),32,p_dev->ddr_gloabl_message.stick_ddr_log_level);
 			printf("\n reg_add_offset: %08x %08x %08x ",reg_add_offset,readl(reg_add_offset),reg_add_offset);
 			count=count+4;
 		}
@@ -23019,11 +22647,11 @@ delay_temp=dwc_ddrphy_apb_rd(add_offset);
 		for (count=0;count<0x80;) {
 			reg_add_offset=0x54000+count;//dwc_ddrphy_apb_wr(0x54008,0x1001);
 			//ddr_log_serial_puts("\n",p_dev->ddr_gloabl_message.stick_ddr_log_level);
-			//ddr_log_serial_put_hex(count,32,p_dev->ddr_gloabl_message.stick_ddr_log_level); 
+			//ddr_log_serial_put_hex(count,32,p_dev->ddr_gloabl_message.stick_ddr_log_level);
 			//ddr_log_serial_puts(": ",p_dev->ddr_gloabl_message.stick_ddr_log_level);
 			reg_value= ((*(volatile uint16_t *)((uint64_t)(((0x54000+(count>>1))) << 1)+0xfe000000))>>(((count)%2)?8:0));//dwc_ddrphy_apb_rd(0x54000+add_offset+1);
 			reg_value=reg_value&0xff;
-			//ddr_log_serial_put_hex(reg_value,32,p_dev->ddr_gloabl_message.stick_ddr_log_level);   
+			//ddr_log_serial_put_hex(reg_value,32,p_dev->ddr_gloabl_message.stick_ddr_log_level);
 			printf("\n reg_add_offset: %08x %08x %08x",reg_add_offset,reg_value,((((0x54000+(count>>1))) << 1)+0xfe000000));
 			count=count+1;
 		}
@@ -23037,315 +22665,23 @@ delay_temp=dwc_ddrphy_apb_rd(add_offset);
 			//uint32_t loop = 0;
 			for (count = 0; count < loop_max; count+=4) {
 				//	ddr_log_serial_puts("\n",p_dev->ddr_gloabl_message.stick_ddr_log_level);
-				//	ddr_log_serial_put_hex(count,32,p_dev->ddr_gloabl_message.stick_ddr_log_level); 
+				//	ddr_log_serial_put_hex(count,32,p_dev->ddr_gloabl_message.stick_ddr_log_level);
 				//	ddr_log_serial_puts(": ",p_dev->ddr_gloabl_message.stick_ddr_log_level);
-				//	ddr_log_serial_put_hex(rd_reg((uint64_t)(p_dev->p_ddrs) + count),32,p_dev->ddr_gloabl_message.stick_ddr_log_level);   
+				//	ddr_log_serial_put_hex(rd_reg((uint64_t)(p_dev->p_ddrs) + count),32,p_dev->ddr_gloabl_message.stick_ddr_log_level);
 				//	count=count+4;
 				printf("\n reg_add_offset: %08x %08x %08x",count,rd_reg((uint64_t)(G12_DMC_STICKY_0) + count),((G12_DMC_STICKY_0) + count));
 			}
 		}
 
-
-{
-			uint32_t loop_max = 0;
-			loop_max=sizeof(ddr_set_t);
-			uint32_t count = 0;
-			for (count = 0; count < loop_max; ) {
-				//	ddr_log_serial_puts("\n",p_dev->ddr_gloabl_message.stick_ddr_log_level);
-				//	ddr_log_serial_put_hex(count,32,p_dev->ddr_gloabl_message.stick_ddr_log_level); 
-				//	ddr_log_serial_puts(": ",p_dev->ddr_gloabl_message.stick_ddr_log_level);
-				//	ddr_log_serial_put_hex(rd_reg((uint64_t)(p_dev->p_ddrs) + count),32,p_dev->ddr_gloabl_message.stick_ddr_log_level);   
-				printf("\n%08x %08x",count,rd_reg((uint64_t)(ddr_set_t_p) + count));
-					count=count+4;
-				//printf("\n reg_add_offset: %08x %08x %08x",count,rd_reg((uint64_t)(G12_DMC_STICKY_0) + count),((G12_DMC_STICKY_0) + count));
-			}
-		}
 		//	ddr_log_serial_puts("\n",p_dev->ddr_gloabl_message.stick_ddr_log_level);
 }
 
 	printf("\n ");
 
 
-	//ddr_set_t *ddr_set_t_p;
-	//ddr_set_t_p= (ddr_set_t *)G12_DMC_STICKY_0;
-		{
-
-	//ddr_set_t_p->ddr_func;
-	//system reserve,do not modify
-	/* align8 */
-
-	//unsigned	long	rsv_long0[2];
-	/* v1 end */
-//	/*
-
-
-//	ddr_set_t_p->read_dqs_delay[16];
-//	ddr_set_t_p->read_dq_bit_delay[72];
-//	ddr_set_t_p->write_dqs_delay[16];
-//	*/
-//	ddr_set_t_p->write_dq_bit_delay[72];
-//	ddr_set_t_p->read_dqs_gate_delay[16];
-//	ddr_set_t_p->soc_bit_vref[32];
-//	ddr_set_t_p->dram_bit_vref[32];
-	///*
-//	ddr_set_t_p->dq_dqs_delay_flag;//read_dqs  read_dq,write_dqs, write_dq
-//	ddr_set_t_p->dfi_mrl;
-//	ddr_set_t_p->dfi_hwtmrl;
-//	ddr_set_t_p->ARdPtrInitVal;
-		}
-	uint32_t temp_count=0;
+	ddr_set_t *ddr_set_t_p;
+	ddr_set_t_p= (ddr_set_t *)G12_DMC_STICKY_0;
 	{
-
-
-printf("\n.magic=0x%08x,// %d",ddr_set_t_p->magic,ddr_set_t_p->magic);
-for( temp_count=0;temp_count<4;temp_count++)
-printf("\n.fast_boot[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->fast_boot[temp_count],ddr_set_t_p->fast_boot[temp_count]);
-//printf("\n.rsv_int0=0x%08x,// %d",ddr_set_t_p->rsv_int0,ddr_set_t_p->rsv_int0);
-printf("\n.board_id=0x%08x,// %d",ddr_set_t_p->board_id,ddr_set_t_p->board_id);
-printf("\n.version=0x%08x,// %d",ddr_set_t_p->version,ddr_set_t_p->version);
-printf("\n.DramType=0x%08x,// %d",ddr_set_t_p->DramType,ddr_set_t_p->DramType);
-printf("\n.DisabledDbyte=0x%08x,// %d",ddr_set_t_p->DisabledDbyte,ddr_set_t_p->DisabledDbyte);
-printf("\n.Is2Ttiming=0x%08x,// %d",ddr_set_t_p->Is2Ttiming,ddr_set_t_p->Is2Ttiming);
-printf("\n.HdtCtrl=0x%08x,// %d",ddr_set_t_p->HdtCtrl,ddr_set_t_p->HdtCtrl);
-printf("\n.dram_rank_config=0x%08x,// %d",ddr_set_t_p->dram_rank_config,ddr_set_t_p->dram_rank_config);
-printf("\n.diagnose=0x%08x,// %d",ddr_set_t_p->diagnose,ddr_set_t_p->diagnose);
-printf("\n.imem_load_addr=0x%08x,// %d",ddr_set_t_p->imem_load_addr,ddr_set_t_p->imem_load_addr);
-printf("\n.dmem_load_addr=0x%08x,// %d",ddr_set_t_p->dmem_load_addr,ddr_set_t_p->dmem_load_addr);
-printf("\n.imem_load_size=0x%08x,// %d",ddr_set_t_p->imem_load_size,ddr_set_t_p->imem_load_size);
-printf("\n.dmem_load_size=0x%08x,// %d",ddr_set_t_p->dmem_load_size,ddr_set_t_p->dmem_load_size);
-printf("\n.ddr_base_addr=0x%08x,// %d",ddr_set_t_p->ddr_base_addr,ddr_set_t_p->ddr_base_addr);
-printf("\n.ddr_start_offset=0x%08x,// %d",ddr_set_t_p->ddr_start_offset,ddr_set_t_p->ddr_start_offset);
-printf("\n.dram_cs0_size_MB=0x%08x,// %d",ddr_set_t_p->dram_cs0_size_MB,ddr_set_t_p->dram_cs0_size_MB);
-printf("\n.dram_cs1_size_MB=0x%08x,// %d",ddr_set_t_p->dram_cs1_size_MB,ddr_set_t_p->dram_cs1_size_MB);
-printf("\n.training_SequenceCtrl[0]=0x%08x,// %d",ddr_set_t_p->training_SequenceCtrl[0],ddr_set_t_p->training_SequenceCtrl[0]);
-printf("\n.training_SequenceCtrl[1]=0x%08x,// %d",ddr_set_t_p->training_SequenceCtrl[1],ddr_set_t_p->training_SequenceCtrl[1]);
-printf("\n.phy_odt_config_rank[0]=0x%08x,// %d",ddr_set_t_p->phy_odt_config_rank[0],ddr_set_t_p->phy_odt_config_rank[0]);
-printf("\n.phy_odt_config_rank[1]=0x%08x,// %d",ddr_set_t_p->phy_odt_config_rank[1],ddr_set_t_p->phy_odt_config_rank[1]);
-printf("\n.rever1=0x%08x,// %d",ddr_set_t_p->rever1,ddr_set_t_p->rever1);
-printf("\n.rever2=0x%08x,// %d",ddr_set_t_p->rever2,ddr_set_t_p->rever2);
-//	unsigned	char	phy_odt_config_rank[2];
-//	unsigned	char	 ddr_fast_boot_function;
-//	unsigned	char	 dqs_offset_value;
-printf("\n.dfi_odt_config=0x%08x,// %d",ddr_set_t_p->dfi_odt_config,ddr_set_t_p->dfi_odt_config);
-printf("\n.DRAMFreq[0]=0x%08x,// %d",ddr_set_t_p->DRAMFreq[0],ddr_set_t_p->DRAMFreq[0]);
-printf("\n.DRAMFreq[1]=0x%08x,// %d",ddr_set_t_p->DRAMFreq[1],ddr_set_t_p->DRAMFreq[1]);
-printf("\n.DRAMFreq[2]=0x%08x,// %d",ddr_set_t_p->DRAMFreq[2],ddr_set_t_p->DRAMFreq[2]);
-printf("\n.DRAMFreq[3]=0x%08x,// %d",ddr_set_t_p->DRAMFreq[3],ddr_set_t_p->DRAMFreq[3]);
-printf("\n.PllBypassEn=0x%08x,// %d",ddr_set_t_p->PllBypassEn,ddr_set_t_p->PllBypassEn);
-printf("\n.ddr_rdbi_wr_enable=0x%08x,// %d",ddr_set_t_p->ddr_rdbi_wr_enable,ddr_set_t_p->ddr_rdbi_wr_enable);
-printf("\n.ddr_rfc_type=0x%08x,// %d",ddr_set_t_p->ddr_rfc_type,ddr_set_t_p->ddr_rfc_type);
-printf("\n.enable_lpddr4x_mode=0x%08x,// %d",ddr_set_t_p->enable_lpddr4x_mode,ddr_set_t_p->enable_lpddr4x_mode);
-printf("\n.pll_ssc_mode=0x%08x,// %d",ddr_set_t_p->pll_ssc_mode,ddr_set_t_p->pll_ssc_mode);
-printf("\n.clk_drv_ohm=0x%08x,// %d",ddr_set_t_p->clk_drv_ohm,ddr_set_t_p->clk_drv_ohm);
-printf("\n.cs_drv_ohm=0x%08x,// %d",ddr_set_t_p->cs_drv_ohm,ddr_set_t_p->cs_drv_ohm);
-printf("\n.ac_drv_ohm=0x%08x,// %d",ddr_set_t_p->ac_drv_ohm,ddr_set_t_p->ac_drv_ohm);
-printf("\n.soc_data_drv_ohm_p=0x%08x,// %d",ddr_set_t_p->soc_data_drv_ohm_p,ddr_set_t_p->soc_data_drv_ohm_p);
-printf("\n.soc_data_drv_ohm_n=0x%08x,// %d",ddr_set_t_p->soc_data_drv_ohm_n,ddr_set_t_p->soc_data_drv_ohm_n);
-printf("\n.soc_data_odt_ohm_p=0x%08x,// %d",ddr_set_t_p->soc_data_odt_ohm_p,ddr_set_t_p->soc_data_odt_ohm_p);
-printf("\n.soc_data_odt_ohm_n=0x%08x,// %d",ddr_set_t_p->soc_data_odt_ohm_n,ddr_set_t_p->soc_data_odt_ohm_n);
-printf("\n.dram_data_drv_ohm=0x%08x,// %d",ddr_set_t_p->dram_data_drv_ohm,ddr_set_t_p->dram_data_drv_ohm);
-printf("\n.dram_data_odt_ohm=0x%08x,// %d",ddr_set_t_p->dram_data_odt_ohm,ddr_set_t_p->dram_data_odt_ohm);
-printf("\n.dram_ac_odt_ohm=0x%08x,// %d",ddr_set_t_p->dram_ac_odt_ohm,ddr_set_t_p->dram_ac_odt_ohm);
-printf("\n.soc_clk_slew_rate=0x%08x,// %d",ddr_set_t_p->soc_clk_slew_rate,ddr_set_t_p->soc_clk_slew_rate);
-printf("\n.soc_cs_slew_rate=0x%08x,// %d",ddr_set_t_p->soc_cs_slew_rate,ddr_set_t_p->soc_cs_slew_rate);
-printf("\n.soc_ac_slew_rate=0x%08x,// %d",ddr_set_t_p->soc_ac_slew_rate,ddr_set_t_p->soc_ac_slew_rate);
-printf("\n.soc_data_slew_rate=0x%08x,// %d",ddr_set_t_p->soc_data_slew_rate,ddr_set_t_p->soc_data_slew_rate);
-printf("\n.vref_output_permil =0x%08x,// %d",ddr_set_t_p->vref_output_permil ,ddr_set_t_p->vref_output_permil );
-printf("\n.vref_receiver_permil =0x%08x,// %d",ddr_set_t_p->vref_receiver_permil ,ddr_set_t_p->vref_receiver_permil );
-printf("\n.vref_dram_permil=0x%08x,// %d",ddr_set_t_p->vref_dram_permil,ddr_set_t_p->vref_dram_permil);
-printf("\n.max_core_timmming_frequency=0x%08x,// %d",ddr_set_t_p->max_core_timmming_frequency,ddr_set_t_p->max_core_timmming_frequency);
-printf("\n.ac_trace_delay[0]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[0],ddr_set_t_p->ac_trace_delay[0]);
-printf("\n.ac_trace_delay[1]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[1],ddr_set_t_p->ac_trace_delay[1]);
-printf("\n.ac_trace_delay[2]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[2],ddr_set_t_p->ac_trace_delay[2]);
-printf("\n.ac_trace_delay[3]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[3],ddr_set_t_p->ac_trace_delay[3]);
-printf("\n.ac_trace_delay[4]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[4],ddr_set_t_p->ac_trace_delay[4]);
-printf("\n.ac_trace_delay[5]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[5],ddr_set_t_p->ac_trace_delay[5]);
-printf("\n.ac_trace_delay[6]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[6],ddr_set_t_p->ac_trace_delay[6]);
-printf("\n.ac_trace_delay[7]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[7],ddr_set_t_p->ac_trace_delay[7]);
-printf("\n.ac_trace_delay[8]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[8],ddr_set_t_p->ac_trace_delay[8]);
-printf("\n.ac_trace_delay[9]=0x%08x,// %d",ddr_set_t_p->ac_trace_delay[9],ddr_set_t_p->ac_trace_delay[9]);
-printf("\n.lpddr4_dram_vout_voltage_1_3_2_5_setting=0x%08x,// %d",ddr_set_t_p->lpddr4_dram_vout_voltage_1_3_2_5_setting,ddr_set_t_p->lpddr4_dram_vout_voltage_1_3_2_5_setting);
-printf("\n.lpddr4_x8_mode=0x%08x,// %d",ddr_set_t_p->lpddr4_x8_mode,ddr_set_t_p->lpddr4_x8_mode);
-printf("\n.ac_pinmux[0]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[0],ddr_set_t_p->ac_pinmux[0]);
-printf("\n.ac_pinmux[1]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[1],ddr_set_t_p->ac_pinmux[1]);
-printf("\n.ac_pinmux[2]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[2],ddr_set_t_p->ac_pinmux[2]);
-printf("\n.ac_pinmux[3]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[3],ddr_set_t_p->ac_pinmux[3]);
-printf("\n.ac_pinmux[4]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[4],ddr_set_t_p->ac_pinmux[4]);
-printf("\n.ac_pinmux[5]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[5],ddr_set_t_p->ac_pinmux[5]);
-printf("\n.ac_pinmux[6]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[6],ddr_set_t_p->ac_pinmux[6]);
-printf("\n.ac_pinmux[7]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[7],ddr_set_t_p->ac_pinmux[7]);
-printf("\n.ac_pinmux[8]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[8],ddr_set_t_p->ac_pinmux[8]);
-printf("\n.ac_pinmux[9]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[9],ddr_set_t_p->ac_pinmux[9]);
-printf("\n.ac_pinmux[10]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[10],ddr_set_t_p->ac_pinmux[10]);
-printf("\n.ac_pinmux[11]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[11],ddr_set_t_p->ac_pinmux[11]);
-printf("\n.ac_pinmux[12]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[12],ddr_set_t_p->ac_pinmux[12]);
-printf("\n.ac_pinmux[13]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[13],ddr_set_t_p->ac_pinmux[13]);
-printf("\n.ac_pinmux[14]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[14],ddr_set_t_p->ac_pinmux[14]);
-printf("\n.ac_pinmux[15]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[15],ddr_set_t_p->ac_pinmux[15]);
-printf("\n.ac_pinmux[16]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[16],ddr_set_t_p->ac_pinmux[16]);
-printf("\n.ac_pinmux[17]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[17],ddr_set_t_p->ac_pinmux[17]);
-printf("\n.ac_pinmux[18]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[18],ddr_set_t_p->ac_pinmux[18]);
-printf("\n.ac_pinmux[19]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[19],ddr_set_t_p->ac_pinmux[19]);
-printf("\n.ac_pinmux[20]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[20],ddr_set_t_p->ac_pinmux[20]);
-printf("\n.ac_pinmux[21]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[21],ddr_set_t_p->ac_pinmux[21]);
-printf("\n.ac_pinmux[22]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[22],ddr_set_t_p->ac_pinmux[22]);
-printf("\n.ac_pinmux[23]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[23],ddr_set_t_p->ac_pinmux[23]);
-printf("\n.ac_pinmux[24]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[24],ddr_set_t_p->ac_pinmux[24]);
-printf("\n.ac_pinmux[25]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[25],ddr_set_t_p->ac_pinmux[25]);
-printf("\n.ac_pinmux[26]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[26],ddr_set_t_p->ac_pinmux[26]);
-printf("\n.ac_pinmux[27]=0x%08x,// %d",ddr_set_t_p->ac_pinmux[27],ddr_set_t_p->ac_pinmux[27]);
-printf("\n.dfi_pinmux[0]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[0],ddr_set_t_p->dfi_pinmux[0]);
-printf("\n.dfi_pinmux[1]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[1],ddr_set_t_p->dfi_pinmux[1]);
-printf("\n.dfi_pinmux[2]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[2],ddr_set_t_p->dfi_pinmux[2]);
-printf("\n.dfi_pinmux[3]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[3],ddr_set_t_p->dfi_pinmux[3]);
-printf("\n.dfi_pinmux[4]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[4],ddr_set_t_p->dfi_pinmux[4]);
-printf("\n.dfi_pinmux[5]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[5],ddr_set_t_p->dfi_pinmux[5]);
-printf("\n.dfi_pinmux[6]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[6],ddr_set_t_p->dfi_pinmux[6]);
-printf("\n.dfi_pinmux[7]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[7],ddr_set_t_p->dfi_pinmux[7]);
-printf("\n.dfi_pinmux[8]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[8],ddr_set_t_p->dfi_pinmux[8]);
-printf("\n.dfi_pinmux[9]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[9],ddr_set_t_p->dfi_pinmux[9]);
-printf("\n.dfi_pinmux[10]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[10],ddr_set_t_p->dfi_pinmux[10]);
-printf("\n.dfi_pinmux[11]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[11],ddr_set_t_p->dfi_pinmux[11]);
-printf("\n.dfi_pinmux[12]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[12],ddr_set_t_p->dfi_pinmux[12]);
-printf("\n.dfi_pinmux[13]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[13],ddr_set_t_p->dfi_pinmux[13]);
-printf("\n.dfi_pinmux[14]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[14],ddr_set_t_p->dfi_pinmux[14]);
-printf("\n.dfi_pinmux[15]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[15],ddr_set_t_p->dfi_pinmux[15]);
-printf("\n.dfi_pinmux[16]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[16],ddr_set_t_p->dfi_pinmux[16]);
-printf("\n.dfi_pinmux[17]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[17],ddr_set_t_p->dfi_pinmux[17]);
-printf("\n.dfi_pinmux[18]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[18],ddr_set_t_p->dfi_pinmux[18]);
-printf("\n.dfi_pinmux[19]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[19],ddr_set_t_p->dfi_pinmux[19]);
-printf("\n.dfi_pinmux[20]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[20],ddr_set_t_p->dfi_pinmux[20]);
-printf("\n.dfi_pinmux[21]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[21],ddr_set_t_p->dfi_pinmux[21]);
-printf("\n.dfi_pinmux[22]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[22],ddr_set_t_p->dfi_pinmux[22]);
-printf("\n.dfi_pinmux[23]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[23],ddr_set_t_p->dfi_pinmux[23]);
-printf("\n.dfi_pinmux[24]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[24],ddr_set_t_p->dfi_pinmux[24]);
-printf("\n.dfi_pinmux[25]=0x%08x,// %d",ddr_set_t_p->dfi_pinmux[25],ddr_set_t_p->dfi_pinmux[25]);
-printf("\n.slt_test_function[0]  =0x%08x,// %d",ddr_set_t_p->slt_test_function[0]  ,ddr_set_t_p->slt_test_function[0]  );
-printf("\n.slt_test_function[1]  =0x%08x,// %d",ddr_set_t_p->slt_test_function[1]  ,ddr_set_t_p->slt_test_function[1]  );
-printf("\n.tdqs2dq=0x%08x,// %d",ddr_set_t_p->tdqs2dq,ddr_set_t_p->tdqs2dq);
-printf("\n.dram_data_wr_odt_ohm=0x%08x,// %d",ddr_set_t_p->dram_data_wr_odt_ohm,ddr_set_t_p->dram_data_wr_odt_ohm);
-printf("\n.bitTimeControl_2d=0x%08x,// %d",ddr_set_t_p->bitTimeControl_2d,ddr_set_t_p->bitTimeControl_2d);
-printf("\n.ddr_dmc_remap[0]=0x%08x,// %d",ddr_set_t_p->ddr_dmc_remap[0],ddr_set_t_p->ddr_dmc_remap[0]);
-printf("\n.ddr_dmc_remap[1]=0x%08x,// %d",ddr_set_t_p->ddr_dmc_remap[1],ddr_set_t_p->ddr_dmc_remap[1]);
-printf("\n.ddr_dmc_remap[2]=0x%08x,// %d",ddr_set_t_p->ddr_dmc_remap[2],ddr_set_t_p->ddr_dmc_remap[2]);
-printf("\n.ddr_dmc_remap[3]=0x%08x,// %d",ddr_set_t_p->ddr_dmc_remap[3],ddr_set_t_p->ddr_dmc_remap[3]);
-printf("\n.ddr_dmc_remap[4]=0x%08x,// %d",ddr_set_t_p->ddr_dmc_remap[4],ddr_set_t_p->ddr_dmc_remap[4]);
-printf("\n.ddr_lpddr34_ca_remap[0]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_ca_remap[0],ddr_set_t_p->ddr_lpddr34_ca_remap[0]);
-printf("\n.ddr_lpddr34_ca_remap[1]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_ca_remap[1],ddr_set_t_p->ddr_lpddr34_ca_remap[1]);
-printf("\n.ddr_lpddr34_ca_remap[2]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_ca_remap[2],ddr_set_t_p->ddr_lpddr34_ca_remap[2]);
-printf("\n.ddr_lpddr34_ca_remap[3]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_ca_remap[3],ddr_set_t_p->ddr_lpddr34_ca_remap[3]);
-printf("\n.ddr_lpddr34_dq_remap[0]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[0],ddr_set_t_p->ddr_lpddr34_dq_remap[0]);
-printf("\n.ddr_lpddr34_dq_remap[1]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[1],ddr_set_t_p->ddr_lpddr34_dq_remap[1]);
-printf("\n.ddr_lpddr34_dq_remap[2]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[2],ddr_set_t_p->ddr_lpddr34_dq_remap[2]);
-printf("\n.ddr_lpddr34_dq_remap[3]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[3],ddr_set_t_p->ddr_lpddr34_dq_remap[3]);
-printf("\n.ddr_lpddr34_dq_remap[4]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[4],ddr_set_t_p->ddr_lpddr34_dq_remap[4]);
-printf("\n.ddr_lpddr34_dq_remap[5]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[5],ddr_set_t_p->ddr_lpddr34_dq_remap[5]);
-printf("\n.ddr_lpddr34_dq_remap[6]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[6],ddr_set_t_p->ddr_lpddr34_dq_remap[6]);
-printf("\n.ddr_lpddr34_dq_remap[7]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[7],ddr_set_t_p->ddr_lpddr34_dq_remap[7]);
-printf("\n.ddr_lpddr34_dq_remap[8]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[8],ddr_set_t_p->ddr_lpddr34_dq_remap[8]);
-printf("\n.ddr_lpddr34_dq_remap[9]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[9],ddr_set_t_p->ddr_lpddr34_dq_remap[9]);
-printf("\n.ddr_lpddr34_dq_remap[10]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[10],ddr_set_t_p->ddr_lpddr34_dq_remap[10]);
-printf("\n.ddr_lpddr34_dq_remap[11]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[11],ddr_set_t_p->ddr_lpddr34_dq_remap[11]);
-printf("\n.ddr_lpddr34_dq_remap[12]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[12],ddr_set_t_p->ddr_lpddr34_dq_remap[12]);
-printf("\n.ddr_lpddr34_dq_remap[13]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[13],ddr_set_t_p->ddr_lpddr34_dq_remap[13]);
-printf("\n.ddr_lpddr34_dq_remap[14]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[14],ddr_set_t_p->ddr_lpddr34_dq_remap[14]);
-printf("\n.ddr_lpddr34_dq_remap[15]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[15],ddr_set_t_p->ddr_lpddr34_dq_remap[15]);
-printf("\n.ddr_lpddr34_dq_remap[16]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[16],ddr_set_t_p->ddr_lpddr34_dq_remap[16]);
-printf("\n.ddr_lpddr34_dq_remap[17]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[17],ddr_set_t_p->ddr_lpddr34_dq_remap[17]);
-printf("\n.ddr_lpddr34_dq_remap[18]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[18],ddr_set_t_p->ddr_lpddr34_dq_remap[18]);
-printf("\n.ddr_lpddr34_dq_remap[19]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[19],ddr_set_t_p->ddr_lpddr34_dq_remap[19]);
-printf("\n.ddr_lpddr34_dq_remap[20]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[20],ddr_set_t_p->ddr_lpddr34_dq_remap[20]);
-printf("\n.ddr_lpddr34_dq_remap[21]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[21],ddr_set_t_p->ddr_lpddr34_dq_remap[21]);
-printf("\n.ddr_lpddr34_dq_remap[22]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[22],ddr_set_t_p->ddr_lpddr34_dq_remap[22]);
-printf("\n.ddr_lpddr34_dq_remap[23]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[23],ddr_set_t_p->ddr_lpddr34_dq_remap[23]);
-printf("\n.ddr_lpddr34_dq_remap[24]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[24],ddr_set_t_p->ddr_lpddr34_dq_remap[24]);
-printf("\n.ddr_lpddr34_dq_remap[25]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[25],ddr_set_t_p->ddr_lpddr34_dq_remap[25]);
-printf("\n.ddr_lpddr34_dq_remap[26]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[26],ddr_set_t_p->ddr_lpddr34_dq_remap[26]);
-printf("\n.ddr_lpddr34_dq_remap[27]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[27],ddr_set_t_p->ddr_lpddr34_dq_remap[27]);
-printf("\n.ddr_lpddr34_dq_remap[28]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[28],ddr_set_t_p->ddr_lpddr34_dq_remap[28]);
-printf("\n.ddr_lpddr34_dq_remap[29]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[29],ddr_set_t_p->ddr_lpddr34_dq_remap[29]);
-printf("\n.ddr_lpddr34_dq_remap[30]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[30],ddr_set_t_p->ddr_lpddr34_dq_remap[30]);
-printf("\n.ddr_lpddr34_dq_remap[31]=0x%08x,// %d",ddr_set_t_p->ddr_lpddr34_dq_remap[31],ddr_set_t_p->ddr_lpddr34_dq_remap[31]);
-printf("\n.dram_rtt_nom_wr_park[0]=0x%08x,// %d",ddr_set_t_p->dram_rtt_nom_wr_park[0],ddr_set_t_p->dram_rtt_nom_wr_park[0]);
-printf("\n.dram_rtt_nom_wr_park[1]=0x%08x,// %d",ddr_set_t_p->dram_rtt_nom_wr_park[1],ddr_set_t_p->dram_rtt_nom_wr_park[1]);
-printf("\n.ddr_func=0x%08x,// %d",ddr_set_t_p->ddr_func,ddr_set_t_p->ddr_func);
-
-/*
-printf("\n.read_dqs_delay[0]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[0],ddr_set_t_p->read_dqs_delay[0]);
-printf("\n.read_dqs_delay[1]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[1],ddr_set_t_p->read_dqs_delay[1]);
-printf("\n.read_dqs_delay[2]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[2],ddr_set_t_p->read_dqs_delay[2]);
-printf("\n.read_dqs_delay[3]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[3],ddr_set_t_p->read_dqs_delay[3]);
-printf("\n.read_dqs_delay[4]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[4],ddr_set_t_p->read_dqs_delay[4]);
-printf("\n.read_dqs_delay[5]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[5],ddr_set_t_p->read_dqs_delay[5]);
-printf("\n.read_dqs_delay[6]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[6],ddr_set_t_p->read_dqs_delay[6]);
-printf("\n.read_dqs_delay[7]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[7],ddr_set_t_p->read_dqs_delay[7]);
-printf("\n.read_dqs_delay[8]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[8],ddr_set_t_p->read_dqs_delay[8]);
-printf("\n.read_dqs_delay[9]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[9],ddr_set_t_p->read_dqs_delay[9]);
-printf("\n.read_dqs_delay[10]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[10],ddr_set_t_p->read_dqs_delay[10]);
-printf("\n.read_dqs_delay[11]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[11],ddr_set_t_p->read_dqs_delay[11]);
-printf("\n.read_dqs_delay[12]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[12],ddr_set_t_p->read_dqs_delay[12]);
-printf("\n.read_dqs_delay[13]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[13],ddr_set_t_p->read_dqs_delay[13]);
-printf("\n.read_dqs_delay[14]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[14],ddr_set_t_p->read_dqs_delay[14]);
-printf("\n.read_dqs_delay[15]=0x%08x,// %d",ddr_set_t_p->read_dqs_delay[15],ddr_set_t_p->read_dqs_delay[15]);
-printf("\n.read_dq_bit_delay[72]=0x%08x,// %d",ddr_set_t_p->read_dq_bit_delay[72],ddr_set_t_p->read_dq_bit_delay[72]);
-printf("\n.write_dqs_delay[16]=0x%08x,// %d",ddr_set_t_p->write_dqs_delay[16],ddr_set_t_p->write_dqs_delay[16]);
-printf("\n.write_dq_bit_delay[72]=0x%08x,// %d",ddr_set_t_p->write_dq_bit_delay[72],ddr_set_t_p->write_dq_bit_delay[72]);
-printf("\n.read_dqs_gate_delay[16]=0x%08x,// %d",ddr_set_t_p->read_dqs_gate_delay[16],ddr_set_t_p->read_dqs_gate_delay[16]);
-printf("\n.soc_bit_vref[32]=0x%08x,// %d",ddr_set_t_p->soc_bit_vref[32],ddr_set_t_p->soc_bit_vref[32]);
-printf("\n.dram_bit_vref[32]=0x%08x,// %d",ddr_set_t_p->dram_bit_vref[32],ddr_set_t_p->dram_bit_vref[32]);
-printf("\n.dq_dqs_delay_flag=0x%08x,// %d",ddr_set_t_p->dq_dqs_delay_flag,ddr_set_t_p->dq_dqs_delay_flag);
-printf("\n.dfi_mrl=0x%08x,// %d",ddr_set_t_p->dfi_mrl,ddr_set_t_p->dfi_mrl);
-printf("\n.dfi_hwtmrl=0x%08x,// %d",ddr_set_t_p->dfi_hwtmrl,ddr_set_t_p->dfi_hwtmrl);
-printf("\n.ARdPtrInitVal=0x%08x,// %d",ddr_set_t_p->ARdPtrInitVal,ddr_set_t_p->ARdPtrInitVal);
-
-
-*/
-
-
-//printf("\n.read_dq_bit_delay[72]=%d,",ddr_set_t_p->read_dq_bit_delay[72]);
-//printf("\n.write_dqs_delay[16]=%d,",ddr_set_t_p->write_dqs_delay[16]);
-//printf("\n.write_dq_bit_delay[72]=%d,",ddr_set_t_p->write_dq_bit_delay[72]);
-//printf("\n.read_dqs_gate_delay[16]=%d,",ddr_set_t_p->read_dqs_gate_delay[16]);
-//printf("\n.soc_bit_vref[32]=%d,",ddr_set_t_p->soc_bit_vref[32]);
-//printf("\n.dram_bit_vref[32]=%d,",ddr_set_t_p->dram_bit_vref[32]);
-//printf("\n.dq_dqs_delay_flag=%d,",ddr_set_t_p->dq_dqs_delay_flag);
-//printf("\n.dfi_mrl=%d,",ddr_set_t_p->dfi_mrl);
-//printf("\n.dfi_hwtmrl=%d,",ddr_set_t_p->dfi_hwtmrl);
-//printf("\n.ARdPtrInitVal=%d,",ddr_set_t_p->ARdPtrInitVal);
-
-for( temp_count=0;temp_count<16;temp_count++)
-printf("\n.read_dqs_delay[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->read_dqs_delay[temp_count],ddr_set_t_p->read_dqs_delay[temp_count]);
-for( temp_count=0;temp_count<72;temp_count++)
-printf("\n.read_dq_bit_delay[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->read_dq_bit_delay[temp_count],ddr_set_t_p->read_dq_bit_delay[temp_count]);
-for( temp_count=0;temp_count<16;temp_count++)
-//printf("\n.write_dqs_delay[%d]=%d,",temp_count,ddr_set_t_p->write_dqs_delay[temp_count]);
-printf("\n.write_dqs_delay[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->write_dqs_delay[temp_count],ddr_set_t_p->write_dqs_delay[temp_count]);
-for( temp_count=0;temp_count<72;temp_count++)
-//printf("\n.write_dq_bit_delay[%d]=%d,",temp_count,ddr_set_t_p->write_dq_bit_delay[temp_count]);
-printf("\n.write_dq_bit_delay[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->write_dq_bit_delay[temp_count],ddr_set_t_p->write_dq_bit_delay[temp_count]);
-for( temp_count=0;temp_count<16;temp_count++)
-//printf("\n.read_dqs_gate_delay[%d]=%d,",temp_count,ddr_set_t_p->read_dqs_gate_delay[temp_count]);
-printf("\n.read_dqs_gate_delay[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->read_dqs_gate_delay[temp_count],ddr_set_t_p->read_dqs_gate_delay[temp_count]);
-for( temp_count=0;temp_count<32;temp_count++)
-//printf("\n.soc_bit_vref[%d]=%d,",temp_count,ddr_set_t_p->soc_bit_vref[temp_count]);
-printf("\n.soc_bit_vref[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->soc_bit_vref[temp_count],ddr_set_t_p->soc_bit_vref[temp_count]);
-for( temp_count=0;temp_count<32;temp_count++)
-//printf("\n.dram_bit_vref[%d]=%d,",temp_count,ddr_set_t_p->dram_bit_vref[temp_count]);
-printf("\n.dram_bit_vref[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->dram_bit_vref[temp_count],ddr_set_t_p->dram_bit_vref[temp_count]);
-
-//ddr_set_t_p->dq_dqs_delay_flag=0xff;
-printf("\n.rever3=0x%08x,// %d",ddr_set_t_p->rever3,ddr_set_t_p->rever3);
-printf("\n.dfi_mrl=0x%08x,// %d",ddr_set_t_p->dfi_mrl,ddr_set_t_p->dfi_mrl);
-printf("\n.dfi_hwtmrl=0x%08x,// %d",ddr_set_t_p->dfi_hwtmrl,ddr_set_t_p->dfi_hwtmrl);
-printf("\n.ARdPtrInitVal=0x%08x,// %d",ddr_set_t_p->ARdPtrInitVal,ddr_set_t_p->ARdPtrInitVal);
-
-for( temp_count=0;temp_count<16;temp_count++)
-//printf("\n.dram_bit_vref[%d]=%d,",temp_count,ddr_set_t_p->dram_bit_vref[temp_count]);
-printf("\n.retraining[%d]=0x%08x,// %d",temp_count,ddr_set_t_p->retraining[temp_count],ddr_set_t_p->retraining[temp_count]);
-
-
-printf("\n");
-/*
 		printf("\nddr_set_t_p->magic:%08x",ddr_set_t_p->magic);
 		printf("\nddr_set_t_p->rsv_int0:%08x",ddr_set_t_p->rsv_int0);
 		printf("\nddr_set_t_p->board_id:%08x",ddr_set_t_p->board_id);
@@ -23397,7 +22733,7 @@ printf("\n");
 		printf("\nddr_set_t_p->vref_output_permil:%08x",ddr_set_t_p->vref_output_permil);
 		printf("\nddr_set_t_p->vref_receiver_permil:%08x",ddr_set_t_p->vref_receiver_permil);
 		printf("\nddr_set_t_p->vref_dram_permil:%08x",ddr_set_t_p->vref_dram_permil);
-        printf("\nddr_set_t_p->max_core_timmming_frequency:%08x",ddr_set_t_p->max_core_timmming_frequency);
+		printf("\nddr_set_t_p->vref_reverse:%08x",ddr_set_t_p->vref_reverse);
 		printf("\nddr_set_t_p->ac_trace_delay[0]:%08x",ddr_set_t_p->ac_trace_delay[0]);
 		printf("\nddr_set_t_p->ac_trace_delay[1]:%08x",ddr_set_t_p->ac_trace_delay[1]);
 		printf("\nddr_set_t_p->ac_trace_delay[2]:%08x",ddr_set_t_p->ac_trace_delay[2]);
@@ -23408,14 +22744,13 @@ printf("\n");
 		printf("\nddr_set_t_p->ac_trace_delay[7]:%08x",ddr_set_t_p->ac_trace_delay[7]);
 		printf("\nddr_set_t_p->ac_trace_delay[8]:%08x",ddr_set_t_p->ac_trace_delay[8]);
 		printf("\nddr_set_t_p->ac_trace_delay[9]:%08x",ddr_set_t_p->ac_trace_delay[9]);
-        printf("\nddr_set_t_p->lpddr4_dram_vout_voltage_1_3_2_5_setting:%08x",ddr_set_t_p->lpddr4_dram_vout_voltage_1_3_2_5_setting);
-        printf("\nddr_set_t_p->lpddr4_x8_mode:%08x",ddr_set_t_p->lpddr4_x8_mode);
+		printf("\nddr_set_t_p->ac_trace_delay[10]:%08x",ddr_set_t_p->ac_trace_delay[10]);
+		printf("\nddr_set_t_p->ac_trace_delay[11]:%08x",ddr_set_t_p->ac_trace_delay[11]);
 		//printf("\nddr_set_t_p->ac_pinmux[26]:%08x",ddr_set_t_p->ac_pinmux[26]);
 		//printf("\nddr_set_t_p->dfi_pinmux[28]:%08x",ddr_set_t_p->dfi_pinmux[28]);
 		//printf("\nddr_set_t_p->slt_test_function[2]:%08x",ddr_set_t_p->slt_test_function[2]);
 		printf("\nddr_set_t_p->dq_bdlr_org:%08x",ddr_set_t_p->dq_bdlr_org);
-        printf("\nddr_set_t_p->dram_data_wr_odt_ohm:%08x",ddr_set_t_p->dram_data_wr_odt_ohm);
-        printf("\nddr_set_t_p->bitTimeControl_2d:%08x",ddr_set_t_p->bitTimeControl_2d);
+		//printf("\nddr_set_t_p->rsv_char1[2]:%08x",ddr_set_t_p->rsv_char1[2]);
 		printf("\nddr_set_t_p->ddr_dmc_remap[0]:%08x",ddr_set_t_p->ddr_dmc_remap[0]);
 		printf("\nddr_set_t_p->ddr_dmc_remap[1]:%08x",ddr_set_t_p->ddr_dmc_remap[1]);
 		printf("\nddr_set_t_p->ddr_dmc_remap[2]:%08x",ddr_set_t_p->ddr_dmc_remap[2]);
@@ -23463,283 +22798,9 @@ printf("\n");
 		//printf("\nddr_set_t_p->rsv_long0[2]:%08x",ddr_set_t_p->rsv_long0[2]);
 		//printf("\nddr_set_t_p->dqs_adjust[16]:%08x",ddr_set_t_p->dqs_adjust[16]);
 		//printf("\nddr_set_t_p->dq_bit_delay[72]:%08x",ddr_set_t_p->dq_bit_delay[72]);
-*/
+
 	}
 
-
-
-	return 1;
-
-
-}
-
-
-int do_ddr_fastboot_config(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-
-	int i=0;
-	int count=0;
-	char *endp;
-	unsigned int enable_ddr_fast_boot=0;  // 0 pause 1,resume
-
-	printf("\nargc== 0x%08x\n", argc);
-	for (i = 0;i<argc;i++)
-		printf("\nargv[%d]=%s\n",i,argv[i]);
-	if (argc == 1)
-		printf("\nplease read help\n");
-	else if (argc > 1)
-	{
-			count=0;
-			enable_ddr_fast_boot= simple_strtoull_ddr(argv[count+1], &endp, 0);
-			if (*argv[count+1] == 0 || *endp != 0)
-			{
-				enable_ddr_fast_boot = 0;
-			}
-			//	count++;
-		}
- if(!enable_ddr_fast_boot)
- 	return 1;
-	ddr_set_t *ddr_set_t_p=NULL;
-	ddr_set_t_p=(ddr_set_t *)(ddr_set_t_p_arrary);
-	//ddr_set_t_p= (ddr_set_t *)G12_DMC_STICKY_0;
-	//if (sizeof(ddr_set_t)<loop_max)
-	uint32_t  ddr_set_add=0;
-	uint32_t  ddr_set_size=0;
-	ddr_set_add=(uint32_t)(uint64_t)(ddr_set_t_p);
-	ddr_set_size=sizeof(ddr_set_t);
-	printf("\nddr_set_t_p==0x%08x\n",ddr_set_add);
-	uint32_t loop=0;
-	uint32_t loop_max = (4+(0x3f<<2));//((DMC_STICKY_63-DMC_STICKY_0));
-			//	loop_max=sizeof(ddr_set_t);
-			for (loop = 0; loop <loop_max; loop+=4) {
-				wr_reg(((uint64_t)(ddr_set_t_p) + loop), rd_reg(G12_DMC_STICKY_0 + loop));
-			}
-	
-			
-{
-		uint16_t	dq_bit_delay[72];
-		unsigned	char t_count=0;
-		uint16_t  delay_org=0;
-		uint16_t  delay_temp=0;
-		uint32_t  add_offset=0;
-		dwc_ddrphy_apb_wr(0xd0000,0x0);
-
-char dmc_test_worst_window_rx=0;
-		char dmc_test_worst_window_tx=0;
-
-{
-	dwc_ddrphy_apb_wr((0<<20)|(0xd<<16)|(0<<12)|(0x0),0); // DWC_DDRPHYA_APBONLY0_MicroContMuxSel
-
-	dmc_test_worst_window_tx=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0x0c2));
-	dmc_test_worst_window_rx=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0x0c3));
-	if(dmc_test_worst_window_tx>30)
-		dmc_test_worst_window_tx=30;
-	if(dmc_test_worst_window_rx>30)
-		dmc_test_worst_window_rx=30;
-//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(0<<12)|(0x1c2),t4_write_worst_margin_rank1);
-//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(0<<12)|(0x1c3),t4_read_worst_margin_rank1);
-ddr_set_t_p->fast_boot[1]=(((dmc_test_worst_window_tx/2)<<4))|(((dmc_test_worst_window_rx/2)));
-				}
-	
-
-		{
-
-			
-
-	//	printf("\n ARdPtrInitVal");
-		add_offset=((0<<20)|(0<<16)|(0<<12)|(0x2e));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-		ddr_set_t_p->ARdPtrInitVal=delay_org;
-	//	printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		
-	//	printf("\n dfimrl0 dfimrl1 dfimrl2 dfimrl3 HwtMRL");
-		add_offset=((0<<20)|(1<<16)|(0<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-		ddr_set_t_p->dfi_mrl=delay_org;
-	//	printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(1<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-	//	printf("\n t_count: %04d %04d  %08x %08x",1,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(2<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-	//	printf("\n t_count: %04d %04d  %08x %08x",2,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(3<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-	//	printf("\n t_count: %04d %04d  %08x %08x",3,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(2<<16)|(0<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-
-		ddr_set_t_p->dfi_hwtmrl=delay_org;
-	//	printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		}
-	{
-	//	printf("\n count_index     delay_value     register_add     register_value \n ");
-	//	printf("\n address delay * 1/32UIx100==%d ps bit0-4 fine tune  --step==1/32UI ,bit 6 is coarse  --step==1UI",ui_1_32_100step);
-		for(t_count=0;t_count<10;t_count++)
-		{
-			add_offset=((0<<20)|(0<<16)|(t_count<<12)|(0x80));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			ddr_set_t_p->ac_trace_delay[t_count]=delay_temp;
-	//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	}
-	{
-	//	printf("\n tdqs delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI ,bit 6-9 is coarse  --step==1UI",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0xd0+(t_count/8)+((t_count%2)<<8)));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			
-			ddr_set_t_p->write_dqs_delay[t_count]=delay_temp;
-			
-		//	printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	}
-	{
-	//	printf("\n rxdqs delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI,no coarse",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0x8c+(t_count/8)+((t_count%2)<<8)));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			ddr_set_t_p->read_dqs_delay[t_count]=delay_temp;
-	//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	}
-	{
-	//	printf("\n write dq_bit delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI ,bit 6-8 is coarse  --step==1U",ui_1_32_100step);
-			for(t_count=0;t_count<72;t_count++)
-			{
-				add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(0xc0+((t_count%9)<<8)+(t_count/36)));
-				dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-				delay_org=dq_bit_delay[t_count];
-				delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-
-				ddr_set_t_p->write_dq_bit_delay[t_count]=delay_temp;
-
-				
-		//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-			}
-	}
-	{
-	//	printf("\n read dq_bit delay * BDLRx100==%d ps bit0-4 fine tune --step==bdlr step size about 5ps,no coarse",bdlr_100step);
-		for(t_count=0;t_count<72;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(0x68+((t_count%9)<<8)+(t_count/36)));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=((delay_org&0x3f));
-			
-			ddr_set_t_p->read_dq_bit_delay[t_count]=delay_temp;
-		//	printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	}
-	{
-	//	printf("\n read dqs gate delay * 1/32UIx100==%d ps bit0-4 fine tune ,bit 6-10 is coarse",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0x80+(t_count/8)+((t_count%2)<<8)));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-
-			ddr_set_t_p->read_dqs_gate_delay[t_count]=delay_temp;
-
-			
-	//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-
-	//	printf("\n soc vref : lpddr4-- VREF = VDDQ*(0.047 + VrefDAC0[6:0]*0.00367   DDR4 --VREF = VDDQ*(0.510 + VrefDAC0[6:0]*0.00345");
-		//((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(((over_ride_sub_index%36)%9)<<8)|(0x40),over_ride_value)	
-		uint32_t vref_t_count=0;
-		for(t_count=0;t_count<72;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(((t_count%36)%9)<<8)|(0x40));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=((delay_org));
-
-if(t_count<35)
-{
-			vref_t_count=((((t_count%36)/9)*8)+(t_count%9));
-
-			ddr_set_t_p->soc_bit_vref[vref_t_count]=delay_temp;
-}
-
-			
-	//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-
-
-
-//	printf("\n dram vref : lpddr4-- VREF = VDDQ*(0. + VrefDAC0[6:0]*0.   DDR4 --VREF = VDDQ*(0. + VrefDAC0[6:0]*0.");
-	add_offset=((0<<20)|(1<<16)|(0<<12)|(0x082));
-delay_temp=dwc_ddrphy_apb_rd(add_offset);
-					for(t_count=0;t_count<32;t_count++)
-		{
-
-		
-			ddr_set_t_p->dram_bit_vref[t_count]=delay_temp;
-
-
-			
-		//	printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	//	printf("\n t_count: %04d %04d  %08x %08x",0,delay_temp,((((add_offset) << 1)+0xfe000000)),delay_temp);
-
-						for(t_count=0;t_count<4;t_count++)
-		{//p_dev->p_ddrs->tdqs2dq=lpddr4_tdqs2dq;
-		//ddr_set_t_p->retraining[0]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xaa));  //PptCtlStatic
-		//ddr_set_t_p->retraining[1]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xae));  //PptDqsCntInvTrnTg0  ps0 rank0
-		//ddr_set_t_p->retraining[2]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xaf));  //PptDqsCntInvTrnTg0  ps0 rank1
-		ddr_set_t_p->retraining[4*t_count+0]=(dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaa)))&0xff;  //PptCtlStatic
-		ddr_set_t_p->retraining[4*t_count+1]=(dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaa)))>>8;  //PptCtlStatic
-		ddr_set_t_p->retraining[4*t_count+2]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xae));  //PptDqsCntInvTrnTg0  ps0 rank0 lane 0-3
-		ddr_set_t_p->retraining[4*t_count+3]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaf));  //PptDqsCntInvTrnTg0  ps0 rank1 lane 0-3
-		}
-	}
-}
-
-
-char str[1024]="";
-//store ddr_parameter write 0x77f81cf0 0x300
-//	printf("\n ");
-
-
-		if(enable_ddr_fast_boot==1)
-			ddr_set_t_p->fast_boot[0]=0xff;
-
-		if(enable_ddr_fast_boot==2)
-			ddr_set_t_p->fast_boot[0]=0;
-
-			{
-		#ifdef DEBUG_DDR_FASTBOOT_SHA
-		printf("&ddr_sha.ddrs : 0x%x\n", (uint32_t)(uint64_t)&ddr_sha.ddrs);
-		printf("&ddr_sha.sha2 : 0x%x\n", (uint32_t)(uint64_t)&ddr_sha.sha2);
-		printf("ddr_set_add : 0x%x\n", (uint32_t)(uint64_t)ddr_set_add);
-		#endif
-		sha256_csum_wd((unsigned char *)(uint64_t)ddr_set_add, sizeof(ddr_set_t), ddr_sha.sha2, 0);
-		#ifdef DEBUG_DDR_FASTBOOT_SHA
-		printf("print sha\n");
-		sprintf(str,"md %08x 0x100", (uint32_t)(uint64_t)(ddr_set_add-32));
-		run_command(str,0);
-		#endif
-	#ifdef USE_FOR_UBOOT_2018
-		sprintf(str,"store rsv write ddr-parameter 0x%08x 0x%08x ",ddr_set_add-SHA256_SUM_LEN,ddr_set_size+SHA256_SUM_LEN);
-	#else
-		sprintf(str,"store ddr_parameter write 0x%08x 0x%08x ",ddr_set_add-SHA256_SUM_LEN,ddr_set_size+SHA256_SUM_LEN);
-	#endif
-		//	sprintf(str,"store ddr_parameter write 0x%08x 0x%08x ",ddr_set_add,ddr_set_size);
-	//	sprintf(str,"store rsv write ddr-parameter 0x%08x 0x%08x ",ddr_set_add,ddr_set_size);
-			printf("\nstr=%s\n",str);
-
-			run_command(str,0);
-			}
 
 
 	return 1;
@@ -23798,15 +22859,15 @@ int do_ddr_display_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 	unsigned int ddr_type= pub_dcr&0x7; //0 -lpddr2  |  1- lpddr3  |   2- rev  |  3 -ddr3   | 4- ddr4
 
 	{
-		if (ddr_type==0)
+		if (ddr_type == 0)
 			printf("\nddr_type==lpddr2\n");
-		if (ddr_type==1)
+		if (ddr_type == 1)
 			printf("\nddr_type==lpddr3\n");
-		if (ddr_type==DDR_TYPE_DDR3)
+		if (ddr_type == DDR_TYPE_DDR3)
 			printf("\nddr_type==ddr3\n");
-		if (ddr_type==DDR_TYPE_DDR4)
+		if (ddr_type == DDR_TYPE_DDR4)
 			printf("\nddr_type==ddr4\n");
-		if(ddr_type==DDR_TYPE_DDR3)
+		if (ddr_type == DDR_TYPE_DDR3)
 		{//soc_zq_odt_div=360;
 		}
 		soc_ac_drv3=zq0pr_org&0xf;
@@ -23829,9 +22890,9 @@ int do_ddr_display_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 
 		reg_value=pub_mr1;
-		if((((reg_value>>5)&1)==0))
+		if ((((reg_value>>5)&1) == 0))
 		{
-			if(((reg_value>>1)&1)==0)
+			if (((reg_value>>1)&1) == 0)
 			{
 				dram_drv=40;
 				dram_ddr4_drv=34;
@@ -23843,40 +22904,40 @@ int do_ddr_display_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			}
 		}
 
-		if(((reg_value>>8)&7)==0)
+		if (((reg_value>>8)&7) == 0)
 		{
 			dram_ddr4_odt=0;
 		}
-		if(((reg_value>>8)&7))
+		if (((reg_value>>8)&7))
 		{
 			dram_ddr4_odt=240/(((reg_value>>10)&1)|(((reg_value>>9)&1)<<1)|(((reg_value>>8)&1)<<2));
 		}
 		reg_value=(((reg_value>>9)&1)<<2)|(((reg_value>>6)&1)<<1)|(((reg_value>>2)&1)<<0);
-		if(reg_value==1)
+		if (reg_value == 1)
 		{
 			dram_odt=60;
 		}
-		if(reg_value==2)
+		if (reg_value == 2)
 		{
 			dram_odt=120;
 		}
-		if(reg_value==3)
+		if (reg_value == 3)
 		{
 			dram_odt=40;
 		}
-		if(reg_value==4)
+		if (reg_value == 4)
 		{
 			dram_odt=20;
 		}
-		if(reg_value==5)
+		if (reg_value == 5)
 		{
 			dram_odt=30;
-		}	
+		}
 
 		printf("zq0pr_org==%x,zq1pr_org==%x,zq2pr_org==%x,\n",zq0pr_org,zq1pr_org,zq2pr_org);
 		printf("soc_ac_drv3==%d,soc_ac_odt3==%d,\n",480/(soc_ac_drv3+1),360/(soc_ac_odt3+1));
-		printf("soc_data01_drv3==%d,soc_data01_odt3==%d,\n",480/(soc_data01_drv3+1),360/(soc_data01_odt3+1));	
-		printf("soc_data23_drv3==%d,soc_data23_odt3==%d,\n",480/(soc_data23_drv3+1),360/(soc_data23_odt3+1));	
+		printf("soc_data01_drv3==%d,soc_data01_odt3==%d,\n",480/(soc_data01_drv3+1),360/(soc_data01_odt3+1));
+		printf("soc_data23_drv3==%d,soc_data23_odt3==%d,\n",480/(soc_data23_drv3+1),360/(soc_data23_odt3+1));
 		printf("dram_drv3==%d,dram_odt3==%d,\n\n\n",dram_drv,dram_odt);
 
 		printf("soc_ac_drv4_up==%d,soc_ac_drv4_down==%d,soc_ac_odt4==%d,\n",480/(soc_ac_drv4_up+1),480/(soc_ac_drv4_down+1),480/(soc_ac_odt4+1));
@@ -23909,12 +22970,12 @@ int do_ddr_display_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 		///*
 		unsigned int i=0;
 		unsigned int rank=0;
-		for(rank=0;rank<2;(rank++))
+		for (rank=0;rank<2;(rank++))
 		{
 			printf("DDR0_RANK0==%d,\n",rank);
 			//bl2_print("DDR0_RANK0: 0x", rank, VALUE_HEX, "\n\n");
 			wr_reg(DDR0_PUB_RANKIDR, ((rank<<0)|((rank<<16))));
-			for(i=0;i<4;(i++))
+			for (i=0;i<4;(i++))
 			{
 				//change dtcr0 lane reg map
 				wr_reg(DDR0_PUB_DTCR0,(((rank<<24)|(i<<16)))|((rd_reg(DDR0_PUB_DTCR0))&(~((1<<11)|(0xf<<16)))));//
@@ -23943,7 +23004,7 @@ int do_ddr_display_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 				printf("DDR0_PUB_R_SETTING: %d\n", ((rd_reg((uint64_t)(DDR0_PUB_DX0LCDLR3+i*(DDR0_PUB_DX1LCDLR3-DDR0_PUB_DX0LCDLR3)))))&0x1ff);
 				lcdlr_r_setting[rank][i]=((rd_reg((uint64_t)(DDR0_PUB_DX0LCDLR3+i*(DDR0_PUB_DX1LCDLR3-DDR0_PUB_DX0LCDLR3)))));
-				printf("DDR0_PUB_VTDR: 0x%x\n", (rd_reg(DDR0_PUB_VTDR)));	
+				printf("DDR0_PUB_VTDR: 0x%x\n", (rd_reg(DDR0_PUB_VTDR)));
 			}
 		}
 		wr_reg(DDR0_PUB_RANKIDR, ((0<<0)|((0<<16))));
@@ -23965,11 +23026,11 @@ int do_ddr_display_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 				global_ddr_clk ,(10000*1000/(2*global_ddr_clk))/((rd_reg(DDR0_PUB_ACMDLR0)>>16)&0X1FF),
 				(1000*100000/(2*global_ddr_clk))/((rd_reg(DDR0_PUB_ACMDLR0)>>16)&0X1FF));
 		delay_line_100step=(1000*100000/(2*global_ddr_clk))/((rd_reg(DDR0_PUB_ACMDLR0)>>16)&0X1FF);
-		for(rank=0;rank<2;(rank++))
+		for (rank=0;rank<2;(rank++))
 		{
 			printf("DDR0_RANK0==%d,\n",rank);
 
-			for(i=0;i<4;(i++))
+			for (i=0;i<4;(i++))
 			{
 				//dtedr0[rank][i]=(rd_reg(DDR0_PUB_DTEDR0));
 				//dtedr1[rank][i]=(rd_reg(DDR0_PUB_DTEDR1));
@@ -23984,7 +23045,7 @@ int do_ddr_display_ddr_information(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 				printf("%4d      ", ((((dtedr1[rank][i])>>9)&0x1ff)-lcdlr_r_setting[rank][i])*delay_line_100step/100
 					  );
 			}
-			printf("\n");			
+			printf("\n");
 		}
 		printf("\nend==%d,\n",rank);
 #endif
@@ -24000,7 +23061,7 @@ int do_ddr_offset_ddr_lcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 {
 
 	//ddr_test_cmd 0x25 1 1  10 10 10 10 10 10 10 10 10 10
-#if (CONFIG_DDR_PHY > P_DDR_PHY_DEFAULT) 
+#if (CONFIG_DDR_PHY > P_DDR_PHY_DEFAULT)
 	//   if(!argc)
 	//    goto DDR_TUNE_DQS_START;
 	int i=0;
@@ -24010,7 +23071,7 @@ int do_ddr_offset_ddr_lcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 	unsigned int count=0;
 	unsigned int reg_add=0;
 	unsigned int reg_value=0;
-	unsigned int offset_value[10]={0,0,0,0,0,0,0,0,0,0} ; // ac w  clk w   lane 0 w r lane 1 w r lane2 w r lane3 w r  
+	unsigned int offset_value[10]={0,0,0,0,0,0,0,0,0,0} ; // ac w  clk w   lane 0 w r lane 1 w r lane2 w r lane3 w r
 	printf("\nargc== 0x%08x\n", argc);
 	for (i = 0;i<argc;i++)
 		printf("\nargv[%d]=%s\n",i,argv[i]);
@@ -24037,9 +23098,9 @@ int do_ddr_offset_ddr_lcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 		}
 
 		if  (argc > 3)
-		{		
+		{
 			count=2;
-			while(count<(argc-1))
+			while (count<(argc-1))
 			{
 				offset_value[count-2]= simple_strtoull_ddr(argv[count+1], &endp, 0);
 				if (*argv[count+1] == 0 || *endp != 0)
@@ -24053,7 +23114,7 @@ int do_ddr_offset_ddr_lcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 	}
 
 	printf("resume_ddl=%d,\n",resume_ddl);
-	if(offset_id)
+	if (offset_id)
 		printf("offset right ++%d,\n",offset_id);
 	else
 		printf("offset left --%d,\n",offset_id);
@@ -24080,15 +23141,15 @@ int do_ddr_offset_ddr_lcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 
 
 	//if (vref_lcdlr_offset)
-	for (i = 0;i<10;i++)	
+	for (i = 0;i<10;i++)
 	{
-		if(i==0)
+		if (i == 0)
 			reg_add = DDR0_PUB_ACLCDLR;
-		if(i==1)
+		if (i == 1)
 			reg_add = DDR0_PUB_ACBDLR0;
-		if(i>1)
+		if (i>1)
 		{
-			if(i%2){
+			if (i%2) {
 				reg_add = DDR0_PUB_DX0LCDLR3 + ((DDR0_PUB_DX1LCDLR3 - DDR0_PUB_DX0LCDLR3)*((i-2)/2));}
 			else{
 				reg_add = DDR0_PUB_DX0LCDLR1 + ((DDR0_PUB_DX1LCDLR3 - DDR0_PUB_DX0LCDLR3)*((i-2)/2));}
@@ -24096,10 +23157,10 @@ int do_ddr_offset_ddr_lcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 
 		printf("\n org reg_add 0x%08x== 0x%08x\n ",(reg_add),
 				rd_reg(reg_add));
-		if(offset_id)  //offset +
+		if (offset_id)  //offset +
 		{
 			wr_reg(reg_add, ( rd_reg(reg_add)+offset_value[i]));
-			if(i>1)
+			if (i>1)
 			{if(i%2){wr_reg((reg_add+DDR0_PUB_DX0LCDLR4-DDR0_PUB_DX0LCDLR3),
 					( rd_reg((reg_add+DDR0_PUB_DX0LCDLR4-DDR0_PUB_DX0LCDLR3))+offset_value[i]));
 					}
@@ -24113,7 +23174,7 @@ int do_ddr_offset_ddr_lcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 			reg_value=rd_reg(reg_add);
 			reg_value=( reg_value>offset_value[i])?( reg_value-offset_value[i]):0;
 			wr_reg(reg_add, reg_value);
-			if(i>1)
+			if (i>1)
 			{if(i%2){wr_reg((reg_add+DDR0_PUB_DX0LCDLR4-DDR0_PUB_DX0LCDLR3),
 					( reg_value));
 					}
@@ -24135,7 +23196,7 @@ int do_ddr_offset_ddr_lcdlr(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 	}
 	// printf("\n read reg==0x%08x\n ",(readl(reg_add)));
 	printf("\nend pause ddl pir== 0x%08x\n", readl(DDR0_PUB_REG_BASE+4));
-	if(resume_ddl){
+	if (resume_ddl) {
 		writel(((readl(DDR0_PUB_REG_BASE+4))&(~(1<<29))),(DDR0_PUB_REG_BASE+4));
 		printf("\n resume ddl pir== 0x%08x\n", readl(DDR0_PUB_REG_BASE+4));
 	}
@@ -24222,8 +23283,8 @@ int do_ddr_set_watchdog_value(cmd_tbl_t *cmdtp, int flag, int argc, char * const
 	#define  TEST_ARG_BOOT_TIMES_H 7
 
 	//BYTE12-15
-	#define  TEST_ARG_ERROR_FLAG 8   //take 4 byte for kernel test flag
-	//#define  TEST_ARG_ERROR_FLAG 63*4   //take 4 byte for kernel test flag
+	//#define  TEST_ARG_ERROR_FLAG 8   //take 4 byte for kernel test flag
+	#define  TEST_ARG_ERROR_FLAG 63*4   //take 4 byte for kernel test flag
 
 	//BYTE16-19
 	//#define  TEST_ARG_16_LCDLR_TEMP_COUNT 16
@@ -24329,7 +23390,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	}
 	printf("test_index_enable==0x%08x\n",test_index_enable);
 	enable_kernel_test=(test_index_enable>>7)&1;
-	if(enable_kernel_test){
+	if (enable_kernel_test) {
 		printf("enable kernel window test\n");
 	}
 
@@ -24416,7 +23477,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	//num_arry=p_num_arry;
 	for (i = 0; i < 64*4; i++) {
 		num_arry[i]=ddr_rd_8_16bit_on_32reg(sticky_reg_base_add,8,i);
-		if((i==0)||(i==32)||(i==(32+10*3))||(i==(32+10*3+16*3))||(i==(32+10*3+16*3+16*3)))
+		if ((i == 0) || (i == 32) || (i == (32+10*3)) || (i == (32+10*3+16*3)) || (i == (32+10*3+16*3+16*3)))
 		{
 			printf("\n numarry[%d]" ,i);
 		}
@@ -24434,11 +23495,11 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	#define  TEST_ARG_7_DMC_STICKY_MAGIC  7
 	*/
 
-	uint16_t test_left_max_init_value =32;  
-	uint16_t test_right_max_init_value =32;  
-	uint16_t test_boot_times =0;  
-	uint16_t test_ddr_frequency =0;  
-	//uint16_t temp_sub_value_a =0;  
+	uint16_t test_left_max_init_value =32;
+	uint16_t test_right_max_init_value =32;
+	uint16_t test_boot_times =0;
+	uint16_t test_ddr_frequency =0;
+	//uint16_t temp_sub_value_a =0;
 	/*
 	uint16_t test_arg_1_cmd0 =1;  //master cmd
 	uint16_t test_arg_1_cmd1 =0;  //min cmd
@@ -24467,7 +23528,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	printf("TEST_ARG_BOOT_TIMES==%d\n",(num_arry[TEST_ARG_BOOT_TIMES_H]<<8)|(num_arry[TEST_ARG_BOOT_TIMES_L]<<0));
 	test_boot_times=(num_arry[TEST_ARG_BOOT_TIMES_H]<<8)|(num_arry[TEST_ARG_BOOT_TIMES_L]<<0);
 	test_ddr_frequency=(num_arry[TEST_ARG_FREQ_NIBBLE_H]<<8)|(num_arry[TEST_ARG_FREQ_NIBBLE_L]<<0);
-	if((num_arry[TEST_ARG_0_DMC_STICKY_MAGIC]==(DMC_STICKY_UBOOT_WINDOW_MAGIC_1&0xff))&&
+	if ((num_arry[TEST_ARG_0_DMC_STICKY_MAGIC] == (DMC_STICKY_UBOOT_WINDOW_MAGIC_1&0xff)) &&
 	(num_arry[TEST_ARG_1_CMD0]==(DMC_STICKY_UBOOT_WINDOW_MAGIC_1&0xff)) ) //for check magic number make sume enter test command
 	{
 		//num_arry[TEST_ARG_5_BOOT_TIMES]++;
@@ -24477,13 +23538,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 		ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_BOOT_TIMES_L,num_arry[TEST_ARG_BOOT_TIMES_L]);
 		ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_BOOT_TIMES_H,num_arry[TEST_ARG_BOOT_TIMES_H]);
 
-		if( test_ddr_frequency!=global_ddr_clk)  //
+		if ( test_ddr_frequency != global_ddr_clk)  //
 		{
 			printf("running ddr freq==%d,but test freq is%d,will reboot use d2pll \n",global_ddr_clk,test_ddr_frequency);
 			sprintf(str,"d2pll  %d",test_ddr_frequency);
 			printf("\nstr=%s\n",str);
 			run_command(str,0);
-			while(1);
+			while (1) ;
 		}
 	}
 	else
@@ -24498,6 +23559,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	}
 	printf("test_sticky is not magic nummber,boot times==%d\n",test_boot_times);
 
+	if (config_register == 1)
 	{
 		wr_reg((sticky_reg_base_add+TEST_ARG_CS0_TEST_START_INDEX), cs0_test_start);
 		wr_reg((sticky_reg_base_add+TEST_ARG_CS0_TEST_SIZE_INDEX), cs0_test_size);
@@ -24511,16 +23573,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 		}
 		num_arry[TEST_ARG_TEST_INDEX_ENALBE_INDEX]=test_index_enable;
 		ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_TEST_INDEX_ENALBE_INDEX,num_arry[TEST_ARG_TEST_INDEX_ENALBE_INDEX]);
-		if(config_register==1)
-		{
-			num_arry[TEST_ARG_2_STEP]=0;
-			ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_2_STEP,num_arry[TEST_ARG_2_STEP]);
-		}
+		num_arry[TEST_ARG_2_STEP]=0;
+		ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_2_STEP,num_arry[TEST_ARG_2_STEP]);
 		num_arry[TEST_ARG_3_ALL_TOGHTER]=all_toghter_enable;
 		ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_3_ALL_TOGHTER,num_arry[TEST_ARG_3_ALL_TOGHTER]);
 	}
 
-	if(( num_arry[TEST_ARG_2_STEP])==0)
+	if (( num_arry[TEST_ARG_2_STEP]) == 0)
 	{
 		{
 			num_arry[TEST_ARG_0_DMC_STICKY_MAGIC]=DMC_STICKY_UBOOT_WINDOW_MAGIC_1;
@@ -24556,7 +23615,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				//num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+(nibble_step*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_ORG]=0xffff;
 				test_left_max_init_value=16;
 				test_right_max_init_value=16;
-				if(nibble_step<10)
+				if (nibble_step<10)
 				{
 					test_left_max_init_value=32;
 					test_right_max_init_value=32;
@@ -24570,22 +23629,22 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			{
 				if (nibble_step<32)
 				{
-					if(((nibble_mask[0])>>nibble_step)&1)
+					if (((nibble_mask[0])>>nibble_step)&1)
 						num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+nibble_step*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=4;
 				}
 				else if (nibble_step<64)
 				{
-					if(((nibble_mask[1])>>(nibble_step-32))&1)
+					if (((nibble_mask[1])>>(nibble_step-32))&1)
 						num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+nibble_step*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=4;
 				}
 				else if (nibble_step<96)
 				{
-					if(((nibble_mask[2])>>(nibble_step-64))&1)
+					if (((nibble_mask[2])>>(nibble_step-64))&1)
 						num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+nibble_step*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=4;
 				}
-				if(all_toghter_enable)
+				if (all_toghter_enable)
 				{
-					if((nibble_step==0)||(nibble_step==10)||(nibble_step==(10+16)))
+					if ((nibble_step == 0) || (nibble_step == 10) || (nibble_step == (10+16)))
 						num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+nibble_step*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=0;
 					else
 						num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+nibble_step*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=4;
@@ -24609,69 +23668,56 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 
 	}
 
-	if(all_toghter_enable)
-	{
-		for (nibble_step = 0; nibble_step < 72; nibble_step++)
-		{
-			if((nibble_step==0)||(nibble_step==10)||(nibble_step==(10+16)))
-			{
-					//	num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+nibble_step*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=0;
-			}
-			else
-				num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+nibble_step*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=4;
-		}
-	}
-if(config_register==1)
+if (config_register == 1)
 {
 	num_arry[TEST_ARG_2_STEP]=0;
 	ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_2_STEP,	num_arry[TEST_ARG_2_STEP]);
 }
 
-if(( num_arry[TEST_ARG_2_STEP]))
+if (( num_arry[TEST_ARG_2_STEP]))
 {
-for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++ )
+for (test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++ )
 {
 	printf("\ntest_index=%d\n",test_index);
-	if((((test_index_enable)>>(test_index-1))&1)==0)
+	if ((((test_index_enable)>>(test_index-1))&1) == 0)
 	{
 		num_arry[TEST_ARG_2_STEP]=((num_arry[TEST_ARG_2_STEP])+1);//why can not use ++
 		ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_2_STEP,	num_arry[TEST_ARG_2_STEP]);
 		continue;
 	}
 	{
-		if(test_index==DMC_TEST_WINDOW_INDEX_ATXDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_ATXDLY)
 		{
 			nibble_save_offset=0;
 			nibble_max=10;
-			nibble_mask[0]= 0x30;
-			if((dram_type==CONFIG_DDR_TYPE_LPDDR3))
+			if ((dram_type == CONFIG_DDR_TYPE_LPDDR3))
 			{
-				nibble_mask[0]= 0x3e3;
+				nibble_mask[0]= 0x3e0;
 			}
-			if((dram_type==CONFIG_DDR_TYPE_LPDDR4))
+			if ((dram_type == CONFIG_DDR_TYPE_LPDDR4))
 			{
-				nibble_mask[0]= 0x273;
-				if((channel_mode==CONFIG_DDR0_32BIT_RANK01_CH0))
-					nibble_mask[0]= 0x3f3;
+				nibble_mask[0]= 0x210;
+				if ((channel_mode == CONFIG_DDR0_32BIT_RANK01_CH0))
+					nibble_mask[0]= 0x3f0;
 			}
 			test_left_max_init_value=64;
 			test_right_max_init_value=64;
 		}
-		if(test_index==DMC_TEST_WINDOW_INDEX_TXDQSDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_TXDQSDLY)
 		{
 			nibble_save_offset=10;
 			nibble_max=16;
-			if((cs1_test_size==0))
+			if ((cs1_test_size == 0))
 			{
 				nibble_mask[0]= 0xff00;
 			}
 			test_left_max_init_value=16;
 			test_right_max_init_value=16;
 		}
-		if(test_index==DMC_TEST_WINDOW_INDEX_RXCLKDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_RXCLKDLY)
 		{
 			nibble_save_offset=(10)+(16);
-			if((cs1_test_size==0))
+			if ((cs1_test_size == 0))
 			{
 				nibble_mask[0]= 0xff00;
 			}
@@ -24679,11 +23725,11 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 			test_left_max_init_value=16;
 			test_right_max_init_value=16;
 		}
-		if(test_index==DMC_TEST_WINDOW_INDEX_TXDQDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_TXDQDLY)
 		{
 			nibble_save_offset=0;
 			nibble_max=72;
-			if((cs1_test_size==0))
+			if ((cs1_test_size == 0))
 			{
 				nibble_mask[1]= 0xfffffff0;
 				nibble_mask[2]= 0xffffffff;
@@ -24691,40 +23737,40 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 			test_left_max_init_value=16;
 			test_right_max_init_value=16;
 		}
-		if(test_index==DMC_TEST_WINDOW_INDEX_RXPBDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_RXPBDLY)
 		{
 			nibble_save_offset=0;
 			nibble_max=72;
-			if((cs1_test_size==0))
+			if ((cs1_test_size == 0))
 			{
 				nibble_mask[1]= 0xfffffff0;
 				nibble_mask[2]= 0xffffffff;
 			}
-		
+
 		test_left_max_init_value=64;
 		test_right_max_init_value=64;}
-		//nibble_max=8;//	
+		//nibble_max=8;//
 		// if(nibble_max>30)  can not over sticky register size
 		// 	nibble_max=30;
 		for ((nibble_step=0);(nibble_step<nibble_max);(nibble_step++))
 		{
 			if (nibble_step<32)
 			{
-				if(((nibble_mask[0])>>nibble_step)&1)
+				if (((nibble_mask[0])>>nibble_step)&1)
 					num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+(nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=4;
 			}
 			else if (nibble_step<64)
 			{
-				if(((nibble_mask[1])>>(nibble_step-32))&1)
+				if (((nibble_mask[1])>>(nibble_step-32))&1)
 					num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+(nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=4;
 			}
 			else if (nibble_step<96)
 			{
-				if(((nibble_mask[2])>>(nibble_step-64))&1)
+				if (((nibble_mask[2])>>(nibble_step-64))&1)
 					num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+(nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE+LCD_BDLR_STATUS]=4;
 			}
 			ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-			(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+			(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 			num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 		}
 	}
@@ -24732,24 +23778,24 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 {
 	for ((nibble_step=0);(nibble_step<nibble_max);(nibble_step++))
 	{
-		if(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==4)
+		if (num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)] == 4)
 			continue;
 		printf("nibble_step ==%d\n",nibble_step);
 
-		if(test_index==DMC_TEST_WINDOW_INDEX_TXDQSDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_TXDQSDLY)
 		{
-			if(nibble_step%2)
+			if (nibble_step%2)
 			{
 				//nibble_save_offset
 				//num_arry[TEST_ARG_2_STEP]=1;
 				ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN),	
+				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN),
 				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step-1+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]);
 				ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX),	
+				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX),
 				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step-1+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]);
 				ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step-1+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 				//nibble_step++;
 				continue;
@@ -24757,39 +23803,39 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 		}
 		test_start_addr=cs0_test_start;
 		ddr_test_size=cs0_test_size;
-		if(test_index==DMC_TEST_WINDOW_INDEX_ATXDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_ATXDLY)
 		{
 			test_start_addr=cs0_test_start;
 			ddr_test_size=cs0_test_size;
 		}
 
-		if(test_index==DMC_TEST_WINDOW_INDEX_TXDQSDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_TXDQSDLY)
 		{
-			if(nibble_step>7)
+			if (nibble_step>7)
 			{
 				test_start_addr=cs1_test_start;
 				ddr_test_size=cs1_test_size;
 			}
 		}
-		if(test_index==DMC_TEST_WINDOW_INDEX_RXCLKDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_RXCLKDLY)
 		{
-			if(nibble_step>7)
+			if (nibble_step>7)
 			{
 				test_start_addr=cs1_test_start;
 				ddr_test_size=cs1_test_size;
 			}
 		}
-		if(test_index==DMC_TEST_WINDOW_INDEX_TXDQDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_TXDQDLY)
 		{
-			if(nibble_step>35)
+			if (nibble_step>35)
 			{
 				test_start_addr=cs1_test_start;
 				ddr_test_size=cs1_test_size;
 			}
 		}
-		if(test_index==DMC_TEST_WINDOW_INDEX_RXPBDLY)
+		if (test_index == DMC_TEST_WINDOW_INDEX_RXPBDLY)
 		{
-			if(nibble_step>35)
+			if (nibble_step>35)
 			{
 				test_start_addr=cs1_test_start;
 				ddr_test_size=cs1_test_size;
@@ -24815,54 +23861,27 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 				nibble_mask[2]=((0xffffffff)&(~(1<<(nibble_step-64))));
 			}
 		}
-		if(all_toghter_enable)
-		{
-			if(test_index==DMC_TEST_WINDOW_INDEX_ATXDLY)
-			{
-				nibble_save_offset=0;
-				nibble_max=10;
-				nibble_mask[0]= 0x30;
-				nibble_mask[1]= 0;
-				nibble_mask[2]= 0;
-				if((dram_type==CONFIG_DDR_TYPE_LPDDR3))
-				{
-					nibble_mask[0]= 0x3e3;
-				}
-				if((dram_type==CONFIG_DDR_TYPE_LPDDR4))
-				{
-					nibble_mask[0]= 0x273;
-					if((channel_mode==CONFIG_DDR0_32BIT_RANK01_CH0))
-						nibble_mask[0]= 0x3f3;
-				}
-			}
-			else
-			{
-				nibble_mask[0]= 0;
-				nibble_mask[1]= 0;
-				nibble_mask[2]= 0;
-			}
-		}
 
 		ddr_test_watchdog_enable(watchdog_time_s); //s
 		printf("\nenable %ds watchdog \n",watchdog_time_s);
-		if((num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==0xffff)
+		if ((num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)] == 0xffff)
 		||(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==0)
 		||(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==1) )
 		{
 			printf("\nnibble_step  ==%d ", nibble_step);
-			if((num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==0xffff)
+			if ((num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)] == 0xffff)
 			||(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==0))
 			{
 				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=1;
 				ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 
-				if(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]==0)
+				if (num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)] == 0)
 				{
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=2;
 					ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 					run_command("reset",0);
 				}
@@ -24881,33 +23900,28 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 					num_arry[TEST_ARG_ERROR_FLAG]);
 				}
 
-				sprintf(str,"ddr_g12_offset_data  %d  0x%08x 0x%08x  0x%08x  %d %d",test_index,nibble_mask[0],nibble_mask[1],nibble_mask[2],DDR_PARAMETER_LEFT,
-				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]);
+				if (all_toghter_enable)
+					sprintf(str,"ddr_g12_offset_data  %d  0x%08x 0x%08x  0x%08x  %d %d",test_index,0,0,0,DDR_PARAMETER_LEFT,
+					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]);
+				else
+					sprintf(str,"ddr_g12_offset_data  %d  0x%08x 0x%08x  0x%08x  %d %d",test_index,nibble_mask[0],nibble_mask[1],nibble_mask[2],DDR_PARAMETER_LEFT,
+					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]);
 				printf("\nstr=%s\n",str);
 				ddr_test_watchdog_clear();
 				run_command(str,0);
-
 				temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
-				if(all_toghter_enable && cs1_test_size)
-				{
-					test_start_addr=cs1_test_start;
-					ddr_test_size=cs1_test_size;
-					temp_test_error=temp_test_error+ddr_test_s_cross_talk_pattern(ddr_test_size);
-					test_start_addr=cs0_test_start;
-					ddr_test_size=cs0_test_size;
-				}
-				if(temp_test_error)
+				if (temp_test_error)
 				{
 					run_command("reset",0);
 				}
 				else
 				{
 					//
-					if(!enable_kernel_test)
+					if (!enable_kernel_test)
 					{
 						num_arry[TEST_ARG_ERROR_FLAG]=TEST_ARG_ERROR_FLAG_PASS;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						TEST_ARG_ERROR_FLAG,	
+						TEST_ARG_ERROR_FLAG,
 						num_arry[TEST_ARG_ERROR_FLAG]);
 						run_command("reset",0);
 					}
@@ -24917,10 +23931,10 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 						printf("\nenable %ds watchdog \n",kernel_watchdog_s);
 						run_command("run storeboot",0);
 					}
-					/*	
+					/*
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=2;
 					ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 					run_command("reset",0);
 					*/
@@ -24929,38 +23943,38 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 			else if (num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==1)
 			{//go on find left edge
 
-				if(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]==0)
+				if (num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)] == 0)
 				{
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=2;
 					ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 					run_command("reset",0);
 				}
 
-				if((num_arry[TEST_ARG_ERROR_FLAG])==TEST_ARG_ERROR_FLAG_PASS)
+				if ((num_arry[TEST_ARG_ERROR_FLAG]) == TEST_ARG_ERROR_FLAG_PASS)
 				{
 					{
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=2;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 					}
 					{
 						num_arry[TEST_ARG_ERROR_FLAG]=TEST_ARG_ERROR_FLAG_NULL;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						TEST_ARG_ERROR_FLAG,	
+						TEST_ARG_ERROR_FLAG,
 						num_arry[TEST_ARG_ERROR_FLAG]);
 					}
 					run_command("reset",0);
 				}
-				if((num_arry[TEST_ARG_ERROR_FLAG])==TEST_ARG_ERROR_FLAG_FAIL)
+				if ((num_arry[TEST_ARG_ERROR_FLAG]) == TEST_ARG_ERROR_FLAG_FAIL)
 				{
 					{
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]=
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]-1;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN),	
+						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN),
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]);
 					}
 					{
@@ -24971,29 +23985,24 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 					}
 					sprintf(buf, "0x%08x", ( num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]));
 					printf( "%s", buf);
-
-					sprintf(str,"ddr_g12_offset_data  %d  0x%08x 0x%08x  0x%08x  %d %d",test_index,nibble_mask[0],nibble_mask[1],nibble_mask[2],DDR_PARAMETER_LEFT,
-					( num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]));
+					if (all_toghter_enable)
+						sprintf(str,"ddr_g12_offset_data  %d  0x%08x 0x%08x  0x%08x  %d %d",test_index,0,0,0,DDR_PARAMETER_LEFT,
+						( num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]));
+					else
+						sprintf(str,"ddr_g12_offset_data  %d  0x%08x 0x%08x  0x%08x  %d %d",test_index,nibble_mask[0],nibble_mask[1],nibble_mask[2],DDR_PARAMETER_LEFT,
+						( num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MIN)]));
 					printf("\nstr=%s\n",str);
 					ddr_test_watchdog_clear();
 					run_command(str,0);
 					temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
-					if(all_toghter_enable&&cs1_test_size)
-					{
-						test_start_addr=cs1_test_start;
-						ddr_test_size=cs1_test_size;
-						temp_test_error=temp_test_error+ddr_test_s_cross_talk_pattern(ddr_test_size);
-						test_start_addr=cs0_test_start;
-						ddr_test_size=cs0_test_size;
-					}
-					if(temp_test_error)
+					if (temp_test_error)
 					{
 						run_command("reset",0);
 					}
 					else
 					{
 						//
-						if(!enable_kernel_test)
+						if (!enable_kernel_test)
 						{
 							num_arry[TEST_ARG_ERROR_FLAG]=TEST_ARG_ERROR_FLAG_PASS;
 							ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
@@ -25007,10 +24016,10 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 							printf("\nenable %ds watchdog \n",kernel_watchdog_s);
 							run_command("run storeboot",0);
 						}
-						/*	
+						/*
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=2;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 						run_command("reset",0);
 						*/
@@ -25019,24 +24028,24 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 			}
 			//	run_command("reset",0);
 		}
-		
-		if((num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==2)||
+
+		if ((num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)] == 2) ||
 		(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==3))
 		{
 			printf("\nnibble_step  ==%d ", nibble_step);
-			if((num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==2)
+			if ((num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)] == 2)
 			||(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==2))
 			{
 				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=3;
 				ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+				(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 
-				if(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]==0)
+				if (num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)] == 0)
 				{
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=4;
 					ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 					run_command("reset",0);
 				}
@@ -25055,27 +24064,19 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 					num_arry[TEST_ARG_ERROR_FLAG]);
 				}
 				sprintf(str,"ddr_g12_offset_data  %d  0x%08x 0x%08x  0x%08x  %d %d",test_index,nibble_mask[0],nibble_mask[1],nibble_mask[2],DDR_PARAMETER_RIGHT,
-					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]);
+				num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]);
 				printf("\nstr=%s\n",str);
 				ddr_test_watchdog_clear();
 				run_command(str,0);
 				temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
-				if(all_toghter_enable&&cs1_test_size)
-				{
-					test_start_addr=cs1_test_start;
-					ddr_test_size=cs1_test_size;
-					temp_test_error=temp_test_error+ddr_test_s_cross_talk_pattern(ddr_test_size);
-					test_start_addr=cs0_test_start;
-					ddr_test_size=cs0_test_size;
-				}
-				if(temp_test_error)
+				if (temp_test_error)
 				{
 					run_command("reset",0);
 				}
 				else
 				{
 					//
-					if(!enable_kernel_test)
+					if (!enable_kernel_test)
 					{
 						num_arry[TEST_ARG_ERROR_FLAG]=TEST_ARG_ERROR_FLAG_PASS;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
@@ -25089,10 +24090,10 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 						printf("\nenable %ds watchdog \n",kernel_watchdog_s);
 						run_command("run storeboot",0);
 					}
-					/*	
+					/*
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=2;
 					ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 					run_command("reset",0);
 					*/
@@ -25100,44 +24101,44 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 			}
 			else if (num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]==3)
 			{//go on find left edge
-				if(num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]==0)
+				if (num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)] == 0)
 				{
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=4;
 					ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+					(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 					num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 					run_command("reset",0);
 				}
 
-				if((num_arry[TEST_ARG_ERROR_FLAG])==TEST_ARG_ERROR_FLAG_PASS)
+				if ((num_arry[TEST_ARG_ERROR_FLAG]) == TEST_ARG_ERROR_FLAG_PASS)
 				{
 					{
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=4;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 					}
 					{
 						num_arry[TEST_ARG_ERROR_FLAG]=TEST_ARG_ERROR_FLAG_NULL;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						TEST_ARG_ERROR_FLAG,	
+						TEST_ARG_ERROR_FLAG,
 						num_arry[TEST_ARG_ERROR_FLAG]);
 					}
 					run_command("reset",0);
 				}
-				if((num_arry[TEST_ARG_ERROR_FLAG])==TEST_ARG_ERROR_FLAG_FAIL)
+				if ((num_arry[TEST_ARG_ERROR_FLAG]) == TEST_ARG_ERROR_FLAG_FAIL)
 				{
 					{
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]=
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]-1;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX),	
+						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX),
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]);
 					}
 					{
 						num_arry[TEST_ARG_ERROR_FLAG]=TEST_ARG_ERROR_FLAG_FAIL;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						TEST_ARG_ERROR_FLAG,	
+						TEST_ARG_ERROR_FLAG,
 						num_arry[TEST_ARG_ERROR_FLAG]);
 					}
 					sprintf(buf, "0x%08x", ( num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_MAX)]));
@@ -25148,25 +24149,17 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 					ddr_test_watchdog_clear();
 					run_command(str,0);
 					temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
-					if(all_toghter_enable&&cs1_test_size)
-					{
-						test_start_addr=cs1_test_start;
-						ddr_test_size=cs1_test_size;
-						temp_test_error=temp_test_error+ddr_test_s_cross_talk_pattern(ddr_test_size);
-						test_start_addr=cs0_test_start;
-						ddr_test_size=cs0_test_size;
-					}
-					if(temp_test_error)
+					if (temp_test_error)
 					{
 						run_command("reset",0);
 					}
 					else
 					{
-						if(!enable_kernel_test)
+						if (!enable_kernel_test)
 						{
 							num_arry[TEST_ARG_ERROR_FLAG]=TEST_ARG_ERROR_FLAG_PASS;
 							ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-							TEST_ARG_ERROR_FLAG,	
+							TEST_ARG_ERROR_FLAG,
 							num_arry[TEST_ARG_ERROR_FLAG]);
 							run_command("reset",0);
 						}
@@ -25177,10 +24170,10 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 							run_command("run storeboot",0);
 						}
 
-						/*	
+						/*
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]=2;
 						ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,
-						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),	
+						(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS),
 						num_arry[(TEST_ARG_NIBBLE_SAVE_OFFSET_BYTE+((nibble_step+nibble_save_offset)*TEST_ARG_NIBBLE_WIDTH_BYTE)+LCD_BDLR_STATUS)]);
 						run_command("reset",0);
 						*/
@@ -25258,10 +24251,6 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 
 		char delay_left_margin=0;
 		char delay_right_margin=0;
-		if(all_toghter_enable==1)
-		{
-			nibble_max=1;
-		}
 		for ( nibble_step=0;nibble_step<nibble_max;nibble_step++)
 		{
 			//serial_put_dec_out_align(delay_martix[count].add_index,8);
@@ -25284,7 +24273,7 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 						);
 				}
 			}
-				
+
 			//	delay_left_margin=((num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET+nibble_step*TEST_ARG_NIBBLE_WIDTH+LCD_BDLR_ORG]>num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET+nibble_step*TEST_ARG_NIBBLE_WIDTH+LCD_BDLR_MIN])?
 			//		(num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET+nibble_step*TEST_ARG_NIBBLE_WIDTH+LCD_BDLR_ORG]-num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET+nibble_step*TEST_ARG_NIBBLE_WIDTH+LCD_BDLR_MIN]):0);
 			//	delay_right_margin=((num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET+nibble_step*TEST_ARG_NIBBLE_WIDTH+LCD_BDLR_MAX]>num_arry[TEST_ARG_NIBBLE_SAVE_OFFSET+nibble_step*TEST_ARG_NIBBLE_WIDTH+LCD_BDLR_ORG])?
@@ -25327,17 +24316,14 @@ for(test_index=num_arry[TEST_ARG_2_STEP];test_index<test_index_max ;test_index++
 }
 }
 
-	if(config_register==1)
+	if (config_register == 1)
 	{
-		if(num_arry[TEST_ARG_2_STEP]==0)
+		if (num_arry[TEST_ARG_2_STEP] == 0)
 		{
 			num_arry[TEST_ARG_2_STEP]=1;
 			ddr_wr_8_16bit_on_32reg(sticky_reg_base_add,8,TEST_ARG_2_STEP,	num_arry[TEST_ARG_2_STEP]);
 		}
 	}
-
-	if((enable_kernel_test)&&(num_arry[TEST_ARG_2_STEP]>1))
-		run_command("run storeboot",0);
 	return reg_value;
 }
 #else
@@ -25455,10 +24441,10 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	//unsigned int *num_arry_lane1=NULL;
 	//unsigned int *num_arry_lane2=NULL;
 	//unsigned int *num_arry_lane3=NULL;
-	//char *name_lane0; 
-	//char *name_lane1; 
-	//char *name_lane2; 
-	//char *name_lane3; 
+	//char *name_lane0;
+	//char *name_lane1;
+	//char *name_lane2;
+	//char *name_lane3;
 	num_arry = (unsigned int *)(&str_to_numarry);
 	int i;
 	//char *varname;  char *env_lcdlr_temp_count;
@@ -25535,7 +24521,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	printf("test_arg_6 lcdlr_temp_count=%d\n",num_arry[6]);
 	printf("test_arg_7=%d\n",num_arry[7]);
 
-	if((num_arry[7]==DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
+	if ((num_arry[7] == DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
 	{boot_times++;
 
 	}
@@ -25554,18 +24540,18 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	writel(num_arry[5],(sticky_reg_base_add+(5<<2)));
 
 	//if(test_arg_2_step)
-	if(test_arg_2_step)
+	if (test_arg_2_step)
 	{
-		if(test_arg_3_freq!=global_ddr_clk)  //
+		if (test_arg_3_freq != global_ddr_clk)  //
 		{
 			printf("running ddr freq==%d,but test freq is%d,will reboot use d2pll \n",global_ddr_clk,test_arg_3_freq);
 			sprintf(str,"d2pll  %d",test_arg_3_freq);
 			printf("\nstr=%s\n",str);
 			run_command(str,0);
-			while(1);
+			while (1) ;
 		}
 	}
-	if(test_arg_2_step==0)
+	if (test_arg_2_step == 0)
 	{
 		{
 			test_arg_0_cmd0=0x22;
@@ -25658,39 +24644,39 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			printf("DDR0_PUB_DX1GCR0==%x\n",(readl(DDR0_PUB_DX1GCR0)));
 			printf("DDR0_PUB_DX2GCR0==%x\n",(readl(DDR0_PUB_DX2GCR0)));
 			printf("DDR0_PUB_DX3GCR0==%x\n",(readl(DDR0_PUB_DX3GCR0)));
-			if(((readl(DDR0_PUB_DX0GCR0))&1)==0)
-				lane_disable=   lane_disable|1;      
-			if(((readl(DDR0_PUB_DX1GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<1);   
-			if(((readl(DDR0_PUB_DX2GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<2);   
-			if(((readl(DDR0_PUB_DX3GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<3);   
+			if (((readl(DDR0_PUB_DX0GCR0))&1) == 0)
+				lane_disable=   lane_disable|1;
+			if (((readl(DDR0_PUB_DX1GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<1);
+			if (((readl(DDR0_PUB_DX2GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<2);
+			if (((readl(DDR0_PUB_DX3GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<3);
 
 #endif
-			if(lane_disable)
+			if (lane_disable)
 			{if(lane_disable&0x1){
 									 dq_lcd_bdl_value_wdq_status_a[0]=4;
 									 dq_lcd_bdl_value_rdqs_status_a[0]=4;
 								 }
-			if(lane_disable&0x2){
+			if (lane_disable&0x2) {
 				dq_lcd_bdl_value_wdq_status_a[1]=4;
 				dq_lcd_bdl_value_rdqs_status_a[1]=4;
 			}
-			if(lane_disable&0x4){
+			if (lane_disable&0x4) {
 				dq_lcd_bdl_value_wdq_status_a[2]=4;
 				dq_lcd_bdl_value_rdqs_status_a[2]=4;
 			}
-			if(lane_disable&0x8){
+			if (lane_disable&0x8) {
 				dq_lcd_bdl_value_wdq_status_a[3]=4;
 				dq_lcd_bdl_value_rdqs_status_a[3]=4;
 			}
 			printf("lane_disable==%x\n",lane_disable);
-			if(lane_disable&0x10){
+			if (lane_disable&0x10) {
 				dq_lcd_bdl_value_aclcdlr_status_a=4;
 				printf("dq_lcd_bdl_value_aclcdlr_status_a==%x\n",dq_lcd_bdl_value_aclcdlr_status_a);
 			}
-			if(lane_disable&0x20){
+			if (lane_disable&0x20) {
 				dq_lcd_bdl_value_bdlr0_status_a=4;
 				printf("dq_lcd_bdl_value_bdlr0_status_a==%x\n",dq_lcd_bdl_value_bdlr0_status_a);
 
@@ -25738,7 +24724,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 		for (i = 0; i < 48; i++) {
 			sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 			sprintf(str_temp2,"0x%08x",num_arry[i]);
-			//setenv(str_temp1, str_temp2);
+			//env_set(str_temp1, str_temp2);
 			//run_command("save",0);
 			writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 		}
@@ -25759,7 +24745,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 	}
 	//sprintf(str, "%lx", value);
 	printf("%s", str);
-	// setenv(varname, str);
+	// env_set(varname, str);
 	//run_command("save",0);
 
 	for (i = 0; i < 48; i++) {
@@ -25825,16 +24811,16 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			   lcdlr_temp_count=dq_lcd_bdl_temp_reg_value;
 			   sprintf(buf, "0x%08x", lcdlr_temp_count);
 			   printf( "%s", buf);
-			   setenv(env_lcdlr_temp_count, buf);
+			   env_set(env_lcdlr_temp_count, buf);
 			   run_command("save",0);
 			   }
 			   */
-			if((dq_lcd_bdl_value_wdq_status_a[lane_step]==0xffff)
+			if ((dq_lcd_bdl_value_wdq_status_a[lane_step] == 0xffff)
 					||(dq_lcd_bdl_value_wdq_status_a[lane_step]==0)
 					||(dq_lcd_bdl_value_wdq_status_a[lane_step]==1)
 			  )
 			{
-				if((dq_lcd_bdl_value_wdq_status_a[lane_step]==0xffff)
+				if ((dq_lcd_bdl_value_wdq_status_a[lane_step] == 0xffff)
 						||(dq_lcd_bdl_value_wdq_status_a[lane_step]==0))
 				{		dq_lcd_bdl_value_wdq_status_a[lane_step]=1;
 					{
@@ -25843,14 +24829,14 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 							i=8+lane_step*8+3;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							// setenv(str_temp1, str_temp2);
+							// env_set(str_temp1, str_temp2);
 							//run_command("save",0);
 							writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						}
 						lcdlr_temp_count=0;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s", buf);
-						//     setenv(env_lcdlr_temp_count, buf);
+						//     env_set(env_lcdlr_temp_count, buf);
 						//			run_command("save",0);
 						writel(num_arry[6],(sticky_reg_base_add+(6<<2)));
 					}
@@ -25868,7 +24854,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				}
 				else if (dq_lcd_bdl_value_wdq_status_a[lane_step]==1)
 				{
-					//  temp_s= getenv(env_lcdlr_temp_count);
+					//  temp_s= env_get(env_lcdlr_temp_count);
 					//	 if(temp_s)
 					//	 	{
 					//	lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
@@ -25890,13 +24876,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 					i=8+lane_step*8+1;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					//	 setenv(str_temp1, str_temp2);
+					//	 env_set(str_temp1, str_temp2);
 					//run_command("save",0);
 					writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					i=8+lane_step*8+3;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					//	 setenv(str_temp1, str_temp2);
+					//	 env_set(str_temp1, str_temp2);
 					//      run_command("save",0);
 					writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 				}
@@ -25905,7 +24891,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_wdq_status_a[lane_step]==2)||
+			if ((dq_lcd_bdl_value_wdq_status_a[lane_step] == 2) ||
 					(dq_lcd_bdl_value_wdq_status_a[lane_step]==3))
 			{
 				//	if((dq_lcd_bdl_value_wdq_min_a[lane_step])==0xffff)
@@ -25915,14 +24901,14 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				//		}
 
 				{
-					if(dq_lcd_bdl_value_wdq_status_a[lane_step]==2)
+					if (dq_lcd_bdl_value_wdq_status_a[lane_step] == 2)
 					{		dq_lcd_bdl_value_wdq_status_a[lane_step]=3;
 						{
 							num_arry[8+lane_step*4*2+3]=dq_lcd_bdl_value_wdq_status_a[lane_step];
 							i=8+lane_step*8+3;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							// setenv(str_temp1, str_temp2);
+							// env_set(str_temp1, str_temp2);
 							//run_command("save",0);
 							writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						}
@@ -25930,7 +24916,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 							lcdlr_temp_count=0;
 							sprintf(buf, "0x%08x", lcdlr_temp_count);
 							printf( "%s", buf);
-							//        setenv(env_lcdlr_temp_count, buf);
+							//        env_set(env_lcdlr_temp_count, buf);
 							//			run_command("save",0);
 							writel(num_arry[6],(sticky_reg_base_add+(6<<2)));
 						}
@@ -25948,7 +24934,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 					}
 					else if (dq_lcd_bdl_value_wdq_status_a[lane_step]==3)
 					{
-						//   temp_s= getenv(env_lcdlr_temp_count);
+						//   temp_s= env_get(env_lcdlr_temp_count);
 						// if(temp_s)
 						//	{
 						//
@@ -25969,13 +24955,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						i=8+lane_step*8+2;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						// setenv(str_temp1, str_temp2);
+						// env_set(str_temp1, str_temp2);
 						//run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						i=8+lane_step*8+3;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						// setenv(str_temp1, str_temp2);
+						// env_set(str_temp1, str_temp2);
 						//  run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					}
@@ -25986,12 +24972,12 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			}
 
 
-			if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==0xffff)
+			if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 0xffff)
 					||(dq_lcd_bdl_value_rdqs_status_a[lane_step]==0)
 					||(dq_lcd_bdl_value_rdqs_status_a[lane_step]==1)
 			  )
 			{
-				if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==0xffff)
+				if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 0xffff)
 						||(dq_lcd_bdl_value_rdqs_status_a[lane_step]==0))
 				{		dq_lcd_bdl_value_rdqs_status_a[lane_step]=1;
 					{
@@ -25999,7 +24985,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						i=8+lane_step*8+7;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						//	 setenv(str_temp1, str_temp2);
+						//	 env_set(str_temp1, str_temp2);
 						//run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					}
@@ -26007,7 +24993,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						lcdlr_temp_count=0;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s", buf);
-						//  setenv(env_lcdlr_temp_count, buf);
+						//  env_set(env_lcdlr_temp_count, buf);
 						//	run_command("save",0);
 						//i=6;
 						writel(num_arry[6],(sticky_reg_base_add+(6<<2)));
@@ -26026,12 +25012,12 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				}
 				else if (dq_lcd_bdl_value_rdqs_status_a[lane_step]==1)
 				{
-					//  temp_s= getenv(env_lcdlr_temp_count);
+					//  temp_s= env_get(env_lcdlr_temp_count);
 					// if(temp_s)
 					// 	{
 					//	lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 					// 	}
-					lcdlr_temp_count= readl((sticky_reg_base_add+(6<<2))); 
+					lcdlr_temp_count= readl((sticky_reg_base_add+(6<<2)));
 					dq_lcd_bdl_value_rdqs_min_a[lane_step]=lcdlr_temp_count;
 					dq_lcd_bdl_value_rdqs_status_a[lane_step]=2;
 				}
@@ -26046,13 +25032,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 					i=8+lane_step*8+5;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					//	 setenv(str_temp1, str_temp2);
+					//	 env_set(str_temp1, str_temp2);
 					//run_command("save",0);
 					writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					i=8+lane_step*8+7;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					//	 setenv(str_temp1, str_temp2);
+					//	 env_set(str_temp1, str_temp2);
 					//        run_command("save",0);
 					writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 				}
@@ -26060,13 +25046,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==2)||
+			if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 2) ||
 					(dq_lcd_bdl_value_rdqs_status_a[lane_step]==3))
 			{
 
 				{
-					if(dq_lcd_bdl_value_rdqs_status_a[lane_step]==2)
-					{	
+					if (dq_lcd_bdl_value_rdqs_status_a[lane_step] == 2)
+					{
 
 						dq_lcd_bdl_value_rdqs_status_a[lane_step]=3;
 						{
@@ -26074,7 +25060,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 							i=8+lane_step*8+7;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							//	 setenv(str_temp1, str_temp2);
+							//	 env_set(str_temp1, str_temp2);
 							//run_command("save",0);
 							writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						}
@@ -26083,7 +25069,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 							lcdlr_temp_count=0;
 							sprintf(buf, "0x%08x", lcdlr_temp_count);
 							printf( "%s", buf);
-							//       setenv(env_lcdlr_temp_count, buf);
+							//       env_set(env_lcdlr_temp_count, buf);
 							//		run_command("save",0);
 							writel(num_arry[6],(sticky_reg_base_add+(6<<2)));
 						}
@@ -26101,12 +25087,12 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 					}
 					else if (dq_lcd_bdl_value_rdqs_status_a[lane_step]==3)
 					{
-						//  temp_s= getenv(env_lcdlr_temp_count);
+						//  temp_s= env_get(env_lcdlr_temp_count);
 						//	 if(temp_s)
 						// 	{
 						//	lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
 						// 	}
-						lcdlr_temp_count= readl((sticky_reg_base_add+(6<<2))); 
+						lcdlr_temp_count= readl((sticky_reg_base_add+(6<<2)));
 						dq_lcd_bdl_value_rdqs_max_a[lane_step]=lcdlr_temp_count;
 						dq_lcd_bdl_value_rdqs_status_a[lane_step]=4;
 					}
@@ -26122,13 +25108,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						i=8+lane_step*8+6;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						//	 setenv(str_temp1, str_temp2);
+						//	 env_set(str_temp1, str_temp2);
 						//run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						i=8+lane_step*8+7;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						// setenv(str_temp1, str_temp2);
+						// env_set(str_temp1, str_temp2);
 						//  run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					}
@@ -26138,7 +25124,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			}
 
 			/*
-			   if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==0xffff)||
+			   if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 0xffff) ||
 			   (dq_lcd_bdl_value_rdqs_status_a[lane_step]==0))
 			   {dq_lcd_bdl_value_rdqs_status_a[lane_step]=0;
 			   sprintf(str,"ddr_tune_dqs_step  a 0 0x%08x %d %d",ddr_test_size,( lane_step*2+1),2);
@@ -26157,7 +25143,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==1)||
+			if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 1) ||
 			(dq_lcd_bdl_value_rdqs_status_a[lane_step]==2))
 			{dq_lcd_bdl_value_rdqs_status_a[lane_step]=2;
 			sprintf(str,"ddr_tune_dqs_step  a 0 0x%08x %d %d",ddr_test_size,( lane_step*2+1),1);
@@ -26175,7 +25161,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			num_to_env(varname,num_arry);
 			run_command("reset",0);
 			}
-			*/	
+			*/
 
 
 			ddr_test_watchdog_disable(); //s
@@ -26202,12 +25188,12 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			printf("\ndq_lcd_bdl_value_aclcdlr_status_a %d \n",dq_lcd_bdl_value_aclcdlr_status_a);
 			lane_step=4;
 			//env_lcdlr_temp_count="lcdlr_temp_count_a";
-			if((dq_lcd_bdl_value_aclcdlr_status_a>=0xffff)
+			if ((dq_lcd_bdl_value_aclcdlr_status_a >= 0xffff)
 					||(dq_lcd_bdl_value_aclcdlr_status_a==0)
 					||(dq_lcd_bdl_value_aclcdlr_status_a==1)
 			  )
 			{
-				if((dq_lcd_bdl_value_aclcdlr_status_a>=0xffff)
+				if ((dq_lcd_bdl_value_aclcdlr_status_a >= 0xffff)
 						||(dq_lcd_bdl_value_aclcdlr_status_a==0))
 				{		dq_lcd_bdl_value_aclcdlr_status_a=1;
 					{
@@ -26217,7 +25203,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 							printf("aclcdlr_status_a==0x%08x\n",num_arry[i]);
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							//	 setenv(str_temp1, str_temp2);
+							//	 env_set(str_temp1, str_temp2);
 							//run_command("save",0);
 							writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 
@@ -26226,7 +25212,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						lcdlr_temp_count=0;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s", buf);
-						//     setenv(env_lcdlr_temp_count, buf);
+						//     env_set(env_lcdlr_temp_count, buf);
 						//		run_command("save",0);
 						writel(num_arry[6],(sticky_reg_base_add+(6<<2)));
 					}
@@ -26247,7 +25233,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				}
 				else if (dq_lcd_bdl_value_aclcdlr_status_a==1)
 				{
-					//     temp_s= getenv(env_lcdlr_temp_count);
+					//     temp_s= env_get(env_lcdlr_temp_count);
 					// if(temp_s)
 					// 	{
 					//lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
@@ -26268,13 +25254,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 					i=8+lane_step*8+1;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					// setenv(str_temp1, str_temp2);
+					// env_set(str_temp1, str_temp2);
 					//run_command("save",0);
 					writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					i=8+lane_step*8+3;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					// setenv(str_temp1, str_temp2);
+					// env_set(str_temp1, str_temp2);
 					//  run_command("save",0);
 					writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 				}
@@ -26283,7 +25269,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_aclcdlr_status_a==2)||
+			if ((dq_lcd_bdl_value_aclcdlr_status_a == 2) ||
 					(dq_lcd_bdl_value_aclcdlr_status_a==3))
 			{
 				//	if((dq_lcd_bdl_value_wdq_min_a[lane_step])==0xffff)
@@ -26293,14 +25279,14 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				//		}
 
 				{
-					if(dq_lcd_bdl_value_aclcdlr_status_a==2)
+					if (dq_lcd_bdl_value_aclcdlr_status_a == 2)
 					{		dq_lcd_bdl_value_aclcdlr_status_a=3;
 						{
 							num_arry[8+lane_step*4*2+3]=dq_lcd_bdl_value_aclcdlr_status_a;
 							i=8+lane_step*8+3;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							// setenv(str_temp1, str_temp2);
+							// env_set(str_temp1, str_temp2);
 							//run_command("save",0);
 							writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						}
@@ -26308,7 +25294,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 							lcdlr_temp_count=0;
 							sprintf(buf, "0x%08x", lcdlr_temp_count);
 							printf( "%s", buf);
-							//       setenv(env_lcdlr_temp_count, buf);
+							//       env_set(env_lcdlr_temp_count, buf);
 							//			run_command("save",0);
 							writel(num_arry[6],(sticky_reg_base_add+(6<<2)));
 						}
@@ -26326,7 +25312,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 					}
 					else if (dq_lcd_bdl_value_aclcdlr_status_a==3)
 					{
-						//   temp_s= getenv(env_lcdlr_temp_count);
+						//   temp_s= env_get(env_lcdlr_temp_count);
 						//	 if(temp_s)
 						// 	{
 						//	lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
@@ -26346,13 +25332,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						i=8+lane_step*8+2;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						//	 setenv(str_temp1, str_temp2);
+						//	 env_set(str_temp1, str_temp2);
 						//run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						i=8+lane_step*8+3;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						// setenv(str_temp1, str_temp2);
+						// env_set(str_temp1, str_temp2);
 						//  run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					}
@@ -26363,12 +25349,12 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			}
 
 
-			if((dq_lcd_bdl_value_bdlr0_status_a==0xffff)
+			if ((dq_lcd_bdl_value_bdlr0_status_a == 0xffff)
 					||(dq_lcd_bdl_value_bdlr0_status_a==0)
 					||(dq_lcd_bdl_value_bdlr0_status_a==1)
 			  )
 			{
-				if((dq_lcd_bdl_value_bdlr0_status_a==0xffff)
+				if ((dq_lcd_bdl_value_bdlr0_status_a == 0xffff)
 						||(dq_lcd_bdl_value_bdlr0_status_a==0))
 				{		dq_lcd_bdl_value_bdlr0_status_a=1;
 					{
@@ -26376,7 +25362,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						i=8+lane_step*8+7;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						// setenv(str_temp1, str_temp2);
+						// env_set(str_temp1, str_temp2);
 						//run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					}
@@ -26384,7 +25370,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						lcdlr_temp_count=0;
 						sprintf(buf, "0x%08x", lcdlr_temp_count);
 						printf( "%s", buf);
-						//    setenv(env_lcdlr_temp_count, buf);
+						//    env_set(env_lcdlr_temp_count, buf);
 						//		run_command("save",0);
 						writel(num_arry[6],(sticky_reg_base_add+(6<<2)));
 					}
@@ -26402,7 +25388,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				}
 				else if (dq_lcd_bdl_value_bdlr0_status_a==1)
 				{
-					//  temp_s= getenv(env_lcdlr_temp_count);
+					//  temp_s= env_get(env_lcdlr_temp_count);
 					//	 if(temp_s)
 					// 	{
 					//	lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
@@ -26422,13 +25408,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 					i=8+lane_step*8+5;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					// setenv(str_temp1, str_temp2);
+					// env_set(str_temp1, str_temp2);
 					//run_command("save",0);
 					writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					i=8+lane_step*8+7;
 					sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 					sprintf(str_temp2,"0x%08x",num_arry[i]);
-					// setenv(str_temp1, str_temp2);
+					// env_set(str_temp1, str_temp2);
 					//    run_command("save",0);
 					writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 				}
@@ -26436,13 +25422,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 				run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_bdlr0_status_a==2)||
+			if ((dq_lcd_bdl_value_bdlr0_status_a == 2) ||
 					(dq_lcd_bdl_value_bdlr0_status_a==3))
 			{
 
 				{
-					if(dq_lcd_bdl_value_bdlr0_status_a==2)
-					{	
+					if (dq_lcd_bdl_value_bdlr0_status_a == 2)
+					{
 
 						dq_lcd_bdl_value_bdlr0_status_a=3;
 						{
@@ -26450,7 +25436,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 							i=8+lane_step*8+7;
 							sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 							sprintf(str_temp2,"0x%08x",num_arry[i]);
-							// setenv(str_temp1, str_temp2);
+							// env_set(str_temp1, str_temp2);
 							//run_command("save",0);
 							writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						}
@@ -26459,7 +25445,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 							lcdlr_temp_count=0;
 							sprintf(buf, "0x%08x", lcdlr_temp_count);
 							printf( "%s", buf);
-							//    setenv(env_lcdlr_temp_count, buf);
+							//    env_set(env_lcdlr_temp_count, buf);
 							//	run_command("save",0);
 							writel(num_arry[6],(sticky_reg_base_add+(6<<2)));
 						}
@@ -26477,7 +25463,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 					}
 					else if (dq_lcd_bdl_value_bdlr0_status_a==3)
 					{
-						//  temp_s= getenv(env_lcdlr_temp_count);
+						//  temp_s= env_get(env_lcdlr_temp_count);
 						// if(temp_s)
 						// 	{
 						//	lcdlr_temp_count= simple_strtoull_ddr(temp_s, &endp, 0);
@@ -26498,13 +25484,13 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 						i=8+lane_step*8+6;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						//	 setenv(str_temp1, str_temp2);
+						//	 env_set(str_temp1, str_temp2);
 						//run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 						i=8+lane_step*8+7;
 						sprintf(str_temp1,"ddr_test_data_num_%04d",i);
 						sprintf(str_temp2,"0x%08x",num_arry[i]);
-						// setenv(str_temp1, str_temp2);
+						// env_set(str_temp1, str_temp2);
 						//  run_command("save",0);
 						writel(num_arry[i],(sticky_reg_base_add+(i<<2)));
 					}
@@ -26514,7 +25500,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			}
 
 			/*
-			   if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==0xffff)||
+			   if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 0xffff) ||
 			   (dq_lcd_bdl_value_rdqs_status_a[lane_step]==0))
 			   {dq_lcd_bdl_value_rdqs_status_a[lane_step]=0;
 			   sprintf(str,"ddr_tune_dqs_step  a 0 0x%08x %d %d",ddr_test_size,( lane_step*2+1),2);
@@ -26533,7 +25519,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			run_command("reset",0);
 			}
 
-			if((dq_lcd_bdl_value_rdqs_status_a[lane_step]==1)||
+			if ((dq_lcd_bdl_value_rdqs_status_a[lane_step] == 1) ||
 			(dq_lcd_bdl_value_rdqs_status_a[lane_step]==2))
 			{dq_lcd_bdl_value_rdqs_status_a[lane_step]=2;
 			sprintf(str,"ddr_tune_dqs_step  a 0 0x%08x %d %d",ddr_test_size,( lane_step*2+1),1);
@@ -26551,7 +25537,7 @@ int do_ddr_test_dqs_window_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char * c
 			num_to_env(varname,num_arry);
 			run_command("reset",0);
 			}
-			*/	
+			*/
 
 
 			ddr_test_watchdog_disable(); //s
@@ -26690,7 +25676,7 @@ unsigned int do_ddr_uboot_window_init(cmd_tbl_t *cmdtp, int flag, int argc, char
 {
 	char *endp;
 	unsigned temp_count=0;
-	for(;temp_count<argc;temp_count++)
+	for (;temp_count<argc;temp_count++)
 	{
 		printf("arg[%d]==%s;\n",argc,argv[temp_count]);
 	}
@@ -26737,24 +25723,24 @@ unsigned int do_ddr_read_write_ddr_data_window_lcdlr(unsigned int rank_index,uns
 			reg_add=((data_index>>1)*(DDR0_PUB_DX1LCDLR1-
 						DDR0_PUB_DX0LCDLR1)
 					+DDR0_PUB_DX0LCDLR1);
-			if((data_index%2)==0)
+			if ((data_index%2) == 0)
 			{
-				if(read_write_flag==DDR_PARAMETER_READ)
+				if (read_write_flag == DDR_PARAMETER_READ)
 				{
 					lcdlr_value=((readl(reg_add))&0xff);
 				}
-				if(read_write_flag==DDR_PARAMETER_WRITE)
+				if (read_write_flag == DDR_PARAMETER_WRITE)
 				{
 					wr_reg(reg_add, ((readl(reg_add))&0xffffff00)|(lcdlr_value&0xff));
 				}
 			}
-			if((data_index%2)==1)
+			if ((data_index%2) == 1)
 			{
-				if(read_write_flag==DDR_PARAMETER_READ)
+				if (read_write_flag == DDR_PARAMETER_READ)
 				{
 					lcdlr_value=(((readl(reg_add))>>8)&0xff);
 				}
-				if(read_write_flag==DDR_PARAMETER_WRITE)
+				if (read_write_flag == DDR_PARAMETER_WRITE)
 				{
 					wr_reg(reg_add, ((readl(reg_add))&0xffff00ff)|((lcdlr_value&0xff)<<8));
 				}
@@ -26763,25 +25749,25 @@ unsigned int do_ddr_read_write_ddr_data_window_lcdlr(unsigned int rank_index,uns
 
 #else
 
-		if((data_index%2)==0)
+		if ((data_index%2) == 0)
 		{
 			reg_add=((data_index>>1)*(DDR0_PUB_DX1LCDLR1-
 						DDR0_PUB_DX0LCDLR1)
 					+DDR0_PUB_DX0LCDLR1);
 
 		}
-		if((data_index%2)==1)
+		if ((data_index%2) == 1)
 		{
 			reg_add=((data_index>>1)*(DDR0_PUB_DX1LCDLR1-
 						DDR0_PUB_DX0LCDLR1)
 					+DDR0_PUB_DX0LCDLR3);
 
 		}
-		if(read_write_flag==DDR_PARAMETER_READ)
+		if (read_write_flag == DDR_PARAMETER_READ)
 		{
 			lcdlr_value=(((readl(reg_add))>>0)&0x1ff);
 		}
-		if(read_write_flag==DDR_PARAMETER_WRITE)
+		if (read_write_flag == DDR_PARAMETER_WRITE)
 		{
 			wr_reg(reg_add, ((lcdlr_value&0x1ff)<<0));
 		}
@@ -26797,7 +25783,7 @@ unsigned int do_ddr_read_write_ddr_data_window_lcdlr(unsigned int rank_index,uns
 
 	return read_value;
 
-#endif 
+#endif
 }
 unsigned int do_ddr_read_acmdlr(void )
 {
@@ -26813,16 +25799,16 @@ unsigned int do_ddr_read_write_ddr_add_window_lcdlr(unsigned int rank_index,unsi
 {
 	unsigned reg_add=0;
 
-	if(add_index==0)
+	if (add_index == 0)
 		reg_add=(DDR0_PUB_ACLCDLR);
-	if(add_index==1)
+	if (add_index == 1)
 		reg_add=(DDR0_PUB_ACBDLR0);
 	{
-		if(read_write_flag==DDR_PARAMETER_READ)
+		if (read_write_flag == DDR_PARAMETER_READ)
 		{
 			lcdlr_value=(((readl(reg_add))>>0)&0x1ff);
 		}
-		if(read_write_flag==DDR_PARAMETER_WRITE)
+		if (read_write_flag == DDR_PARAMETER_WRITE)
 		{
 			wr_reg(reg_add, ((lcdlr_value&0x1ff)<<0));
 		}
@@ -26836,7 +25822,7 @@ unsigned int do_ddr_read_write_ddr_add_window_lcdlr(unsigned int rank_index,unsi
 int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 
-	//setenv bootcmd "ddr_test_cmd 0x31 2 6  20 0 0x100000 0x4000000"
+	//env_set bootcmd "ddr_test_cmd 0x31 2 6  20 0 0x100000 0x4000000"
 	printf("\nsetenv bootcmd ddr_test_cmd 0x32 2 6  20 0 0x100000 0x4000000 \n");
 	printf("\nEnter do_ddr_uboot_window_use_source function\n");
 	printf("\n--- watchdog should >15s\n");
@@ -26888,7 +25874,7 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			lane_disable= 0;
 		}
 	}
-	printf("lane_disable==0x%08x\n",lane_disable);   
+	printf("lane_disable==0x%08x\n",lane_disable);
 
 	if (argc >5) {
 		ddr_data_test_size = simple_strtoull_ddr(argv[5], &endp, 0);
@@ -26918,11 +25904,11 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 	memset(num_array, 0, sizeof(num_array));
 	char str[1024]="";
 
-	if(data_source==DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
+	if (data_source == DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
 		ddr_test_data_array_max=64;
-	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++) 
+	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++)
 	{
-		num_array[temp_count]= read_write_window_test_parameter(data_source, 
+		num_array[temp_count]= read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_READ );
 		printf("read numarry[%d]==%d\n",temp_count,num_array[temp_count]);
 	}
@@ -26958,7 +25944,7 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 
 
 
-	if((test_arg_7_magic_number==DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
+	if ((test_arg_7_magic_number == DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
 	{
 	}
 	else
@@ -26980,26 +25966,26 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 	num_array[6]	=	test_arg_6_lcdlr_temp_count		;
 	num_array[7]	=	test_arg_7_magic_number		;
 
-	for (temp_count= 0;temp_count < 8; temp_count++) 
+	for (temp_count= 0;temp_count < 8; temp_count++)
 	{
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	}
 
 
 
-	if(test_arg_2_step)
+	if (test_arg_2_step)
 	{
-		if(test_arg_3_freq!=global_ddr_clk)  //
+		if (test_arg_3_freq != global_ddr_clk)  //
 		{
 			printf("running ddr freq==%d,but test freq is%d,will reboot use d2pll \n",global_ddr_clk,test_arg_3_freq);
 			sprintf(str,"d2pll  %d",test_arg_3_freq);
 			printf("\nstr=%s\n",str);
 			run_command(str,0);
-			while(1);
+			while (1) ;
 		}
 	}
-	if(test_arg_2_step==0)
+	if (test_arg_2_step == 0)
 	{
 		{
 			test_arg_0_ab_best_lcdlr_value=0;
@@ -27020,9 +26006,9 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			num_array[7]	=	test_arg_7_magic_number		;
 
 
-			for (temp_count= 0;temp_count < 8; temp_count++) 
+			for (temp_count= 0;temp_count < 8; temp_count++)
 			{
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			}
 
@@ -27035,9 +26021,9 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			{
 				//printf("1temp_count=%d\n",temp_count);
 
-				if((temp_count%4)==0)  //org
+				if ((temp_count%4) == 0)  //org
 				{
-					if(((temp_count-8)/4)<8)  
+					if (((temp_count-8)/4)<8)
 					{
 						lcdlr_min=0;
 						lcdlr_max=(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
@@ -27045,12 +26031,12 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 						//if(lane_step==9)
 						//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
-					else if(((temp_count-8)/4)<10)  
+					else if(((temp_count-8)/4)<10)
 					{
 						lcdlr_min=0;
 						lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
 						//lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
-						if(((temp_count-8)/4)==9)
+						if (((temp_count-8)/4) == 9)
 							lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
 					//printf("2temp_count=%d\n",temp_count);
@@ -27069,9 +26055,9 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 
 			for (temp_count = 32+8; temp_count < (32+8+8); temp_count++)  //add
 			{
-				if((temp_count%4)==0)  //org
-				{	
-					if(((temp_count-8)/4)<8)  
+				if ((temp_count%4) == 0)  //org
+				{
+					if (((temp_count-8)/4)<8)
 					{
 						lcdlr_min=0;
 						lcdlr_max=(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
@@ -27079,12 +26065,12 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 						//if(lane_step==9)
 						//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
-					else if(((temp_count-8)/4)<10)  
+					else if(((temp_count-8)/4)<10)
 					{
 						lcdlr_min=0;
 						lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
 						//lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
-						if(((temp_count-8)/4)==9)
+						if (((temp_count-8)/4) == 9)
 							lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
 					//num_array[temp_count]=0;
@@ -27106,38 +26092,38 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			printf("DDR0_PUB_DX1GCR0==%x\n",(readl(DDR0_PUB_DX1GCR0)));
 			printf("DDR0_PUB_DX2GCR0==%x\n",(readl(DDR0_PUB_DX2GCR0)));
 			printf("DDR0_PUB_DX3GCR0==%x\n",(readl(DDR0_PUB_DX3GCR0)));
-			if(((readl(DDR0_PUB_DX0GCR0))&1)==0)
-				lane_disable=   lane_disable|1;      
-			if(((readl(DDR0_PUB_DX1GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<1);   
-			if(((readl(DDR0_PUB_DX2GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<2);   
-			if(((readl(DDR0_PUB_DX3GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<3);   
+			if (((readl(DDR0_PUB_DX0GCR0))&1) == 0)
+				lane_disable=   lane_disable|1;
+			if (((readl(DDR0_PUB_DX1GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<1);
+			if (((readl(DDR0_PUB_DX2GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<2);
+			if (((readl(DDR0_PUB_DX3GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<3);
 
 #endif
-			if(lane_disable)
+			if (lane_disable)
 			{if(lane_disable&0x1){
 									 num_array[8+3]=0xffff;
 									 num_array[8+4+3]=0xffff;
 								 }
-			if(lane_disable&0x2){
+			if (lane_disable&0x2) {
 				num_array[8+3+8]=0xffff;
 				num_array[8+4+3+8]=0xffff;
 			}
-			if(lane_disable&0x4){
+			if (lane_disable&0x4) {
 				num_array[8+3+8+8]=0xffff;
 				num_array[8+4+3+8+8]=0xffff;
 			}
-			if(lane_disable&0x8){
+			if (lane_disable&0x8) {
 				num_array[8+3+8+8+8]=0xffff;
 				num_array[8+4+3+8+8+8]=0xffff;
 			}
 			printf("lane_disable==%x\n",lane_disable);
-			if(lane_disable&0x10){
+			if (lane_disable&0x10) {
 				num_array[8+3+8+8+8+8]=0xffff;
 			}
-			if(lane_disable&0x20){
+			if (lane_disable&0x20) {
 				num_array[8+4+3+8+8+8+8]=0xffff;
 
 			}
@@ -27150,19 +26136,19 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 
 
 		for (temp_count= 0; temp_count< 48;temp_count++) {
-			num_array[temp_count]= read_write_window_test_parameter(data_source, 
+			num_array[temp_count]= read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		}
 	}
 
 	test_arg_2_step++;
 	num_array[2]=test_arg_2_step;
-	for (temp_count = 1; temp_count < 48; temp_count++) 
+	for (temp_count = 1; temp_count < 48; temp_count++)
 	{
 		printf("%d  %d\n", temp_count,num_array[temp_count]);
 	}
 	temp_count=2;
-	num_array[temp_count]= read_write_window_test_parameter(data_source, 
+	num_array[temp_count]= read_write_window_test_parameter(data_source,
 			temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	//for (i = 0; i < 48; i++) {
 
@@ -27182,14 +26168,14 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 
 	for ((lane_step=0);(lane_step<10);(lane_step++))   //find need test data step
 	{
-		if((num_array[(lane_step<<2)+3+8]<0x4))
+		if ((num_array[(lane_step<<2)+3+8]<0x4))
 		{break;
 		}
 	}
 	printf("\nstart  test lane_step =%d\n",lane_step);
-	if(lane_step<10)
+	if (lane_step<10)
 	{
-		if(lane_step<8)
+		if (lane_step<8)
 		{
 			test_watchdog_time_s=watchdog_time_s;
 			ddr_test_size=ddr_data_test_size;
@@ -27207,7 +26193,7 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 		}
 
-		if((num_array[8+(lane_step<<2)+3]==0))   //test left edge begin
+		if ((num_array[8+(lane_step<<2)+3] == 0))   //test left edge begin
 		{
 			/*
 			   num_array[1]	=	test_arg_1_test_error_flag		;//1 pass 2 error
@@ -27221,23 +26207,23 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			//         test_arg_0_ab_best_lcdlr_value=(num_array[8+(lane_step<<2)+0]);
 			//	 num_array[0]=test_arg_0_ab_best_lcdlr_value;
 			//	 temp_count=0;
-			//	 read_write_window_test_parameter(data_source, 
+			//	 read_write_window_test_parameter(data_source,
 			// 	 temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 			num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 			temp_count=1;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			num_array[5]=(num_array[8+(lane_step<<2)+1]);  //edge lcdlr
 			temp_count=5;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-			(num_array[8+(lane_step<<2)+1])=(num_array[8+(lane_step<<2)+0]);  
+			(num_array[8+(lane_step<<2)+1])=(num_array[8+(lane_step<<2)+0]);
 			temp_count=8+(lane_step<<2)+1;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
@@ -27254,7 +26240,7 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			ddr_test_watchdog_enable(test_watchdog_time_s); //s
 			printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 			ddr_test_watchdog_clear();
-			if(lane_step<8)
+			if (lane_step<8)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 			else if(lane_step<10)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -27265,75 +26251,75 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			if (temp_test_error)
 			{
 				run_command("reset",0);
-				while(1);
+				while (1) ;
 			}
 			else
 			{
 				ddr_test_watchdog_clear();
 				org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-				if(lane_step<8)
+				if (lane_step<8)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 				else if(lane_step<10)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 				num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 				temp_count=1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("reset",0);
-				while(1);
+				while (1) ;
 
 			}
 		}
 		else if((num_array[8+(lane_step<<2)+3]==1))   //test left edge ongoing    -loop
 		{
 
-			if((num_array[5]+1)>=(num_array[6]))
+			if ((num_array[5]+1) >= (num_array[6]))
 			{
-				if(num_array[1]==DDR_TEST_NULL)
+				if (num_array[1] == DDR_TEST_NULL)
 				{printf("default value not stable ,or recovery sticky?\n");
 				}
 
 
 				num_array[8+(lane_step<<2)+3]=2;  //update status
 				temp_count=8+(lane_step<<2)+3;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				num_array[5]=0;  //update edge lcdlr
 				temp_count=5;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-				if(num_array[1]==DDR_TEST_FAIL)
+				if (num_array[1] == DDR_TEST_FAIL)
 					num_array[8+(lane_step<<2)+1]=num_array[6]+1;   //update B
-				if(num_array[1]==DDR_TEST_PASS)
+				if (num_array[1] == DDR_TEST_PASS)
 					num_array[8+(lane_step<<2)+1]=num_array[6];   //update B
 				temp_count=8+(lane_step<<2)+1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				test_arg_6_lcdlr_temp_count=0;  //curren_test +B  //(A+B)/2
 				num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 				temp_count=1;                                                                    //update test error flag
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				//  test_arg_0_ab_best_lcdlr_value=0;//(num_array[8+(lane_step<<2)+0]);
 				// num_array[0]=test_arg_0_ab_best_lcdlr_value;
 				// temp_count=0;
-				// read_write_window_test_parameter(data_source, 
+				// read_write_window_test_parameter(data_source,
 				// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-				run_command("reset",0); 
-				while(1);
+				run_command("reset",0);
+				while (1) ;
 
 			}
-			else 
-			{ 
-				if(num_array[1]==DDR_TEST_NULL)
+			else
+			{
+				if (num_array[1] == DDR_TEST_NULL)
 				{printf("default value not stable ,or recovery sticky?\n");
 				}
 				else  if(num_array[1]==DDR_TEST_FAIL)
@@ -27344,34 +26330,34 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 					{
 						num_array[8+(lane_step<<2)+3]=1;  //update status
 						temp_count=8+(lane_step<<2)+3;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
 						num_array[5]=num_array[6];  //update edge lcdlr
 						temp_count=5;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);  //curren_test +B  //(A+B)/2
 						num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						// num_array[8+(lane_step<<2)+1]=num_array[8+(lane_step<<2)+1];   //update B
 						// temp_count=8+(lane_step<<2)+1;
-						// read_write_window_test_parameter(data_source, 
+						// read_write_window_test_parameter(data_source,
 						// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 						temp_count=1;                                                                    //update test error flag
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						ddr_test_watchdog_enable(test_watchdog_time_s); //s
 						printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 						ddr_test_watchdog_clear();
-						if(lane_step<8)
+						if (lane_step<8)
 							test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 						else if(lane_step<10)
 							test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -27382,23 +26368,23 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 						if (temp_test_error)
 						{
 							run_command("reset",0);
-							while(1);
+							while (1) ;
 						}
 						else
 						{
 							ddr_test_watchdog_clear();
 							org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-							if(lane_step<8)
+							if (lane_step<8)
 								org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 							else if(lane_step<10)
 								org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 							num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 							temp_count=1;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 							run_command("reset",0);
-							while(1);
+							while (1) ;
 
 						}
 					}
@@ -27408,29 +26394,29 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 				{
 					num_array[8+(lane_step<<2)+3]=1;  //update status
 					temp_count=8+(lane_step<<2)+3;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					num_array[8+(lane_step<<2)+1]=num_array[6];  //update min value
 					temp_count=8+(lane_step<<2)+1;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);  //curren_test +B  //(A+B)/2
 					num_array[6]=test_arg_6_lcdlr_temp_count;                                          // --update curent
 					temp_count=6;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 					temp_count=1;                                                                    //update test error flag
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					ddr_test_watchdog_enable(test_watchdog_time_s); //s
 					printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 					ddr_test_watchdog_clear();
-					if(lane_step<8)
+					if (lane_step<8)
 						test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 					else if(lane_step<10)
 						test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -27441,23 +26427,23 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 					if (temp_test_error)
 					{
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 					else
 					{
 						ddr_test_watchdog_clear();
 						org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-						if(lane_step<8)
+						if (lane_step<8)
 							org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 						else if(lane_step<10)
 							org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 						num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 						temp_count=1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 
 					}
 
@@ -27481,17 +26467,17 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 			num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 			temp_count=1;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			num_array[5]=num_array[8+(lane_step<<2)+2];//lcdlr_max;  //edge lcdlr
 			temp_count=5;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			num_array[8+(lane_step<<2)+2]=num_array[8+(lane_step<<2)+0];//
 			temp_count=8+(lane_step<<2)+2;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);
@@ -27507,7 +26493,7 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			ddr_test_watchdog_enable(test_watchdog_time_s); //s
 			printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 			ddr_test_watchdog_clear();
-			if(lane_step<8)
+			if (lane_step<8)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 			else if(lane_step<10)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -27518,67 +26504,67 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 			if (temp_test_error)
 			{
 				run_command("reset",0);
-				while(1);
+				while (1) ;
 			}
 			else
 			{
 				ddr_test_watchdog_clear();
 				org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-				if(lane_step<8)
+				if (lane_step<8)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 				else if(lane_step<10)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 				num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 				temp_count=1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("reset",0);
-				while(1);
+				while (1) ;
 
 			}
 		}
 		else if((num_array[8+(lane_step<<2)+3]==3))   //test right edge ongoing    -loop
 		{
 
-			if((num_array[6]+1)>=(num_array[5]))
+			if ((num_array[6]+1) >= (num_array[5]))
 			{
-				if(num_array[1]==DDR_TEST_NULL)
+				if (num_array[1] == DDR_TEST_NULL)
 				{printf("default value not stable ,or recovery sticky?\n");
 				}
 				num_array[8+(lane_step<<2)+3]=4;  //update status
 				temp_count=8+(lane_step<<2)+3;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				num_array[5]=0;  //update edge lcdlr
 				temp_count=5;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-				if(num_array[1]==DDR_TEST_FAIL)
+				if (num_array[1] == DDR_TEST_FAIL)
 					num_array[8+(lane_step<<2)+2]=num_array[6]-1;   //update B
-				if(num_array[1]==DDR_TEST_PASS)
+				if (num_array[1] == DDR_TEST_PASS)
 					num_array[8+(lane_step<<2)+2]=num_array[6];   //update B
 				temp_count=8+(lane_step<<2)+2;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				test_arg_6_lcdlr_temp_count=0;  //curren_test +B  //(A+B)/2
 				num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 				temp_count=1;                                                                    //update test error flag
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				run_command("reset",0); 
-				while(1);
+				run_command("reset",0);
+				while (1) ;
 			}
-			else 
-			{ 
-				if(num_array[1]==DDR_TEST_NULL)
+			else
+			{
+				if (num_array[1] == DDR_TEST_NULL)
 				{printf("default value not stable ,or recovery sticky?\n");
 				}
 				else  if(num_array[1]==DDR_TEST_FAIL)
@@ -27589,34 +26575,34 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 					{
 						num_array[8+(lane_step<<2)+3]=3;  //update status
 						temp_count=8+(lane_step<<2)+3;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
 						num_array[5]=num_array[6];  //update edge lcdlr
 						temp_count=5;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);  //curren_test +B  //(A+B)/2
 						num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						// num_array[8+(lane_step<<2)+1]=num_array[8+(lane_step<<2)+1];   //update B
 						// temp_count=8+(lane_step<<2)+1;
-						// read_write_window_test_parameter(data_source, 
+						// read_write_window_test_parameter(data_source,
 						// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 						temp_count=1;                                                                    //update test error flag
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						ddr_test_watchdog_enable(test_watchdog_time_s); //s
 						printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 						ddr_test_watchdog_clear();
-						if(lane_step<8)
+						if (lane_step<8)
 							test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 						else if(lane_step<10)
 							test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -27627,23 +26613,23 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 						if (temp_test_error)
 						{
 							run_command("reset",0);
-							while(1);
+							while (1) ;
 						}
 						else
 						{
 							ddr_test_watchdog_clear();
 							org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-							if(lane_step<8)
+							if (lane_step<8)
 								org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 							else if(lane_step<10)
 								org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 							num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 							temp_count=1;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 							run_command("reset",0);
-							while(1);
+							while (1) ;
 
 						}
 					}
@@ -27653,29 +26639,29 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 				{
 					num_array[8+(lane_step<<2)+3]=3;  //update status
 					temp_count=8+(lane_step<<2)+3;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					num_array[8+(lane_step<<2)+2]=num_array[6];  //update max value
 					temp_count=8+(lane_step<<2)+2;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);  //curren_test +B  //(A+B)/2
 					num_array[6]=test_arg_6_lcdlr_temp_count;                                          // --update curent
 					temp_count=6;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 					temp_count=1;                                                                    //update test error flag
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					ddr_test_watchdog_enable(test_watchdog_time_s); //s
 					printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 					ddr_test_watchdog_clear();
-					if(lane_step<8)
+					if (lane_step<8)
 						test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 					else if(lane_step<10)
 						test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -27686,23 +26672,23 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 					if (temp_test_error)
 					{
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 					else
 					{
 						ddr_test_watchdog_clear();
 						org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-						if(lane_step<8)
+						if (lane_step<8)
 							org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 						else if(lane_step<10)
 							org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 						num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 						temp_count=1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 
 					}
 
@@ -27713,7 +26699,7 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 		}
 	}
 
-	if(lane_step>=10) //finish
+	if (lane_step >= 10) //finish
 	{
 		ddr_test_watchdog_disable(); //s
 		printf("close  watchdog\n");
@@ -27815,7 +26801,7 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 
 
 	temp_count=2;
-	read_write_window_test_parameter(data_source, 
+	read_write_window_test_parameter(data_source,
 			temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 	return 1;
@@ -27824,7 +26810,7 @@ int do_ddr_uboot_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int 
 int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 
-	//setenv bootcmd "ddr_test_cmd 0x31 2 6  20 0 0x100000 0x4000000"
+	//env_set bootcmd "ddr_test_cmd 0x31 2 6  20 0 0x100000 0x4000000"
 	printf("\nsetenv bootcmd ddr_test_cmd 0x31 2 6  20 0 0x100000 0x4000000 \n");
 	printf("\nEnter do_ddr_uboot_window_use_source function\n");
 	printf("\n--- watchdog should >15s\n");
@@ -27873,7 +26859,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			lane_disable= 0;
 		}
 	}
-	printf("lane_disable==0x%08x\n",lane_disable);   
+	printf("lane_disable==0x%08x\n",lane_disable);
 
 	if (argc >5) {
 		ddr_data_test_size = simple_strtoull_ddr(argv[5], &endp, 0);
@@ -27903,11 +26889,11 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 	memset(num_array, 0, sizeof(num_array));
 	char str[1024]="";
 
-	if(data_source==DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
+	if (data_source == DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
 		ddr_test_data_array_max=64;
-	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++) 
+	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++)
 	{
-		num_array[temp_count]= read_write_window_test_parameter(data_source, 
+		num_array[temp_count]= read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_READ );
 		printf("read numarry[%d]==%d\n",temp_count,num_array[temp_count]);
 	}
@@ -27943,7 +26929,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 
 
-	if((test_arg_7_magic_number==DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
+	if ((test_arg_7_magic_number == DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
 	{test_arg_5_boottimes++;
 
 	}
@@ -27963,26 +26949,26 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 	num_array[6]	=	test_arg_6_lcdlr_temp_count		;
 	num_array[7]	=	test_arg_7_magic_number		;
 
-	for (temp_count= 0;temp_count < 8; temp_count++) 
+	for (temp_count= 0;temp_count < 8; temp_count++)
 	{
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	}
 
 
 
-	if(test_arg_2_step)
+	if (test_arg_2_step)
 	{
-		if(test_arg_3_freq!=global_ddr_clk)  //
+		if (test_arg_3_freq != global_ddr_clk)  //
 		{
 			printf("running ddr freq==%d,but test freq is%d,will reboot use d2pll \n",global_ddr_clk,test_arg_3_freq);
 			sprintf(str,"d2pll  %d",test_arg_3_freq);
 			printf("\nstr=%s\n",str);
 			run_command(str,0);
-			while(1);
+			while (1) ;
 		}
 	}
-	if(test_arg_2_step==0)
+	if (test_arg_2_step == 0)
 	{
 		{
 			test_arg_0_cmd0=0X31;//DDR_TEST_CMD__DDR_SET_UBOOT_KERNEL_WINDOW;
@@ -28000,9 +26986,9 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			num_array[6]	=	test_arg_6_lcdlr_temp_count		;
 			num_array[7]	=	test_arg_7_magic_number		;
 
-			for (temp_count= 0;temp_count < 8; temp_count++) 
+			for (temp_count= 0;temp_count < 8; temp_count++)
 			{
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			}
 
@@ -28014,7 +27000,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			for (temp_count = 8; temp_count < (32+8); temp_count++)   //data
 			{
 				//printf("1temp_count=%d\n",temp_count);
-				if((temp_count%4)==0)  //org
+				if ((temp_count%4) == 0)  //org
 				{
 					//printf("2temp_count=%d\n",temp_count);
 					//num_array[temp_count]=0;
@@ -28022,16 +27008,16 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 					num_array[temp_count]=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,((temp_count-8)>>2),num_array[temp_count],DDR_PARAMETER_READ);
 
 				}
-				if((temp_count%4)==1)  //min
-				{	
+				if ((temp_count%4) == 1)  //min
+				{
 					num_array[temp_count]=0;
 				}
-				if((temp_count%4)==2) //max
-				{	
+				if ((temp_count%4) == 2) //max
+				{
 					num_array[temp_count]=acmdlr;
 				}
-				if((temp_count%4)==3) //status
-				{	
+				if ((temp_count%4) == 3) //status
+				{
 					num_array[temp_count]=0;
 				}
 
@@ -28040,25 +27026,25 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 			for (temp_count = 32+8; temp_count < (32+8+8); temp_count++)  //add
 			{
-				if((temp_count%4)==0)  //org
-				{	
+				if ((temp_count%4) == 0)  //org
+				{
 					//num_array[temp_count]=0;
 					//unsigned int do_ddr_read_write_ddr_data_window_lcdlr(unsigned int rank_index,unsigned int data_add_index,unsigned int lcdlr_value,unsigned int read_write_flag ))
 					num_array[temp_count]=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,((temp_count-8-32)>>2),num_array[temp_count],DDR_PARAMETER_READ);
 
 				}
-				if((temp_count%4)==1)  //min
-				{	
+				if ((temp_count%4) == 1)  //min
+				{
 					num_array[temp_count]=0;
 				}
-				if((temp_count%4)==2) //max
-				{	
+				if ((temp_count%4) == 2) //max
+				{
 					num_array[temp_count]=acmdlr*3;
-					if(temp_count==(32+8+4+2))
+					if (temp_count == (32+8+4+2))
 						num_array[temp_count]=0x3f;//bdlr0 max value
 				}
-				if((temp_count%4)==3) //status
-				{	
+				if ((temp_count%4) == 3) //status
+				{
 					num_array[temp_count]=0;
 				}
 
@@ -28073,38 +27059,38 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			printf("DDR0_PUB_DX1GCR0==%x\n",(readl(DDR0_PUB_DX1GCR0)));
 			printf("DDR0_PUB_DX2GCR0==%x\n",(readl(DDR0_PUB_DX2GCR0)));
 			printf("DDR0_PUB_DX3GCR0==%x\n",(readl(DDR0_PUB_DX3GCR0)));
-			if(((readl(DDR0_PUB_DX0GCR0))&1)==0)
-				lane_disable=   lane_disable|1;      
-			if(((readl(DDR0_PUB_DX1GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<1);   
-			if(((readl(DDR0_PUB_DX2GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<2);   
-			if(((readl(DDR0_PUB_DX3GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<3);   
+			if (((readl(DDR0_PUB_DX0GCR0))&1) == 0)
+				lane_disable=   lane_disable|1;
+			if (((readl(DDR0_PUB_DX1GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<1);
+			if (((readl(DDR0_PUB_DX2GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<2);
+			if (((readl(DDR0_PUB_DX3GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<3);
 
 #endif
-			if(lane_disable)
+			if (lane_disable)
 			{if(lane_disable&0x1){
 									 num_array[8+3]=0xffff;
 									 num_array[8+4+3]=0xffff;
 								 }
-			if(lane_disable&0x2){
+			if (lane_disable&0x2) {
 				num_array[8+3+8]=0xffff;
 				num_array[8+4+3+8]=0xffff;
 			}
-			if(lane_disable&0x4){
+			if (lane_disable&0x4) {
 				num_array[8+3+8+8]=0xffff;
 				num_array[8+4+3+8+8]=0xffff;
 			}
-			if(lane_disable&0x8){
+			if (lane_disable&0x8) {
 				num_array[8+3+8+8+8]=0xffff;
 				num_array[8+4+3+8+8+8]=0xffff;
 			}
 			printf("lane_disable==%x\n",lane_disable);
-			if(lane_disable&0x10){
+			if (lane_disable&0x10) {
 				num_array[8+3+8+8+8+8]=0xffff;
 			}
-			if(lane_disable&0x20){
+			if (lane_disable&0x20) {
 				num_array[8+4+3+8+8+8+8]=0xffff;
 
 			}
@@ -28117,19 +27103,19 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 
 		for (temp_count= 0; temp_count< 48;temp_count++) {
-			num_array[temp_count]= read_write_window_test_parameter(data_source, 
+			num_array[temp_count]= read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		}
 	}
 
 	test_arg_2_step++;
 	num_array[2]=test_arg_2_step;
-	for (temp_count = 1; temp_count < 48; temp_count++) 
+	for (temp_count = 1; temp_count < 48; temp_count++)
 	{
 		printf("%d  %d\n", temp_count,num_array[temp_count]);
 	}
 	temp_count=2;
-	num_array[temp_count]= read_write_window_test_parameter(data_source, 
+	num_array[temp_count]= read_write_window_test_parameter(data_source,
 			temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	//for (i = 0; i < 48; i++) {
 
@@ -28149,14 +27135,14 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 	for ((lane_step=0);(lane_step<10);(lane_step++))   //find need test data step
 	{
-		if((num_array[(lane_step<<2)+3+8]<0x4))
+		if ((num_array[(lane_step<<2)+3+8]<0x4))
 		{break;
 		}
 	}
 	printf("\nstart  test lane_step =%d\n",lane_step);
-	if(lane_step<10)
+	if (lane_step<10)
 	{
-		if(lane_step<8)
+		if (lane_step<8)
 		{
 			test_watchdog_time_s=watchdog_time_s;
 			ddr_test_size=ddr_data_test_size;
@@ -28171,22 +27157,22 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			lcdlr_max=(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
 		}
 
-		if((num_array[8+(lane_step<<2)+3]==0))   //test left edge begin
+		if ((num_array[8+(lane_step<<2)+3] == 0))   //test left edge begin
 		{
 			num_array[8+(lane_step<<2)+3]=1;
 			test_arg_6_lcdlr_temp_count=lcdlr_min;
 			num_array[6]=test_arg_6_lcdlr_temp_count;
 
 			temp_count=6;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			temp_count=8+(lane_step<<2)+3;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			ddr_test_watchdog_enable(test_watchdog_time_s); //s
 			printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 			ddr_test_watchdog_clear();
-			if(lane_step<8)
+			if (lane_step<8)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 			else if(lane_step<10)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -28202,7 +27188,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			{
 				ddr_test_watchdog_clear();
 				org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-				if(lane_step<8)
+				if (lane_step<8)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 				else if(lane_step<10)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
@@ -28211,19 +27197,19 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 				num_array[8+(lane_step<<2)+3]=2;  //left finish
 
 				temp_count=8+(lane_step<<2)+3;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				temp_count=8+(lane_step<<2)+1;
 				num_array[temp_count]=test_arg_6_lcdlr_temp_count;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				test_arg_6_lcdlr_temp_count=0;
 				num_array[6]=test_arg_6_lcdlr_temp_count;
 
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("reset",0);
 
@@ -28238,15 +27224,15 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			num_array[6]=test_arg_6_lcdlr_temp_count;
 
 			temp_count=6;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			temp_count=8+(lane_step<<2)+3;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			ddr_test_watchdog_enable(test_watchdog_time_s); //s
 			printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 			ddr_test_watchdog_clear();
-			if(lane_step<8)
+			if (lane_step<8)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 			else if(lane_step<10)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -28262,7 +27248,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			{
 				ddr_test_watchdog_clear();
 				org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-				if(lane_step<8)
+				if (lane_step<8)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 				else if(lane_step<10)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
@@ -28270,19 +27256,19 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 				num_array[8+(lane_step<<2)+3]=2;  //left finish
 
 				temp_count=8+(lane_step<<2)+3;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				temp_count=8+(lane_step<<2)+1;
 				num_array[temp_count]=test_arg_6_lcdlr_temp_count;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				test_arg_6_lcdlr_temp_count=0;
 				num_array[6]=test_arg_6_lcdlr_temp_count;
 
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("reset",0);
 
@@ -28297,15 +27283,15 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			num_array[6]=test_arg_6_lcdlr_temp_count;
 
 			temp_count=6;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			temp_count=8+(lane_step<<2)+3;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			ddr_test_watchdog_enable(test_watchdog_time_s); //s
 			printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 			ddr_test_watchdog_clear();
-			if(lane_step<8)
+			if (lane_step<8)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 			else if(lane_step<10)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -28321,7 +27307,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			{
 				ddr_test_watchdog_clear();
 				org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-				if(lane_step<8)
+				if (lane_step<8)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 				else if(lane_step<10)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
@@ -28329,19 +27315,19 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 				num_array[8+(lane_step<<2)+3]=4;  //right finish
 
 				temp_count=8+(lane_step<<2)+3;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				temp_count=8+(lane_step<<2)+2;
 				num_array[temp_count]=test_arg_6_lcdlr_temp_count;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				test_arg_6_lcdlr_temp_count=0;
 				num_array[6]=test_arg_6_lcdlr_temp_count;
 
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("reset",0);
 
@@ -28356,15 +27342,15 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			num_array[6]=test_arg_6_lcdlr_temp_count;
 
 			temp_count=6;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			temp_count=8+(lane_step<<2)+3;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			ddr_test_watchdog_enable(test_watchdog_time_s); //s
 			printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 			ddr_test_watchdog_clear();
-			if(lane_step<8)
+			if (lane_step<8)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 			else if(lane_step<10)
 				test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -28380,7 +27366,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 			{
 				ddr_test_watchdog_clear();
 				org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-				if(lane_step<8)
+				if (lane_step<8)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 				else if(lane_step<10)
 					org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
@@ -28388,19 +27374,19 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 				num_array[8+(lane_step<<2)+3]=4;  //right finish
 
 				temp_count=8+(lane_step<<2)+3;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				temp_count=8+(lane_step<<2)+2;
 				num_array[temp_count]=test_arg_6_lcdlr_temp_count;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				test_arg_6_lcdlr_temp_count=0;
 				num_array[6]=test_arg_6_lcdlr_temp_count;
 
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("reset",0);
 
@@ -28410,7 +27396,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 		}
 	}
 
-	if(lane_step>=10) //finish
+	if (lane_step >= 10) //finish
 	{
 		ddr_test_watchdog_disable(); //s
 		printf("close  watchdog\n");
@@ -28512,7 +27498,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 
 	temp_count=2;
-	read_write_window_test_parameter(data_source, 
+	read_write_window_test_parameter(data_source,
 			temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 	return 1;
@@ -28521,7 +27507,7 @@ int do_ddr_uboot_window_use_source(cmd_tbl_t *cmdtp, int flag, int argc, char * 
 
 int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	//setenv storeboot "ddr_test_cmd 0x33 2 6  20 0 0x100000 0x4000000"
+	//env_set storeboot "ddr_test_cmd 0x33 2 6  20 0 0x100000 0x4000000"
 	printf("\nsetenv bootcmd ddr_test_cmd 0x33 2 6  20 0 0x100000 0x4000000 \n");
 	printf("\nEnter do_ddr_uboot_window_use_source function\n");
 	printf("\n--- watchdog should >15s\n");
@@ -28590,7 +27576,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 			lane_disable= 0;
 		}
 	}
-	printf("lane_disable==0x%08x\n",lane_disable);   
+	printf("lane_disable==0x%08x\n",lane_disable);
 
 	if (argc >5) {
 		ddr_data_test_size = simple_strtoull_ddr(argv[5], &endp, 0);
@@ -28636,11 +27622,11 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 	memset(num_array, 0, sizeof(num_array));
 	char str[1024]="";
 
-	if(data_source==DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
+	if (data_source == DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
 		ddr_test_data_array_max=64;
-	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++) 
+	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++)
 	{
-		num_array[temp_count]= read_write_window_test_parameter(data_source, 
+		num_array[temp_count]= read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_READ );
 		printf("read numarry[%d]==%d\n",temp_count,num_array[temp_count]);
 	}
@@ -28676,7 +27662,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 
 
 
-	if((test_arg_7_magic_number==DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
+	if ((test_arg_7_magic_number == DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
 	{
 	}
 	else
@@ -28698,26 +27684,26 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 	num_array[6]	=	test_arg_6_lcdlr_temp_count		;
 	num_array[7]	=	test_arg_7_magic_number		;
 
-	for (temp_count= 0;temp_count < 8; temp_count++) 
+	for (temp_count= 0;temp_count < 8; temp_count++)
 	{
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	}
 
 
 
-	if(test_arg_2_step)
+	if (test_arg_2_step)
 	{
-		if(test_arg_3_freq!=global_ddr_clk)  //
+		if (test_arg_3_freq != global_ddr_clk)  //
 		{
 			printf("running ddr freq==%d,but test freq is%d,will reboot use d2pll \n",global_ddr_clk,test_arg_3_freq);
 			sprintf(str,"d2pll  %d",test_arg_3_freq);
 			printf("\nstr=%s\n",str);
 			run_command(str,0);
-			while(1);
+			while (1) ;
 		}
 	}
-	if(test_arg_2_step==0)
+	if (test_arg_2_step == 0)
 	{
 		{
 
@@ -28741,13 +27727,13 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 			num_array[7]	=	test_arg_7_magic_number		;
 
 
-			for (temp_count= 0;temp_count < 8; temp_count++) 
+			for (temp_count= 0;temp_count < 8; temp_count++)
 			{
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			}
 
-			// read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+			// read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 			// 	 DDR_TEST_STATUS_STEP_FLAG_ADD_ORG_STICKY_OFFSET ,test_arg_2_step,DDR_PARAMETER_WRITE);
 			//for (temp_count = 8; temp_count< 48;temp_count++) {
 			//		num_array[temp_count]=0;
@@ -28757,9 +27743,9 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 			{
 				//printf("1temp_count=%d\n",temp_count);
 
-				if((temp_count%4)==0)  //org
+				if ((temp_count%4) == 0)  //org
 				{
-					if(((temp_count-8)/4)<8)  
+					if (((temp_count-8)/4)<8)
 					{
 						lcdlr_min=0;
 						lcdlr_max=(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
@@ -28767,12 +27753,12 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 						//if(lane_step==9)
 						//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
-					else if(((temp_count-8)/4)<10)  
+					else if(((temp_count-8)/4)<10)
 					{
 						lcdlr_min=0;
 						lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
 						//lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
-						if(((temp_count-8)/4)==9)
+						if (((temp_count-8)/4) == 9)
 							lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
 					//printf("2temp_count=%d\n",temp_count);
@@ -28791,9 +27777,9 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 
 			for (temp_count = 32+8; temp_count < (32+8+8); temp_count++)  //add
 			{
-				if((temp_count%4)==0)  //org
-				{	
-					if(((temp_count-8)/4)<8)  
+				if ((temp_count%4) == 0)  //org
+				{
+					if (((temp_count-8)/4)<8)
 					{
 						lcdlr_min=0;
 						lcdlr_max=(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
@@ -28801,12 +27787,12 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 						//if(lane_step==9)
 						//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
-					else if(((temp_count-8)/4)<10)  
+					else if(((temp_count-8)/4)<10)
 					{
 						lcdlr_min=0;
 						lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
 						//lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
-						if(((temp_count-8)/4)==9)
+						if (((temp_count-8)/4) == 9)
 							lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
 					//num_array[temp_count]=0;
@@ -28828,38 +27814,38 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 			printf("DDR0_PUB_DX1GCR0==%x\n",(readl(DDR0_PUB_DX1GCR0)));
 			printf("DDR0_PUB_DX2GCR0==%x\n",(readl(DDR0_PUB_DX2GCR0)));
 			printf("DDR0_PUB_DX3GCR0==%x\n",(readl(DDR0_PUB_DX3GCR0)));
-			if(((readl(DDR0_PUB_DX0GCR0))&1)==0)
-				lane_disable=   lane_disable|1;      
-			if(((readl(DDR0_PUB_DX1GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<1);   
-			if(((readl(DDR0_PUB_DX2GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<2);   
-			if(((readl(DDR0_PUB_DX3GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<3);   
+			if (((readl(DDR0_PUB_DX0GCR0))&1) == 0)
+				lane_disable=   lane_disable|1;
+			if (((readl(DDR0_PUB_DX1GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<1);
+			if (((readl(DDR0_PUB_DX2GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<2);
+			if (((readl(DDR0_PUB_DX3GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<3);
 
 #endif
-			if(lane_disable)
+			if (lane_disable)
 			{if(lane_disable&0x1){
 									 num_array[8+3]=0xffff;
 									 num_array[8+4+3]=0xffff;
 								 }
-			if(lane_disable&0x2){
+			if (lane_disable&0x2) {
 				num_array[8+3+8]=0xffff;
 				num_array[8+4+3+8]=0xffff;
 			}
-			if(lane_disable&0x4){
+			if (lane_disable&0x4) {
 				num_array[8+3+8+8]=0xffff;
 				num_array[8+4+3+8+8]=0xffff;
 			}
-			if(lane_disable&0x8){
+			if (lane_disable&0x8) {
 				num_array[8+3+8+8+8]=0xffff;
 				num_array[8+4+3+8+8+8]=0xffff;
 			}
 			printf("lane_disable==%x\n",lane_disable);
-			if(lane_disable&0x10){
+			if (lane_disable&0x10) {
 				num_array[8+3+8+8+8+8]=0xffff;
 			}
-			if(lane_disable&0x20){
+			if (lane_disable&0x20) {
 				num_array[8+4+3+8+8+8+8]=0xffff;
 
 			}
@@ -28872,21 +27858,21 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 
 
 		for (temp_count= 0; temp_count< 48;temp_count++) {
-			num_array[temp_count]= read_write_window_test_parameter(data_source, 
+			num_array[temp_count]= read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		}
 	}
 
 	//test_arg_2_step++;
 	num_array[2]=test_arg_2_step;
-	for (temp_count = 1; temp_count < 48; temp_count++) 
+	for (temp_count = 1; temp_count < 48; temp_count++)
 	{
 		printf("%d  %d\n", temp_count,num_array[temp_count]);
 	}
 	temp_count=2;
-	num_array[temp_count]= read_write_window_test_parameter(data_source, 
+	num_array[temp_count]= read_write_window_test_parameter(data_source,
 			temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-	//	 read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+	//	 read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 	// 	 DDR_TEST_STATUS_STEP_FLAG_ADD_ORG_STICKY_OFFSET ,test_arg_2_step,DDR_PARAMETER_WRITE);
 	//for (i = 0; i < 48; i++) {
 
@@ -28906,15 +27892,15 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 
 	for ((lane_step=0);(lane_step<10);(lane_step++))   //find need test data step
 	{
-		if(test_arg_2_step<DDR_TEST_STATUS_KERNEL_ONGING)
+		if (test_arg_2_step<DDR_TEST_STATUS_KERNEL_ONGING)
 		{
-			if((num_array[(lane_step<<2)+3+8]<(0x4)))
+			if ((num_array[(lane_step<<2)+3+8]<(0x4)))
 			{break;
 			}
 		}
 	}
 
-	if(test_arg_2_step==DDR_TEST_STATUS_UBOOT_ONGOING)
+	if (test_arg_2_step == DDR_TEST_STATUS_UBOOT_ONGOING)
 	{if(lane_step>9)
 		{
 			test_arg_2_step=DDR_TEST_STATUS_UBOOT_FINISH;
@@ -28922,29 +27908,29 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 		}
 	}
 
-	if(test_arg_2_step>DDR_TEST_STATUS_UBOOT_FINISH)
+	if (test_arg_2_step>DDR_TEST_STATUS_UBOOT_FINISH)
 	{
 		for ((lane_step=0);(lane_step<10);(lane_step++))   //find need test data step
 		{
 
 			{
-				if((num_array[(lane_step<<2)+3+8]<(0x4+4)))
+				if ((num_array[(lane_step<<2)+3+8]<(0x4+4)))
 				{break;
 				}
 			}
 		}
 	}
 
-	if(test_arg_2_step==DDR_TEST_STATUS_UBOOT_FINISH)//||(test_arg_2_step==DDR_TEST_STATUS_KERNEL_FINISH)
+	if (test_arg_2_step == DDR_TEST_STATUS_UBOOT_FINISH)// || (test_arg_2_step == DDR_TEST_STATUS_KERNEL_FINISH)
 	{
 		//test_arg_2_step=DDR_TEST_STATUS_KERNEL_ONGING;
 	}
 	else
 	{
 		printf("\nstart  test lane_step =%d\n",lane_step);
-		if(lane_step<10)
+		if (lane_step<10)
 		{
-			if(lane_step<8)
+			if (lane_step<8)
 			{
 				test_watchdog_time_s=watchdog_time_s;
 				ddr_test_size=ddr_data_test_size;
@@ -28964,15 +27950,15 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 				//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 			}
 
-			if(num_array[8+(lane_step<<2)+3]>4)  //from kernel 
+			if (num_array[8+(lane_step<<2)+3]>4)  //from kernel
 			{
-				num_array[1]= read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+				num_array[1]= read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 						DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_READ);
-				// read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+				// read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 				// DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 			}
 
-			if(((num_array[8+(lane_step<<2)+3]==0))||((num_array[8+(lane_step<<2)+3]==4)))   //test left edge begin
+			if (((num_array[8+(lane_step<<2)+3] == 0)) || ((num_array[8+(lane_step<<2)+3] == 4)))   //test left edge begin
 			{
 				/*
 				   num_array[1]	=	test_arg_1_test_error_flag		;//1 pass 2 error
@@ -28986,35 +27972,35 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 				//         test_arg_0_ab_best_lcdlr_value=(num_array[8+(lane_step<<2)+0]);
 				//	 num_array[0]=test_arg_0_ab_best_lcdlr_value;
 				//	 temp_count=0;
-				//	 read_write_window_test_parameter(data_source, 
+				//	 read_write_window_test_parameter(data_source,
 				// 	 temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 				num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 				temp_count=1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				if(num_array[8+(lane_step<<2)+3]>4)
+				if (num_array[8+(lane_step<<2)+3]>4)
 				{
-					read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+					read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 							DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 				}
 
-				read_write_window_test_flag(data_source, 
+				read_write_window_test_flag(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				num_array[5]=(num_array[8+(lane_step<<2)+1]);  //edge lcdlr
 				temp_count=5;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				(num_array[8+(lane_step<<2)+1])=(num_array[8+(lane_step<<2)+0]);  
+				(num_array[8+(lane_step<<2)+1])=(num_array[8+(lane_step<<2)+0]);
 				temp_count=8+(lane_step<<2)+1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+				if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 					test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+0])>>1);
 				else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 					test_arg_6_lcdlr_temp_count=((num_array[5])+1);
@@ -29035,7 +28021,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 					printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 					ddr_test_watchdog_clear();
 				}
-				if(lane_step<8)
+				if (lane_step<8)
 					test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 				else if(lane_step<10)
 					test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -29051,98 +28037,98 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 				if (temp_test_error)
 				{
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 				else
 				{
-					if( num_array[8+(lane_step<<2)+3]>4)
+					if ( num_array[8+(lane_step<<2)+3]>4)
 					{
 						ddr_test_watchdog_disable(); //s
 						run_command("run storeboot",0);
-						while(1);
+						while (1) ;
 					}
 					else
 					{
 						ddr_test_watchdog_clear();
 						org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-						if(lane_step<8)
+						if (lane_step<8)
 							org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 						else if(lane_step<10)
 							org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 						num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 						temp_count=1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-						if(num_array[8+(lane_step<<2)+3]>4)
+						if (num_array[8+(lane_step<<2)+3]>4)
 						{
-							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 									DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 						}
 
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 				}
 			}
 			else if((num_array[8+(lane_step<<2)+3]==1)||((num_array[8+(lane_step<<2)+3]==5)))   //test left edge begin)   //test left edge ongoing    -loop
 			{
 
-				if((num_array[6]+1)>=(num_array[8+(lane_step<<2)+1]))
+				if ((num_array[6]+1) >= (num_array[8+(lane_step<<2)+1]))
 				{
-					if(num_array[1]==DDR_TEST_NULL)
+					if (num_array[1] == DDR_TEST_NULL)
 					{printf("default value not stable ,or recovery sticky?\n");
 					}
 
 
 					num_array[8+(lane_step<<2)+3]= num_array[8+(lane_step<<2)+3]+1;  //update status
 					temp_count=8+(lane_step<<2)+3;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					num_array[5]=0;  //update edge lcdlr
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					if(num_array[1]==DDR_TEST_FAIL)
+					if (num_array[1] == DDR_TEST_FAIL)
 						num_array[8+(lane_step<<2)+1]=num_array[6]+1;   //update B
-					if(num_array[1]==DDR_TEST_PASS)
+					if (num_array[1] == DDR_TEST_PASS)
 						num_array[8+(lane_step<<2)+1]=num_array[6];   //update B
 					temp_count=8+(lane_step<<2)+1;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					test_arg_6_lcdlr_temp_count=0;  //curren_test +B  //(A+B)/2
 					num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 					temp_count=6;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 					temp_count=1;                                                                    //update test error flag
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					if(num_array[8+(lane_step<<2)+3]>4)
+					if (num_array[8+(lane_step<<2)+3]>4)
 					{
-						//	num_array[1]= read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+						//	num_array[1]= read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 						// DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_READ);
-						read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+						read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 								DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 					}
 
 					//  test_arg_0_ab_best_lcdlr_value=0;//(num_array[8+(lane_step<<2)+0]);
 					// num_array[0]=test_arg_0_ab_best_lcdlr_value;
 					// temp_count=0;
-					// read_write_window_test_parameter(data_source, 
+					// read_write_window_test_parameter(data_source,
 					// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-					run_command("reset",0); 
-					while(1);
+					run_command("reset",0);
+					while (1) ;
 
 				}
-				else 
-				{ 
-					if(num_array[1]==DDR_TEST_NULL)
+				else
+				{
+					if (num_array[1] == DDR_TEST_NULL)
 					{printf("default value not stable ,or recovery sticky?\n");
 					}
 					else  if(num_array[1]==DDR_TEST_FAIL)
@@ -29153,37 +28139,37 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 						{
 							//   num_array[8+(lane_step<<2)+3]=1;  //update status
 							temp_count=8+(lane_step<<2)+3;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
 							num_array[5]=num_array[6];  //update edge lcdlr
 							temp_count=5;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-							if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+							if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 								test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);
 							else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 								test_arg_6_lcdlr_temp_count=((num_array[5])+1);
 							//   test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);  //curren_test +B  //(A+B)/2
 							num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 							temp_count=6;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 							// num_array[8+(lane_step<<2)+1]=num_array[8+(lane_step<<2)+1];   //update B
 							// temp_count=8+(lane_step<<2)+1;
-							// read_write_window_test_parameter(data_source, 
+							// read_write_window_test_parameter(data_source,
 							// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 							num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 							temp_count=1;                                                                    //update test error flag
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-							if(num_array[8+(lane_step<<2)+3]>4)
+							if (num_array[8+(lane_step<<2)+3]>4)
 							{
-								read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+								read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 										DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 							}
 
@@ -29191,7 +28177,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 							ddr_test_watchdog_enable(test_watchdog_time_s); //s
 							printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 							ddr_test_watchdog_clear();
-							if(lane_step<8)
+							if (lane_step<8)
 								test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 							else if(lane_step<10)
 								test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -29202,40 +28188,40 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 							if (temp_test_error)
 							{
 								run_command("reset",0);
-								while(1);
+								while (1) ;
 							}
 							else
 							{
-								if( num_array[8+(lane_step<<2)+3]>4)
+								if ( num_array[8+(lane_step<<2)+3]>4)
 								{
 									ddr_test_watchdog_disable(); //s
 									run_command("run storeboot",0);
-									while(1);
+									while (1) ;
 								}
 								else
 								{
 
 									ddr_test_watchdog_clear();
 									org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-									if(lane_step<8)
+									if (lane_step<8)
 										org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 									else if(lane_step<10)
 										org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 									num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 									temp_count=1;
-									read_write_window_test_parameter(data_source, 
+									read_write_window_test_parameter(data_source,
 											temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-									if(num_array[8+(lane_step<<2)+3]>4)
+									if (num_array[8+(lane_step<<2)+3]>4)
 									{
-										read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+										read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 												DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 									}
 
 
 									run_command("reset",0);
-									while(1);
+									while (1) ;
 								}
 
 							}
@@ -29246,32 +28232,32 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 					{
 						// num_array[8+(lane_step<<2)+3]=1;  //update status
 						temp_count=8+(lane_step<<2)+3;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						num_array[8+(lane_step<<2)+1]=num_array[6];  //update min value
 						temp_count=8+(lane_step<<2)+1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-						if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+						if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 							test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);
 						else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 							test_arg_6_lcdlr_temp_count=((num_array[5])+1);
 						//   test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);  //curren_test +B  //(A+B)/2
 						num_array[6]=test_arg_6_lcdlr_temp_count;                                          // --update curent
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 						temp_count=1;                                                                    //update test error flag
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-						if(num_array[8+(lane_step<<2)+3]>4)
+						if (num_array[8+(lane_step<<2)+3]>4)
 						{
-							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 									DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 						}
 
@@ -29279,7 +28265,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 						ddr_test_watchdog_enable(test_watchdog_time_s); //s
 						printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 						ddr_test_watchdog_clear();
-						if(lane_step<8)
+						if (lane_step<8)
 							test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 						else if(lane_step<10)
 							test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -29290,38 +28276,38 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 						if (temp_test_error)
 						{
 							run_command("reset",0);
-							while(1);
+							while (1) ;
 						}
 						else
 						{
-							if( num_array[8+(lane_step<<2)+3]>4)
+							if ( num_array[8+(lane_step<<2)+3]>4)
 							{
 								ddr_test_watchdog_disable(); //s
 								run_command("run storeboot",0);
-								while(1);
+								while (1) ;
 							}
 							else
 							{
 								ddr_test_watchdog_clear();
 								org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-								if(lane_step<8)
+								if (lane_step<8)
 									org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 								else if(lane_step<10)
 									org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 								num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 								temp_count=1;
-								read_write_window_test_parameter(data_source, 
+								read_write_window_test_parameter(data_source,
 										temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-								if(num_array[8+(lane_step<<2)+3]>4)
+								if (num_array[8+(lane_step<<2)+3]>4)
 								{
-									read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+									read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 											DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 								}
 
 								run_command("reset",0);
-								while(1);
+								while (1) ;
 							}
 						}
 
@@ -29345,27 +28331,27 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 				num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 				num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 				temp_count=1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				if(num_array[8+(lane_step<<2)+3]>4)
+				if (num_array[8+(lane_step<<2)+3]>4)
 				{
-					read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+					read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 							DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 				}
 
 
 				num_array[5]=num_array[8+(lane_step<<2)+2];//lcdlr_max;  //edge lcdlr
 				temp_count=5;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				num_array[8+(lane_step<<2)+2]=num_array[8+(lane_step<<2)+0];//
 				temp_count=8+(lane_step<<2)+2;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+				if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 					test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);
 				else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 					test_arg_6_lcdlr_temp_count=((num_array[5])-1);
@@ -29382,7 +28368,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 				ddr_test_watchdog_enable(test_watchdog_time_s); //s
 				printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 				ddr_test_watchdog_clear();
-				if(lane_step<8)
+				if (lane_step<8)
 					test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 				else if(lane_step<10)
 					test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -29393,39 +28379,39 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 				if (temp_test_error)
 				{
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 				else
 				{
 
-					if( num_array[8+(lane_step<<2)+3]>4)
+					if ( num_array[8+(lane_step<<2)+3]>4)
 					{
 						ddr_test_watchdog_disable(); //s
 						run_command("run storeboot",0);
-						while(1);
+						while (1) ;
 					}
 					else
 					{
 
 						ddr_test_watchdog_clear();
 						org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-						if(lane_step<8)
+						if (lane_step<8)
 							org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 						else if(lane_step<10)
 							org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 						num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 						temp_count=1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-						if(num_array[8+(lane_step<<2)+3]>4)
+						if (num_array[8+(lane_step<<2)+3]>4)
 						{
-							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 									DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 						}
 
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 
 				}
@@ -29433,50 +28419,50 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 			else if((num_array[8+(lane_step<<2)+3]==3)||(num_array[8+(lane_step<<2)+3]==7))   //test right edge ongoing    -loop
 			{
 
-				if((num_array[8+(lane_step<<2)+2]+1)>=(num_array[6]))
+				if ((num_array[8+(lane_step<<2)+2]+1) >= (num_array[6]))
 				{
-					if(num_array[1]==DDR_TEST_NULL)
+					if (num_array[1] == DDR_TEST_NULL)
 					{printf("default value not stable ,or recovery sticky?\n");
 					}
 					num_array[8+(lane_step<<2)+3]= num_array[8+(lane_step<<2)+3]+1;  //update status
 					temp_count=8+(lane_step<<2)+3;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					num_array[5]=0;  //update edge lcdlr
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-					if(num_array[1]==DDR_TEST_FAIL)
+					if (num_array[1] == DDR_TEST_FAIL)
 						num_array[8+(lane_step<<2)+2]=num_array[6]-1;   //update B
-					if(num_array[1]==DDR_TEST_PASS)
+					if (num_array[1] == DDR_TEST_PASS)
 						num_array[8+(lane_step<<2)+2]=num_array[6];   //update B
 					temp_count=8+(lane_step<<2)+2;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					test_arg_6_lcdlr_temp_count=0;  //curren_test +B  //(A+B)/2
 					num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 					temp_count=6;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 					temp_count=1;                                                                    //update test error flag
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-					if(num_array[8+(lane_step<<2)+3]>4)
+					if (num_array[8+(lane_step<<2)+3]>4)
 					{
-						read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+						read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 								DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 					}
 
 
-					run_command("reset",0); 
-					while(1);
+					run_command("reset",0);
+					while (1) ;
 				}
-				else 
-				{ 
-					if(num_array[1]==DDR_TEST_NULL)
+				else
+				{
+					if (num_array[1] == DDR_TEST_NULL)
 					{printf("default value not stable ,or recovery sticky?\n");
 					}
 					else  if(num_array[1]==DDR_TEST_FAIL)
@@ -29487,37 +28473,37 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 						{
 							// num_array[8+(lane_step<<2)+3]=3;  //update status
 							temp_count=8+(lane_step<<2)+3;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
 							num_array[5]=num_array[6];  //update edge lcdlr
 							temp_count=5;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-							if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+							if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 								test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);
 							else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 								test_arg_6_lcdlr_temp_count=((num_array[5])-1);
 							//  test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);  //curren_test +B  //(A+B)/2
 							num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 							temp_count=6;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 							// num_array[8+(lane_step<<2)+1]=num_array[8+(lane_step<<2)+1];   //update B
 							// temp_count=8+(lane_step<<2)+1;
-							// read_write_window_test_parameter(data_source, 
+							// read_write_window_test_parameter(data_source,
 							// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 							num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 							temp_count=1;                                                                    //update test error flag
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-							if(num_array[8+(lane_step<<2)+3]>4)
+							if (num_array[8+(lane_step<<2)+3]>4)
 							{
-								read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+								read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 										DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 							}
 
@@ -29525,7 +28511,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 							ddr_test_watchdog_enable(test_watchdog_time_s); //s
 							printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 							ddr_test_watchdog_clear();
-							if(lane_step<8)
+							if (lane_step<8)
 								test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 							else if(lane_step<10)
 								test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -29536,39 +28522,39 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 							if (temp_test_error)
 							{
 								run_command("reset",0);
-								while(1);
+								while (1) ;
 							}
 							else
 							{
-								if( num_array[8+(lane_step<<2)+3]>4)
+								if ( num_array[8+(lane_step<<2)+3]>4)
 								{
 									ddr_test_watchdog_disable(); //s
 									run_command("run storeboot",0);
-									while(1);
+									while (1) ;
 								}
 								else
 								{
 
 									ddr_test_watchdog_clear();
 									org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-									if(lane_step<8)
+									if (lane_step<8)
 										org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 									else if(lane_step<10)
 										org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 									num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 									temp_count=1;
-									read_write_window_test_parameter(data_source, 
+									read_write_window_test_parameter(data_source,
 											temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-									if(num_array[8+(lane_step<<2)+3]>4)
+									if (num_array[8+(lane_step<<2)+3]>4)
 									{
-										read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+										read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 												DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 									}
 
 									run_command("reset",0);
-									while(1);
+									while (1) ;
 								}
 
 							}
@@ -29579,31 +28565,31 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 					{
 						// num_array[8+(lane_step<<2)+3]=3;  //update status
 						temp_count=8+(lane_step<<2)+3;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						num_array[8+(lane_step<<2)+2]=num_array[6];  //update max value
 						temp_count=8+(lane_step<<2)+2;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-						if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+						if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 							test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);
 						else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 							test_arg_6_lcdlr_temp_count=((num_array[5])-1);
 						//    test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);  //curren_test +B  //(A+B)/2
 						num_array[6]=test_arg_6_lcdlr_temp_count;                                          // --update curent
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 						temp_count=1;                                                                    //update test error flag
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-						if(num_array[8+(lane_step<<2)+3]>4)
+						if (num_array[8+(lane_step<<2)+3]>4)
 						{
-							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 									DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 						}
 
@@ -29611,7 +28597,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 						ddr_test_watchdog_enable(test_watchdog_time_s); //s
 						printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 						ddr_test_watchdog_clear();
-						if(lane_step<8)
+						if (lane_step<8)
 							test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 						else if(lane_step<10)
 							test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -29622,37 +28608,37 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 						if (temp_test_error)
 						{
 							run_command("reset",0);
-							while(1);
+							while (1) ;
 						}
 						else
 						{
-							if( num_array[8+(lane_step<<2)+3]>4)
+							if ( num_array[8+(lane_step<<2)+3]>4)
 							{
 								ddr_test_watchdog_disable(); //s
 								run_command("run storeboot",0);
-								while(1);
+								while (1) ;
 							}
 							else
 							{
 								ddr_test_watchdog_clear();
 								org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-								if(lane_step<8)
+								if (lane_step<8)
 									org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 								else if(lane_step<10)
 									org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 
 								num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 								temp_count=1;
-								read_write_window_test_parameter(data_source, 
+								read_write_window_test_parameter(data_source,
 										temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-								if(num_array[8+(lane_step<<2)+3]>4)
+								if (num_array[8+(lane_step<<2)+3]>4)
 								{
-									read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+									read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 											DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 								}
 
 								run_command("reset",0);
-								while(1);
+								while (1) ;
 							}
 
 						}
@@ -29664,7 +28650,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 			}
 		}
 	}
-	if(lane_step>=10) //finish
+	if (lane_step >= 10) //finish
 	{
 		ddr_test_watchdog_disable(); //s
 		printf("close  watchdog\n");
@@ -29761,35 +28747,35 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 	}
 
 
-	if(test_arg_2_step==DDR_TEST_STATUS_UBOOT_FINISH)//||(test_arg_2_step==DDR_TEST_STATUS_KERNEL_FINISH)
+	if (test_arg_2_step == DDR_TEST_STATUS_UBOOT_FINISH)// || (test_arg_2_step == DDR_TEST_STATUS_KERNEL_FINISH)
 	{
 		test_arg_2_step=DDR_TEST_STATUS_KERNEL_ONGING;
 		num_array[2]=test_arg_2_step;
 		temp_count=2;
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		run_command("reset",0);
-		while(1);
+		while (1) ;
 
 	}
 
-	if(test_arg_2_step==DDR_TEST_STATUS_KERNEL_ONGING)//||(test_arg_2_step==DDR_TEST_STATUS_KERNEL_FINISH)
+	if (test_arg_2_step == DDR_TEST_STATUS_KERNEL_ONGING)// || (test_arg_2_step == DDR_TEST_STATUS_KERNEL_FINISH)
 	{
 		test_arg_2_step=DDR_TEST_STATUS_KERNEL_FINISH;
 		num_array[2]=test_arg_2_step;
 		temp_count=2;
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-		read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+		read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 				DDR_TEST_STATUS_STEP_FLAG_ADD_ORG_STICKY_OFFSET ,test_arg_2_step,DDR_PARAMETER_WRITE);
 		num_array[1]=DDR_TEST_NULL;
-		read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+		read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 				DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 		{
 			ddr_test_watchdog_disable(); //s
 			run_command("run storeboot",0);
-			while(1);
+			while (1) ;
 		}
 	}
 
@@ -29808,7 +28794,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_method(cmd_tbl_t *cmdtp, int fla
 
 int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	//setenv storeboot "ddr_test_cmd 0x34 2 6  20 0 0x100000 0x4000000"
+	//env_set storeboot "ddr_test_cmd 0x34 2 6  20 0 0x100000 0x4000000"
 	printf("\nsetenv bootcmd ddr_test_cmd 0x34 2 6  20 0 0x100000 0x4000000 \n");
 	printf("\nEnter do_ddr_uboot_window_use_source function\n");
 	printf("\n--- watchdog should >15s\n");
@@ -29883,7 +28869,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 			lane_disable= 0;
 		}
 	}
-	printf("lane_disable==0x%08x\n",lane_disable);   
+	printf("lane_disable==0x%08x\n",lane_disable);
 
 	if (argc >5) {
 		ddr_data_test_size = simple_strtoull_ddr(argv[5], &endp, 0);
@@ -29938,11 +28924,11 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 	memset(num_array, 0, sizeof(num_array));
 	char str[1024]="";
 
-	if(data_source==DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
+	if (data_source == DDR_PARAMETER_SOURCE_FROM_DMC_STICKY)
 		ddr_test_data_array_max=64;
-	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++) 
+	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++)
 	{
-		num_array[temp_count]= read_write_window_test_parameter(data_source, 
+		num_array[temp_count]= read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_READ );
 		printf("read numarry[%d]==%d\n",temp_count,num_array[temp_count]);
 	}
@@ -29978,7 +28964,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 
 
 
-	if((test_arg_7_magic_number==DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
+	if ((test_arg_7_magic_number == DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
 	{
 	}
 	else
@@ -30000,26 +28986,26 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 	num_array[6]	=	test_arg_6_lcdlr_temp_count		;
 	num_array[7]	=	test_arg_7_magic_number		;
 
-	for (temp_count= 0;temp_count < 8; temp_count++) 
+	for (temp_count= 0;temp_count < 8; temp_count++)
 	{
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	}
 
 
 
-	if(test_arg_2_step)
+	if (test_arg_2_step)
 	{
-		if(test_arg_3_freq!=global_ddr_clk)  //
+		if (test_arg_3_freq != global_ddr_clk)  //
 		{
 			printf("running ddr freq==%d,but test freq is%d,will reboot use d2pll \n",global_ddr_clk,test_arg_3_freq);
 			sprintf(str,"d2pll  %d",test_arg_3_freq);
 			printf("\nstr=%s\n",str);
 			run_command(str,0);
-			while(1);
+			while (1) ;
 		}
 	}
-	if(test_arg_2_step==0)
+	if (test_arg_2_step == 0)
 	{
 		{
 
@@ -30043,13 +29029,13 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 			num_array[7]	=	test_arg_7_magic_number		;
 
 
-			for (temp_count= 0;temp_count < 8; temp_count++) 
+			for (temp_count= 0;temp_count < 8; temp_count++)
 			{
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			}
 
-			// read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+			// read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 			// 	 DDR_TEST_STATUS_STEP_FLAG_ADD_ORG_STICKY_OFFSET ,test_arg_2_step,DDR_PARAMETER_WRITE);
 			//for (temp_count = 8; temp_count< 48;temp_count++) {
 			//		num_array[temp_count]=0;
@@ -30059,9 +29045,9 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 			{
 				//printf("1temp_count=%d\n",temp_count);
 
-				if((temp_count%4)==0)  //org
+				if ((temp_count%4) == 0)  //org
 				{
-					if(((temp_count-8)/4)<8)  
+					if (((temp_count-8)/4)<8)
 					{
 						lcdlr_min=0;
 						lcdlr_max=(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
@@ -30069,12 +29055,12 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						//if(lane_step==9)
 						//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
-					else if(((temp_count-8)/4)<10)  
+					else if(((temp_count-8)/4)<10)
 					{
 						lcdlr_min=0;
 						lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
 						//lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
-						if(((temp_count-8)/4)==9)
+						if (((temp_count-8)/4) == 9)
 							lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
 					//printf("2temp_count=%d\n",temp_count);
@@ -30093,9 +29079,9 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 
 			for (temp_count = 32+8; temp_count < (32+8+8); temp_count++)  //add
 			{
-				if((temp_count%4)==0)  //org
-				{	
-					if(((temp_count-8)/4)<8)  
+				if ((temp_count%4) == 0)  //org
+				{
+					if (((temp_count-8)/4)<8)
 					{
 						lcdlr_min=0;
 						lcdlr_max=(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
@@ -30103,12 +29089,12 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						//if(lane_step==9)
 						//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
-					else if(((temp_count-8)/4)<10)  
+					else if(((temp_count-8)/4)<10)
 					{
 						lcdlr_min=0;
 						lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
 						//lcdlr_max=4*(do_ddr_read_acmdlr());//(num_array[(lane_step<<2)+2+8]);////3*(do_ddr_read_acmdlr());
-						if(((temp_count-8)/4)==9)
+						if (((temp_count-8)/4) == 9)
 							lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 					}
 					//num_array[temp_count]=0;
@@ -30130,38 +29116,38 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 			printf("DDR0_PUB_DX1GCR0==%x\n",(readl(DDR0_PUB_DX1GCR0)));
 			printf("DDR0_PUB_DX2GCR0==%x\n",(readl(DDR0_PUB_DX2GCR0)));
 			printf("DDR0_PUB_DX3GCR0==%x\n",(readl(DDR0_PUB_DX3GCR0)));
-			if(((readl(DDR0_PUB_DX0GCR0))&1)==0)
-				lane_disable=   lane_disable|1;      
-			if(((readl(DDR0_PUB_DX1GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<1);   
-			if(((readl(DDR0_PUB_DX2GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<2);   
-			if(((readl(DDR0_PUB_DX3GCR0))&1)==0)
-				lane_disable=   lane_disable|(1<<3);   
+			if (((readl(DDR0_PUB_DX0GCR0))&1) == 0)
+				lane_disable=   lane_disable|1;
+			if (((readl(DDR0_PUB_DX1GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<1);
+			if (((readl(DDR0_PUB_DX2GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<2);
+			if (((readl(DDR0_PUB_DX3GCR0))&1) == 0)
+				lane_disable=   lane_disable|(1<<3);
 
 #endif
-			if(lane_disable)
+			if (lane_disable)
 			{if(lane_disable&0x1){
 									 num_array[8+3]=0xffff;
 									 num_array[8+4+3]=0xffff;
 								 }
-			if(lane_disable&0x2){
+			if (lane_disable&0x2) {
 				num_array[8+3+8]=0xffff;
 				num_array[8+4+3+8]=0xffff;
 			}
-			if(lane_disable&0x4){
+			if (lane_disable&0x4) {
 				num_array[8+3+8+8]=0xffff;
 				num_array[8+4+3+8+8]=0xffff;
 			}
-			if(lane_disable&0x8){
+			if (lane_disable&0x8) {
 				num_array[8+3+8+8+8]=0xffff;
 				num_array[8+4+3+8+8+8]=0xffff;
 			}
 			printf("lane_disable==%x\n",lane_disable);
-			if(lane_disable&0x10){
+			if (lane_disable&0x10) {
 				num_array[8+3+8+8+8+8]=0xffff;
 			}
-			if(lane_disable&0x20){
+			if (lane_disable&0x20) {
 				num_array[8+4+3+8+8+8+8]=0xffff;
 
 			}
@@ -30174,21 +29160,21 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 
 
 		for (temp_count= 0; temp_count< 48;temp_count++) {
-			num_array[temp_count]= read_write_window_test_parameter(data_source, 
+			num_array[temp_count]= read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		}
 	}
 
 	//test_arg_2_step++;
 	num_array[2]=test_arg_2_step;
-	for (temp_count = 1; temp_count < 48; temp_count++) 
+	for (temp_count = 1; temp_count < 48; temp_count++)
 	{
 		printf("%d  %d\n", temp_count,num_array[temp_count]);
 	}
 	temp_count=2;
-	num_array[temp_count]= read_write_window_test_parameter(data_source, 
+	num_array[temp_count]= read_write_window_test_parameter(data_source,
 			temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-	//	 read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+	//	 read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 	// 	 DDR_TEST_STATUS_STEP_FLAG_ADD_ORG_STICKY_OFFSET ,test_arg_2_step,DDR_PARAMETER_WRITE);
 	//for (i = 0; i < 48; i++) {
 
@@ -30209,21 +29195,21 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 
 	for ((lane_step=0);(lane_step<10);(lane_step++))   //find need test data step
 	{
-		if(ddr_enable_kernel_window_test_flag==0)
+		if (ddr_enable_kernel_window_test_flag == 0)
 		{
-			if((num_array[(lane_step<<2)+3+8]<(0x4)))
+			if ((num_array[(lane_step<<2)+3+8]<(0x4)))
 			{break;
 			}
 		}
 		else if(test_arg_2_step<DDR_TEST_STATUS_KERNEL_ONGING)
 		{
-			if((num_array[(lane_step<<2)+3+8]<(0x4)))
+			if ((num_array[(lane_step<<2)+3+8]<(0x4)))
 			{break;
 			}
 		}
 	}
 
-	if(test_arg_2_step==DDR_TEST_STATUS_UBOOT_ONGOING)
+	if (test_arg_2_step == DDR_TEST_STATUS_UBOOT_ONGOING)
 	{if(lane_step>9)
 		{
 			test_arg_2_step=DDR_TEST_STATUS_UBOOT_FINISH;
@@ -30232,15 +29218,15 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 	}
 
 
-	if(ddr_enable_kernel_window_test_flag)
+	if (ddr_enable_kernel_window_test_flag)
 	{
-		if(test_arg_2_step>DDR_TEST_STATUS_UBOOT_FINISH)
+		if (test_arg_2_step>DDR_TEST_STATUS_UBOOT_FINISH)
 		{
 			for ((lane_step=0);(lane_step<10);(lane_step++))   //find need test data step
 			{
 
 				{
-					if((num_array[(lane_step<<2)+3+8]<(0x4+4)))
+					if ((num_array[(lane_step<<2)+3+8]<(0x4+4)))
 					{break;
 					}
 				}
@@ -30248,16 +29234,16 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 		}
 	}
 
-	if(test_arg_2_step==DDR_TEST_STATUS_UBOOT_FINISH)//||(test_arg_2_step==DDR_TEST_STATUS_KERNEL_FINISH)
+	if (test_arg_2_step == DDR_TEST_STATUS_UBOOT_FINISH)// || (test_arg_2_step == DDR_TEST_STATUS_KERNEL_FINISH)
 	{
 		//test_arg_2_step=DDR_TEST_STATUS_KERNEL_ONGING;
 	}
 	else
 	{
 		printf("\nstart  test lane_step =%d\n",lane_step);
-		if(lane_step<10)
+		if (lane_step<10)
 		{
-			if(lane_step<8)
+			if (lane_step<8)
 			{
 				test_watchdog_time_s=watchdog_time_s;
 				ddr_test_size=ddr_data_test_size;
@@ -30277,15 +29263,15 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 				//lcdlr_max=0x3f;////3*(do_ddr_read_acmdlr());
 			}
 
-			if(num_array[8+(lane_step<<2)+3]>4)  //from kernel 
+			if (num_array[8+(lane_step<<2)+3]>4)  //from kernel
 			{
-				num_array[1]= read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+				num_array[1]= read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 						DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_READ);
-				// read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+				// read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 				// DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 			}
 
-			if(((num_array[8+(lane_step<<2)+3]==0))||((num_array[8+(lane_step<<2)+3]==4)))   //test left edge begin
+			if (((num_array[8+(lane_step<<2)+3] == 0)) || ((num_array[8+(lane_step<<2)+3] == 4)))   //test left edge begin
 			{
 				/*
 				   num_array[1]	=	test_arg_1_test_error_flag		;//1 pass 2 error
@@ -30299,45 +29285,45 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 				//         test_arg_0_orgt_store_lcdlr_value=(num_array[8+(lane_step<<2)+0]);
 				//	 num_array[0]=test_arg_0_orgt_store_lcdlr_value;
 				//	 temp_count=0;
-				//	 read_write_window_test_parameter(data_source, 
+				//	 read_write_window_test_parameter(data_source,
 				// 	 temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
-				if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+				if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 				{
 					test_arg_0_orgt_store_lcdlr_value=(num_array[8+(lane_step<<2)+1]);
 					num_array[0]=test_arg_0_orgt_store_lcdlr_value;
 					temp_count=0;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				}
 
 				num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 				num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 				temp_count=1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				if(num_array[8+(lane_step<<2)+3]>4)
+				if (num_array[8+(lane_step<<2)+3]>4)
 				{
-					read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+					read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 							DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 				}
 
-				read_write_window_test_flag(data_source, 
+				read_write_window_test_flag(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				num_array[5]=(num_array[8+(lane_step<<2)+1]);  //edge lcdlr
 				temp_count=5;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				(num_array[8+(lane_step<<2)+1])=(num_array[8+(lane_step<<2)+0]);  
+				(num_array[8+(lane_step<<2)+1])=(num_array[8+(lane_step<<2)+0]);
 				temp_count=8+(lane_step<<2)+1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+				if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 					test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+0])>>1);
 				else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 					test_arg_6_lcdlr_temp_count=((num_array[5])+1);
@@ -30361,32 +29347,32 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 					ddr_test_watchdog_clear();
 				}
 
-				if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+				if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 				{
 					ddr_lcdlr_test_offset=test_arg_6_lcdlr_temp_count-num_array[0];//test_arg_0_orgt_store_lcdlr_value;//num_array[8+(lane_step<<2)+1];
 					do_ddr_read_write_ddr_data_window_lcdlr( rank_index,0,
 							(num_array[0]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
-					for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))   
+					for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))
 					{
-						if(num_array[8+(lane_step_count<<2)+3]<9)
+						if (num_array[8+(lane_step_count<<2)+3]<9)
 							do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 									(num_array[8+(lane_step_count<<2)+1]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 					}
-					for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+					for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 					{
 						ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+1]+ddr_lcdlr_test_offset);
-						if(lane_step_count==9)
+						if (lane_step_count == 9)
 						{if (ddr_lcdlr_test_temp_value>0x3f)
 							ddr_lcdlr_test_temp_value=0x3f;
 						}
-						if(num_array[8+(lane_step_count<<2)+3]<9)
+						if (num_array[8+(lane_step_count<<2)+3]<9)
 							do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 									ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 					}
 				}
 				else
 				{
-					if(lane_step<8)
+					if (lane_step<8)
 					{
 						test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 					}
@@ -30407,38 +29393,38 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 				if (temp_test_error)
 				{
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 				else
 				{
-					if( num_array[8+(lane_step<<2)+3]>4)
+					if ( num_array[8+(lane_step<<2)+3]>4)
 					{
 						ddr_test_watchdog_disable(); //s
 						run_command("run storeboot",0);
-						while(1);
+						while (1) ;
 					}
 					else
 					{
 						ddr_test_watchdog_clear();
 						org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
 
-						if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+						if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 						{
 							ddr_lcdlr_test_offset=0;//test_arg_6_lcdlr_temp_count-num_array[8+(lane_step<<2)+1];
-							for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+							for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 							{
-								if(num_array[8+(lane_step_count<<2)+3]<9)
+								if (num_array[8+(lane_step_count<<2)+3]<9)
 									do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 											(num_array[8+(lane_step_count<<2)+0]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 							}
-							for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+							for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 							{
 								ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+0]+ddr_lcdlr_test_offset);
-								if(lane_step_count==9)
+								if (lane_step_count == 9)
 								{if (ddr_lcdlr_test_temp_value>0x3f)
 									ddr_lcdlr_test_temp_value=0x3f;
 								}
-								if(num_array[8+(lane_step_count<<2)+3]<9)
+								if (num_array[8+(lane_step_count<<2)+3]<9)
 									do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 											ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 							}
@@ -30446,7 +29432,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						else
 						{
 
-							if(lane_step<8)
+							if (lane_step<8)
 								org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 							else if(lane_step<10)
 								org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
@@ -30454,40 +29440,40 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 
 						num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 						temp_count=1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-						if(num_array[8+(lane_step<<2)+3]>4)
+						if (num_array[8+(lane_step<<2)+3]>4)
 						{
-							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 									DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 						}
 
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 				}
 			}
 			else if((num_array[8+(lane_step<<2)+3]==1)||((num_array[8+(lane_step<<2)+3]==5)))   //test left edge begin)   //test left edge ongoing    -loop
 			{
 
-				if((num_array[6]+1)>=(num_array[8+(lane_step<<2)+1]))
+				if ((num_array[6]+1) >= (num_array[8+(lane_step<<2)+1]))
 				{
-					if(num_array[1]==DDR_TEST_NULL)
+					if (num_array[1] == DDR_TEST_NULL)
 					{printf("default value not stable ,or recovery sticky?\n");
 					}
 
 
 
-					if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+					if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 					{
 						//ddr_lcdlr_test_offset=0;//test_arg_6_lcdlr_temp_count-num_array[8+(lane_step<<2)+1];
-						for ((lane_step_count=0);(lane_step_count<10);(lane_step_count++))   
+						for ((lane_step_count=0);(lane_step_count<10);(lane_step_count++))
 						{
 
 							num_array[8+(lane_step_count<<2)+3]= num_array[8+(lane_step_count<<2)+3]+1;  //update status
 							lane_step_count=8+(lane_step_count<<2)+3;
-							if(num_array[8+(lane_step_count<<2)+3]<9)
-								read_write_window_test_parameter(data_source, 
+							if (num_array[8+(lane_step_count<<2)+3]<9)
+								read_write_window_test_parameter(data_source,
 										temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						}
 
@@ -30497,13 +29483,13 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 					{
 						num_array[8+(lane_step<<2)+3]= num_array[8+(lane_step<<2)+3]+1;  //update status
 						temp_count=8+(lane_step<<2)+3;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					}
 
 					num_array[5]=0;  //update edge lcdlr
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					//    if(num_array[1]==DDR_TEST_FAIL)
@@ -30513,77 +29499,77 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 					//	 temp_count=8+(lane_step<<2)+1;
 
 
-					if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+					if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 					{
 
 						test_arg_0_orgt_store_lcdlr_value= num_array[0];
-						if(num_array[1]==DDR_TEST_FAIL)
+						if (num_array[1] == DDR_TEST_FAIL)
 						{
 							ddr_lcdlr_test_offset=num_array[8+(lane_step<<2)+1]+1-test_arg_0_orgt_store_lcdlr_value;
 						}
-						if(num_array[1]==DDR_TEST_PASS)
+						if (num_array[1] == DDR_TEST_PASS)
 						{
 							ddr_lcdlr_test_offset=num_array[8+(lane_step<<2)+1]+0-test_arg_0_orgt_store_lcdlr_value;
 						}
 						temp_count=8+(lane_step<<2)+2;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-						for ((lane_step_count=1);(lane_step_count<10);(lane_step_count++))   
+						for ((lane_step_count=1);(lane_step_count<10);(lane_step_count++))
 						{
 							ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+2]+ddr_lcdlr_test_offset);
-							if(lane_step_count==9)
+							if (lane_step_count == 9)
 							{
-								if((num_array[8+(lane_step_count<<2)+2]+ddr_lcdlr_test_offset)>0x3f)
+								if ((num_array[8+(lane_step_count<<2)+2]+ddr_lcdlr_test_offset)>0x3f)
 									ddr_lcdlr_test_temp_value=0x3f;
 							}
-							if(num_array[8+(lane_step_count<<2)+3]<9)
-								read_write_window_test_parameter(data_source, 
+							if (num_array[8+(lane_step_count<<2)+3]<9)
+								read_write_window_test_parameter(data_source,
 										(8+(lane_step_count<<2)+2) ,ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 						}
 
 
 					}
-					else 
+					else
 					{
-						if(num_array[1]==DDR_TEST_FAIL)
+						if (num_array[1] == DDR_TEST_FAIL)
 							num_array[8+(lane_step<<2)+1]=num_array[6]+1;   //update B
-						if(num_array[1]==DDR_TEST_PASS)
+						if (num_array[1] == DDR_TEST_PASS)
 							num_array[8+(lane_step<<2)+1]=num_array[6];   //update B
 						temp_count=8+(lane_step<<2)+1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					}
 
 					test_arg_6_lcdlr_temp_count=0;  //curren_test +B  //(A+B)/2
 					num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 					temp_count=6;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 					temp_count=1;                                                                    //update test error flag
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					if(num_array[8+(lane_step<<2)+3]>4)
+					if (num_array[8+(lane_step<<2)+3]>4)
 					{
-						//	num_array[1]= read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+						//	num_array[1]= read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 						// DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_READ);
-						read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+						read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 								DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 					}
 
 					//  test_arg_0_orgt_store_lcdlr_value=0;//(num_array[8+(lane_step<<2)+0]);
 					// num_array[0]=test_arg_0_orgt_store_lcdlr_value;
 					// temp_count=0;
-					// read_write_window_test_parameter(data_source, 
+					// read_write_window_test_parameter(data_source,
 					// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-					run_command("reset",0); 
-					while(1);
+					run_command("reset",0);
+					while (1) ;
 
 				}
-				else 
-				{ 
-					if(num_array[1]==DDR_TEST_NULL)
+				else
+				{
+					if (num_array[1] == DDR_TEST_NULL)
 					{printf("default value not stable ,or recovery sticky?\n");
 					}
 					else  if(num_array[1]==DDR_TEST_FAIL)
@@ -30594,16 +29580,16 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						{
 							//   num_array[8+(lane_step<<2)+3]=1;  //update status
 							temp_count=8+(lane_step<<2)+3;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
 							num_array[5]=num_array[6];  //update edge lcdlr
 							temp_count=5;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-							if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+							if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 								test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);
 							else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 								test_arg_6_lcdlr_temp_count=((num_array[5])+1);
@@ -30612,21 +29598,21 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 							//   test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);  //curren_test +B  //(A+B)/2
 							num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 							temp_count=6;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 							// num_array[8+(lane_step<<2)+1]=num_array[8+(lane_step<<2)+1];   //update B
 							// temp_count=8+(lane_step<<2)+1;
-							// read_write_window_test_parameter(data_source, 
+							// read_write_window_test_parameter(data_source,
 							// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 							num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 							temp_count=1;                                                                    //update test error flag
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-							if(num_array[8+(lane_step<<2)+3]>4)
+							if (num_array[8+(lane_step<<2)+3]>4)
 							{
-								read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+								read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 										DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 							}
 
@@ -30635,26 +29621,26 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 							printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 							ddr_test_watchdog_clear();
 
-							if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+							if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 							{
 
 								ddr_lcdlr_test_offset=test_arg_6_lcdlr_temp_count-num_array[0];//tnum_array[8+(lane_step<<2)+1];
 								do_ddr_read_write_ddr_data_window_lcdlr( rank_index,0,
 										(num_array[0]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
-								for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))   
+								for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))
 								{
-									if(num_array[8+(lane_step_count<<2)+3]<9)
+									if (num_array[8+(lane_step_count<<2)+3]<9)
 										do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 												(num_array[8+(lane_step_count<<2)+1]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 								}
-								for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+								for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 								{
 									ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+1]+ddr_lcdlr_test_offset);
-									if(lane_step_count==9)
+									if (lane_step_count == 9)
 									{if (ddr_lcdlr_test_temp_value>0x3f)
 										ddr_lcdlr_test_temp_value=0x3f;
 									}
-									if(num_array[8+(lane_step_count<<2)+3]<9)
+									if (num_array[8+(lane_step_count<<2)+3]<9)
 										do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 												ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 								}
@@ -30662,7 +29648,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 							else
 							{
 
-								if(lane_step<8)
+								if (lane_step<8)
 									test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 								else if(lane_step<10)
 									test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -30674,15 +29660,15 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 							if (temp_test_error)
 							{
 								run_command("reset",0);
-								while(1);
+								while (1) ;
 							}
 							else
 							{
-								if( num_array[8+(lane_step<<2)+3]>4)
+								if ( num_array[8+(lane_step<<2)+3]>4)
 								{
 									ddr_test_watchdog_disable(); //s
 									run_command("run storeboot",0);
-									while(1);
+									while (1) ;
 								}
 								else
 								{
@@ -30690,30 +29676,30 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 									ddr_test_watchdog_clear();
 									org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
 
-									if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+									if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 									{
 										ddr_lcdlr_test_offset=0;//test_arg_6_lcdlr_temp_count-num_array[8+(lane_step<<2)+1];
-										for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+										for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 										{
-											if(num_array[8+(lane_step_count<<2)+3]<9)
+											if (num_array[8+(lane_step_count<<2)+3]<9)
 												do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 														(num_array[8+(lane_step_count<<2)+0]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 										}
-										for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+										for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 										{
 											ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+0]+ddr_lcdlr_test_offset);
-											if(lane_step_count==9)
+											if (lane_step_count == 9)
 											{if (ddr_lcdlr_test_temp_value>0x3f)
 												ddr_lcdlr_test_temp_value=0x3f;
 											}
-											if(num_array[8+(lane_step_count<<2)+3]<9)
+											if (num_array[8+(lane_step_count<<2)+3]<9)
 												do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 														ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 										}
 									}
 									else
 									{
-										if(lane_step<8)
+										if (lane_step<8)
 											org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 										else if(lane_step<10)
 											org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
@@ -30721,18 +29707,18 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 
 									num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 									temp_count=1;
-									read_write_window_test_parameter(data_source, 
+									read_write_window_test_parameter(data_source,
 											temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-									if(num_array[8+(lane_step<<2)+3]>4)
+									if (num_array[8+(lane_step<<2)+3]>4)
 									{
-										read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+										read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 												DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 									}
 
 
 									run_command("reset",0);
-									while(1);
+									while (1) ;
 								}
 
 							}
@@ -30743,15 +29729,15 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 					{
 						// num_array[8+(lane_step<<2)+3]=1;  //update status
 						temp_count=8+(lane_step<<2)+3;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						num_array[8+(lane_step<<2)+1]=num_array[6];  //update min value
 						temp_count=8+(lane_step<<2)+1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-						if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+						if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 							test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);
 						else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 							test_arg_6_lcdlr_temp_count=((num_array[5])+1);
@@ -30760,17 +29746,17 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						//   test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+1])>>1);  //curren_test +B  //(A+B)/2
 						num_array[6]=test_arg_6_lcdlr_temp_count;                                          // --update curent
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 						temp_count=1;                                                                    //update test error flag
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-						if(num_array[8+(lane_step<<2)+3]>4)
+						if (num_array[8+(lane_step<<2)+3]>4)
 						{
-							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 									DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 						}
 
@@ -30779,32 +29765,32 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 						ddr_test_watchdog_clear();
 
-						if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+						if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 						{
 							ddr_lcdlr_test_offset=test_arg_6_lcdlr_temp_count-num_array[0];//tnum_array[8+(lane_step<<2)+1];
 							do_ddr_read_write_ddr_data_window_lcdlr( rank_index,0,
 									(num_array[0]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
-							for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))   
+							for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))
 							{
-								if(num_array[8+(lane_step_count<<2)+3]<9)
+								if (num_array[8+(lane_step_count<<2)+3]<9)
 									do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 											(num_array[8+(lane_step_count<<2)+1]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 							}
-							for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+							for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 							{
 								ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+1]+ddr_lcdlr_test_offset);
-								if(lane_step_count==9)
+								if (lane_step_count == 9)
 								{if (ddr_lcdlr_test_temp_value>0x3f)
 									ddr_lcdlr_test_temp_value=0x3f;
 								}
-								if(num_array[8+(lane_step_count<<2)+3]<9)
+								if (num_array[8+(lane_step_count<<2)+3]<9)
 									do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 											ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 							}
 						}
 						else
 						{
-							if(lane_step<8)
+							if (lane_step<8)
 								test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 							else if(lane_step<10)
 								test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -30815,44 +29801,44 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						if (temp_test_error)
 						{
 							run_command("reset",0);
-							while(1);
+							while (1) ;
 						}
 						else
 						{
-							if( num_array[8+(lane_step<<2)+3]>4)
+							if ( num_array[8+(lane_step<<2)+3]>4)
 							{
 								ddr_test_watchdog_disable(); //s
 								run_command("run storeboot",0);
-								while(1);
+								while (1) ;
 							}
 							else
 							{
 								ddr_test_watchdog_clear();
 								org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-								if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+								if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 								{
 									ddr_lcdlr_test_offset=0;//test_arg_6_lcdlr_temp_count-num_array[8+(lane_step<<2)+1];
-									for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+									for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 									{
-										if(num_array[8+(lane_step_count<<2)+3]<9)
+										if (num_array[8+(lane_step_count<<2)+3]<9)
 											do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 													(num_array[8+(lane_step_count<<2)+0]+ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 									}
-									for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+									for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 									{
 										ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+0]+ddr_lcdlr_test_offset);
-										if(lane_step_count==9)
+										if (lane_step_count == 9)
 										{if (ddr_lcdlr_test_temp_value>0x3f)
 											ddr_lcdlr_test_temp_value=0x3f;
 										}
-										if(num_array[8+(lane_step_count<<2)+3]<9)
+										if (num_array[8+(lane_step_count<<2)+3]<9)
 											do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 													ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 									}
 								}
 								else
 								{
-									if(lane_step<8)
+									if (lane_step<8)
 										org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 									else if(lane_step<10)
 										org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
@@ -30860,17 +29846,17 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 
 								num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 								temp_count=1;
-								read_write_window_test_parameter(data_source, 
+								read_write_window_test_parameter(data_source,
 										temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-								if(num_array[8+(lane_step<<2)+3]>4)
+								if (num_array[8+(lane_step<<2)+3]>4)
 								{
-									read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+									read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 											DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 								}
 
 								run_command("reset",0);
-								while(1);
+								while (1) ;
 							}
 						}
 
@@ -30892,38 +29878,38 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 				   num_array[7]	=	test_arg_7_magic_number		;
 				   */
 
-				if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+				if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 				{
 					test_arg_0_orgt_store_lcdlr_value=(num_array[8+(lane_step<<2)+2]);
 					num_array[0]=test_arg_0_orgt_store_lcdlr_value;
 					temp_count=0;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				}
 				num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 				num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 				temp_count=1;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				if(num_array[8+(lane_step<<2)+3]>4)
+				if (num_array[8+(lane_step<<2)+3]>4)
 				{
-					read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+					read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 							DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 				}
 
 
 				num_array[5]=num_array[8+(lane_step<<2)+2];//lcdlr_max;  //edge lcdlr
 				temp_count=5;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 				num_array[8+(lane_step<<2)+2]=num_array[8+(lane_step<<2)+0];//
 				temp_count=8+(lane_step<<2)+2;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-				if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+				if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 					test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);
 				else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 					test_arg_6_lcdlr_temp_count=((num_array[5])-1);
@@ -30943,32 +29929,32 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 				printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 				ddr_test_watchdog_clear();
 
-				if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+				if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 				{
 					ddr_lcdlr_test_offset=num_array[0]-test_arg_6_lcdlr_temp_count;
 					do_ddr_read_write_ddr_data_window_lcdlr( rank_index,0,
 							(num_array[0]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
-					for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))   
+					for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))
 					{
-						if(num_array[8+(lane_step_count<<2)+3]<9)
+						if (num_array[8+(lane_step_count<<2)+3]<9)
 							do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 									(num_array[8+(lane_step_count<<2)+2]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 					}
-					for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+					for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 					{
 						ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+2]-ddr_lcdlr_test_offset);
 						//if(lane_step_count==9)
 						{if ((num_array[8+(lane_step_count<<2)+2])<(ddr_lcdlr_test_offset))
 							ddr_lcdlr_test_temp_value=0;
 						}
-						if(num_array[8+(lane_step_count<<2)+3]<9)
+						if (num_array[8+(lane_step_count<<2)+3]<9)
 							do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 									ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 					}
 				}
 				else
 				{
-					if(lane_step<8)
+					if (lane_step<8)
 						test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 					else if(lane_step<10)
 						test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -30979,62 +29965,62 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 				if (temp_test_error)
 				{
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 				else
 				{
 
-					if( num_array[8+(lane_step<<2)+3]>4)
+					if ( num_array[8+(lane_step<<2)+3]>4)
 					{
 						ddr_test_watchdog_disable(); //s
 						run_command("run storeboot",0);
-						while(1);
+						while (1) ;
 					}
 					else
 					{
 
 						ddr_test_watchdog_clear();
 						org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-						if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+						if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 						{
 							ddr_lcdlr_test_offset=0;//num_array[8+(lane_step<<2)+2]-test_arg_6_lcdlr_temp_count;
-							for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+							for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 							{
-								if(num_array[8+(lane_step_count<<2)+3]<9)
+								if (num_array[8+(lane_step_count<<2)+3]<9)
 									do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 											(num_array[8+(lane_step_count<<2)+0]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 							}
-							for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+							for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 							{
 								ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+0]-ddr_lcdlr_test_offset);
 								//if(lane_step_count==9)
 								//	{if ((num_array[8+(lane_step_count<<2)+2]<ddr_lcdlr_test_offset)
 								//	ddr_lcdlr_test_temp_value=0;
 								//	}
-								if(num_array[8+(lane_step_count<<2)+3]<9)
+								if (num_array[8+(lane_step_count<<2)+3]<9)
 									do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 											ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 							}
 						}
 						else
 						{
-							if(lane_step<8)
+							if (lane_step<8)
 								org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 							else if(lane_step<10)
 								org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 						}
 						num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 						temp_count=1;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-						if(num_array[8+(lane_step<<2)+3]>4)
+						if (num_array[8+(lane_step<<2)+3]>4)
 						{
-							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 									DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 						}
 
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 
 				}
@@ -31042,23 +30028,23 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 			else if((num_array[8+(lane_step<<2)+3]==3)||(num_array[8+(lane_step<<2)+3]==7))   //test right edge ongoing    -loop
 			{
 
-				if((num_array[8+(lane_step<<2)+2]+1)>=(num_array[6]))
+				if ((num_array[8+(lane_step<<2)+2]+1) >= (num_array[6]))
 				{
-					if(num_array[1]==DDR_TEST_NULL)
+					if (num_array[1] == DDR_TEST_NULL)
 					{printf("default value not stable ,or recovery sticky?\n");
 					}
 
 
-					if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+					if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 					{
 						//ddr_lcdlr_test_offset=0;//test_arg_6_lcdlr_temp_count-num_array[8+(lane_step<<2)+1];
-						for ((lane_step_count=0);(lane_step_count<10);(lane_step_count++))   
+						for ((lane_step_count=0);(lane_step_count<10);(lane_step_count++))
 						{
 
 							num_array[8+(lane_step_count<<2)+3]= num_array[8+(lane_step_count<<2)+3]+1;  //update status
 							lane_step_count=8+(lane_step_count<<2)+3;
-							if(num_array[8+(lane_step_count<<2)+3]<9)
-								read_write_window_test_parameter(data_source, 
+							if (num_array[8+(lane_step_count<<2)+3]<9)
+								read_write_window_test_parameter(data_source,
 										temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						}
 
@@ -31068,13 +30054,13 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 					{
 						num_array[8+(lane_step<<2)+3]= num_array[8+(lane_step<<2)+3]+1;  //update status
 						temp_count=8+(lane_step<<2)+3;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					}
 
 					num_array[5]=0;  //update edge lcdlr
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 					//    if(num_array[1]==DDR_TEST_FAIL)
@@ -31082,45 +30068,45 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 					//     if(num_array[1]==DDR_TEST_PASS)
 					//     num_array[8+(lane_step<<2)+2]=num_array[6];   //update B
 					//	 temp_count=8+(lane_step<<2)+2;
-					//	 read_write_window_test_parameter(data_source, 
+					//	 read_write_window_test_parameter(data_source,
 					//	 temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
-					if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+					if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 					{
 
 						test_arg_0_orgt_store_lcdlr_value= num_array[0];
-						if(num_array[1]==DDR_TEST_FAIL)
+						if (num_array[1] == DDR_TEST_FAIL)
 						{
 							ddr_lcdlr_test_offset=test_arg_0_orgt_store_lcdlr_value-num_array[8+(lane_step<<2)+2]+1;
 						}
-						if(num_array[1]==DDR_TEST_PASS)
+						if (num_array[1] == DDR_TEST_PASS)
 						{
 							ddr_lcdlr_test_offset=test_arg_0_orgt_store_lcdlr_value-num_array[8+(lane_step<<2)+2]+0;
 						}
 						temp_count=8+(lane_step<<2)+2;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-						for ((lane_step_count=1);(lane_step_count<10);(lane_step_count++))   
+						for ((lane_step_count=1);(lane_step_count<10);(lane_step_count++))
 						{
 							ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+2]-ddr_lcdlr_test_offset);
-							if(num_array[8+(lane_step_count<<2)+2]<ddr_lcdlr_test_offset)
+							if (num_array[8+(lane_step_count<<2)+2]<ddr_lcdlr_test_offset)
 								ddr_lcdlr_test_temp_value=0;
-							if(num_array[8+(lane_step_count<<2)+3]<9)
-								read_write_window_test_parameter(data_source, 
+							if (num_array[8+(lane_step_count<<2)+3]<9)
+								read_write_window_test_parameter(data_source,
 										(8+(lane_step_count<<2)+2) ,ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 						}
 
 
 					}
-					else 
+					else
 					{
-						if(num_array[1]==DDR_TEST_FAIL)
+						if (num_array[1] == DDR_TEST_FAIL)
 							num_array[8+(lane_step<<2)+2]=num_array[6]-1;   //update B
-						if(num_array[1]==DDR_TEST_PASS)
+						if (num_array[1] == DDR_TEST_PASS)
 							num_array[8+(lane_step<<2)+2]=num_array[6];   //update B
 						temp_count=8+(lane_step<<2)+2;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					}
 
@@ -31128,25 +30114,25 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 					test_arg_6_lcdlr_temp_count=0;  //curren_test +B  //(A+B)/2
 					num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 					temp_count=6;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					num_array[1]=DDR_TEST_NULL;  //1 //pass 2 error
 					temp_count=1;                                                                    //update test error flag
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-					if(num_array[8+(lane_step<<2)+3]>4)
+					if (num_array[8+(lane_step<<2)+3]>4)
 					{
-						read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+						read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 								DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 					}
 
 
-					run_command("reset",0); 
-					while(1);
+					run_command("reset",0);
+					while (1) ;
 				}
-				else 
-				{ 
-					if(num_array[1]==DDR_TEST_NULL)
+				else
+				{
+					if (num_array[1] == DDR_TEST_NULL)
 					{printf("default value not stable ,or recovery sticky?\n");
 					}
 					else  if(num_array[1]==DDR_TEST_FAIL)
@@ -31157,16 +30143,16 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						{
 							// num_array[8+(lane_step<<2)+3]=3;  //update status
 							temp_count=8+(lane_step<<2)+3;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
 							num_array[5]=num_array[6];  //update edge lcdlr
 							temp_count=5;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-							if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+							if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 								test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);
 							else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 								test_arg_6_lcdlr_temp_count=((num_array[5])-1);
@@ -31175,21 +30161,21 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 							//  test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);  //curren_test +B  //(A+B)/2
 							num_array[6]=test_arg_6_lcdlr_temp_count;                                          //--update curent
 							temp_count=6;
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 							// num_array[8+(lane_step<<2)+1]=num_array[8+(lane_step<<2)+1];   //update B
 							// temp_count=8+(lane_step<<2)+1;
-							// read_write_window_test_parameter(data_source, 
+							// read_write_window_test_parameter(data_source,
 							// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 							num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 							temp_count=1;                                                                    //update test error flag
-							read_write_window_test_parameter(data_source, 
+							read_write_window_test_parameter(data_source,
 									temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-							if(num_array[8+(lane_step<<2)+3]>4)
+							if (num_array[8+(lane_step<<2)+3]>4)
 							{
-								read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+								read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 										DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 							}
 
@@ -31198,32 +30184,32 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 							printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 							ddr_test_watchdog_clear();
 
-							if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+							if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 							{
 								ddr_lcdlr_test_offset=num_array[0]-test_arg_6_lcdlr_temp_count;
 								do_ddr_read_write_ddr_data_window_lcdlr( rank_index,0,
 										(num_array[0]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
-								for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))   
+								for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))
 								{
-									if(num_array[8+(lane_step_count<<2)+3]<9)
+									if (num_array[8+(lane_step_count<<2)+3]<9)
 										do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 												(num_array[8+(lane_step_count<<2)+2]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 								}
-								for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+								for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 								{
 									ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+2]-ddr_lcdlr_test_offset);
 									//if(lane_step_count==9)
 									{if ((num_array[8+(lane_step_count<<2)+2])<(ddr_lcdlr_test_offset))
 										ddr_lcdlr_test_temp_value=0;
 									}
-									if(num_array[8+(lane_step_count<<2)+3]<9)
+									if (num_array[8+(lane_step_count<<2)+3]<9)
 										do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 												ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 								}
 							}
 							else
 							{
-								if(lane_step<8)
+								if (lane_step<8)
 									test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 								else if(lane_step<10)
 									test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -31234,62 +30220,62 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 							if (temp_test_error)
 							{
 								run_command("reset",0);
-								while(1);
+								while (1) ;
 							}
 							else
 							{
-								if( num_array[8+(lane_step<<2)+3]>4)
+								if ( num_array[8+(lane_step<<2)+3]>4)
 								{
 									ddr_test_watchdog_disable(); //s
 									run_command("run storeboot",0);
-									while(1);
+									while (1) ;
 								}
 								else
 								{
 
 									ddr_test_watchdog_clear();
 									org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-									if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+									if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 									{
 										ddr_lcdlr_test_offset=0;//num_array[8+(lane_step<<2)+2]-test_arg_6_lcdlr_temp_count;
-										for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+										for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 										{
-											if(num_array[8+(lane_step_count<<2)+3]<9)
+											if (num_array[8+(lane_step_count<<2)+3]<9)
 												do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 														(num_array[8+(lane_step_count<<2)+0]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 										}
-										for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+										for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 										{
 											ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+0]-ddr_lcdlr_test_offset);
 											//if(lane_step_count==9)
 											//	{if ((num_array[8+(lane_step_count<<2)+0]<ddr_lcdlr_test_offset)
 											//	ddr_lcdlr_test_temp_value=0;
 											//	}
-											if(num_array[8+(lane_step_count<<2)+3]<9)
+											if (num_array[8+(lane_step_count<<2)+3]<9)
 												do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 														ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 										}
 									}
 									else
 									{
-										if(lane_step<8)
+										if (lane_step<8)
 											org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 										else if(lane_step<10)
 											org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 									}
 									num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 									temp_count=1;
-									read_write_window_test_parameter(data_source, 
+									read_write_window_test_parameter(data_source,
 											temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-									if(num_array[8+(lane_step<<2)+3]>4)
+									if (num_array[8+(lane_step<<2)+3]>4)
 									{
-										read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+										read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 												DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 									}
 
 									run_command("reset",0);
-									while(1);
+									while (1) ;
 								}
 
 							}
@@ -31300,15 +30286,15 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 					{
 						// num_array[8+(lane_step<<2)+3]=3;  //update status
 						temp_count=8+(lane_step<<2)+3;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						num_array[8+(lane_step<<2)+2]=num_array[6];  //update max value
 						temp_count=8+(lane_step<<2)+2;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-						if(ddr_test_method==DDR_TEST_METHOD_DIVIDER_2)
+						if (ddr_test_method == DDR_TEST_METHOD_DIVIDER_2)
 							test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);
 						else if(ddr_test_method==DDR_TEST_METHOD_DECREASE)
 							test_arg_6_lcdlr_temp_count=((num_array[5])-1);
@@ -31317,16 +30303,16 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						//    test_arg_6_lcdlr_temp_count=((num_array[5]+num_array[8+(lane_step<<2)+2])>>1);  //curren_test +B  //(A+B)/2
 						num_array[6]=test_arg_6_lcdlr_temp_count;                                          // --update curent
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 						num_array[1]=DDR_TEST_FAIL;  //1 //pass 2 error
 						temp_count=1;                                                                    //update test error flag
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-						if(num_array[8+(lane_step<<2)+3]>4)
+						if (num_array[8+(lane_step<<2)+3]>4)
 						{
-							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+							read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 									DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 						}
 
@@ -31334,32 +30320,32 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						ddr_test_watchdog_enable(test_watchdog_time_s); //s
 						printf("\nenable %ds watchdog \n",test_watchdog_time_s);
 						ddr_test_watchdog_clear();
-						if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+						if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 						{
 							ddr_lcdlr_test_offset=num_array[0]-test_arg_6_lcdlr_temp_count;
 							do_ddr_read_write_ddr_data_window_lcdlr( rank_index,0,
 									(num_array[0]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
-							for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))   
+							for ((lane_step_count=1);(lane_step_count<8);(lane_step_count++))
 							{
-								if(num_array[8+(lane_step_count<<2)+3]<9)
+								if (num_array[8+(lane_step_count<<2)+3]<9)
 									do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 											(num_array[8+(lane_step_count<<2)+2]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 							}
-							for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+							for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 							{
 								ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+2]-ddr_lcdlr_test_offset);
 								//if(lane_step_count==9)
 								{if ((num_array[8+(lane_step_count<<2)+2])<(ddr_lcdlr_test_offset))
 									ddr_lcdlr_test_temp_value=0;
 								}
-								if(num_array[8+(lane_step_count<<2)+3]<9)
+								if (num_array[8+(lane_step_count<<2)+3]<9)
 									do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 											ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 							}
 						}
 						else
 						{
-							if(lane_step<8)
+							if (lane_step<8)
 								test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
 							else if(lane_step<10)
 								test_arg_6_lcdlr_temp_count=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,test_arg_6_lcdlr_temp_count,DDR_PARAMETER_WRITE);
@@ -31370,60 +30356,60 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 						if (temp_test_error)
 						{
 							run_command("reset",0);
-							while(1);
+							while (1) ;
 						}
 						else
 						{
-							if( num_array[8+(lane_step<<2)+3]>4)
+							if ( num_array[8+(lane_step<<2)+3]>4)
 							{
 								ddr_test_watchdog_disable(); //s
 								run_command("run storeboot",0);
-								while(1);
+								while (1) ;
 							}
 							else
 							{
 								ddr_test_watchdog_clear();
 								org_lcdlr_value_temp=num_array[8+(lane_step<<2)+0];
-								if(ddr_test_method==DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
+								if (ddr_test_method == DDR_TEST_METHOD_DECREASE_ALL_SAMETIME)
 								{
 									ddr_lcdlr_test_offset=0;//num_array[8+(lane_step<<2)+2]-test_arg_6_lcdlr_temp_count;
-									for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+									for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 									{
-										if(num_array[8+(lane_step_count<<2)+3]<9)
+										if (num_array[8+(lane_step_count<<2)+3]<9)
 											do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 													(num_array[8+(lane_step_count<<2)+0]-ddr_lcdlr_test_offset),DDR_PARAMETER_WRITE);
 									}
-									for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))   
+									for ((lane_step_count=8);(lane_step_count<10);(lane_step_count++))
 									{
 										ddr_lcdlr_test_temp_value=(num_array[8+(lane_step_count<<2)+0]-ddr_lcdlr_test_offset);
 										//if(lane_step_count==9)
 										//	{if ((num_array[8+(lane_step_count<<2)+0]<ddr_lcdlr_test_offset)
 										//	ddr_lcdlr_test_temp_value=0;
 										//	}
-										if(num_array[8+(lane_step_count<<2)+3]<9)
+										if (num_array[8+(lane_step_count<<2)+3]<9)
 											do_ddr_read_write_ddr_add_window_lcdlr( rank_index,(lane_step_count-8),
 													ddr_lcdlr_test_temp_value,DDR_PARAMETER_WRITE);
 									}
 								}
 								else
 								{
-									if(lane_step<8)
+									if (lane_step<8)
 										org_lcdlr_value_temp=do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 									else if(lane_step<10)
 										org_lcdlr_value_temp=do_ddr_read_write_ddr_add_window_lcdlr( rank_index,lane_step-8,org_lcdlr_value_temp,DDR_PARAMETER_WRITE);
 								}
 								num_array[1]=DDR_TEST_PASS;  //pass 2 error 1
 								temp_count=1;
-								read_write_window_test_parameter(data_source, 
+								read_write_window_test_parameter(data_source,
 										temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
-								if(num_array[8+(lane_step<<2)+3]>4)
+								if (num_array[8+(lane_step<<2)+3]>4)
 								{
-									read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+									read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 											DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 								}
 
 								run_command("reset",0);
-								while(1);
+								while (1) ;
 							}
 
 						}
@@ -31435,7 +30421,7 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 			}
 		}
 	}
-	if(lane_step>=10) //finish
+	if (lane_step >= 10) //finish
 	{
 		ddr_test_watchdog_disable(); //s
 		printf("close  watchdog\n");
@@ -31532,35 +30518,35 @@ int do_ddr_uboot_kernel_window_use_source_quick_methods(cmd_tbl_t *cmdtp, int fl
 	}
 
 
-	if(test_arg_2_step==DDR_TEST_STATUS_UBOOT_FINISH)//||(test_arg_2_step==DDR_TEST_STATUS_KERNEL_FINISH)
+	if (test_arg_2_step == DDR_TEST_STATUS_UBOOT_FINISH)// || (test_arg_2_step == DDR_TEST_STATUS_KERNEL_FINISH)
 	{
 		test_arg_2_step=DDR_TEST_STATUS_KERNEL_ONGING;
 		num_array[2]=test_arg_2_step;
 		temp_count=2;
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		run_command("reset",0);
-		while(1);
+		while (1) ;
 
 	}
 
-	if(test_arg_2_step==DDR_TEST_STATUS_KERNEL_ONGING)//||(test_arg_2_step==DDR_TEST_STATUS_KERNEL_FINISH)
+	if (test_arg_2_step == DDR_TEST_STATUS_KERNEL_ONGING)// || (test_arg_2_step == DDR_TEST_STATUS_KERNEL_FINISH)
 	{
 		test_arg_2_step=DDR_TEST_STATUS_KERNEL_FINISH;
 		num_array[2]=test_arg_2_step;
 		temp_count=2;
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-		read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+		read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 				DDR_TEST_STATUS_STEP_FLAG_ADD_ORG_STICKY_OFFSET ,test_arg_2_step,DDR_PARAMETER_WRITE);
 		num_array[1]=DDR_TEST_NULL;
-		read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY, 
+		read_write_window_test_flag(DDR_PARAMETER_SOURCE_FROM_ORG_STICKY,
 				DDR_TEST_STATUS_PASS_FAIL_ADD_ORG_STICKY_OFFSET ,num_array[1],DDR_PARAMETER_WRITE);
 		{
 			ddr_test_watchdog_disable(); //s
 			run_command("run storeboot",0);
-			while(1);
+			while (1) ;
 		}
 	}
 
@@ -31650,7 +30636,7 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 			lane_disable= 0;
 		}
 	}
-	printf("lane_disable==0x%08x\n",lane_disable);   
+	printf("lane_disable==0x%08x\n",lane_disable);
 
 	if (argc >5) {
 		ddr_data_test_size = simple_strtoull_ddr(argv[5], &endp, 0);
@@ -31719,9 +30705,9 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 	ddr_test_data_array_max=10;
 
-	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++) 
+	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++)
 	{
-		num_array[temp_count]= read_write_window_test_parameter(data_source, 
+		num_array[temp_count]= read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_READ );
 		printf("read numarry[%d]==%d\n",temp_count,num_array[temp_count]);
 	}
@@ -31735,7 +30721,7 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 	unsigned int test_arg_5_pass_fail_flag_add_sticky_offset =0; //use for kernel
 
 	unsigned int test_arg_6_step_status =0; //uboot test we should read error then done status.  0 no test 1 ongoing 2 this step done  fail or pass
-	unsigned int test_arg_7_lcdlr_offset =0; //left_lcdlr+right_lcdlr<<16 
+	unsigned int test_arg_7_lcdlr_offset =0; //left_lcdlr+right_lcdlr<<16
 	unsigned int test_arg_7_lcdlr_offset_l =0; //left_lcdlr
 	unsigned int test_arg_7_lcdlr_offset_r=0; //right_lcdlr
 	unsigned int  delay_step_x100= 0;
@@ -31773,25 +30759,25 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 
 
-	//for (temp_count= 0;temp_count < 8; temp_count++) 
+	//for (temp_count= 0;temp_count < 8; temp_count++)
 	//	{
-	//	 read_write_window_test_parameter(data_source, 
+	//	 read_write_window_test_parameter(data_source,
 	// 	 temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	//}
 
 
-	if(ddr_test_clear_flag)
+	if (ddr_test_clear_flag)
 	{            test_arg_6_step_status=0;
 		num_array[6]	=	test_arg_6_step_status		;
 		temp_count=6;
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		printf("\n clear sticky register should reset,then over write ....\n");
 		run_command("reset",0);
-		while(1);
+		while (1) ;
 	}
 
-	if(test_arg_6_step_status==0)
+	if (test_arg_6_step_status == 0)
 	{
 		{
 
@@ -31812,7 +30798,7 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 		test_arg_5_pass_fail_flag_add_sticky_offset=0;
 		test_arg_6_step_status=0;
 		test_arg_7_lcdlr_offset=0;
-		if(ddr_test_init_offset)
+		if (ddr_test_init_offset)
 		{test_arg_7_lcdlr_offset=ddr_test_init_offset;
 		}
 		num_array[0]	=	reg_def_value_data[0]		;
@@ -31826,9 +30812,9 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 
 
-		for (temp_count= 0;temp_count < 8; temp_count++) 
+		for (temp_count= 0;temp_count < 8; temp_count++)
 		{
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		}
 
@@ -31847,7 +30833,7 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 		}
 	}
 
-	if(ddr_test_uboot_kernel_enable_mask&1)
+	if (ddr_test_uboot_kernel_enable_mask&1)
 	{printf("skip uboot test should init kernel offset  value==0x%08x\n",num_array[7]);
 	}
 
@@ -31871,7 +30857,7 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 		printf("test_arg_6_step_status=%d\n",num_array[6]);
 		printf("test_arg_7_lcdlr_offset=%d\n",num_array[7]);
 
-		if(test_arg_6_step_status==4) //uboot finish
+		if (test_arg_6_step_status == 4) //uboot finish
 		{
 			ddr_test_watchdog_disable(); //s
 			printf("close  watchdog\n");
@@ -31893,21 +30879,21 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 
 			}
-			if(ddr_test_uboot_kernel_enable_mask&2)
+			if (ddr_test_uboot_kernel_enable_mask&2)
 			{
-				if(ddr_test_uboot_loop)
+				if (ddr_test_uboot_loop)
 				{
 					{            test_arg_6_step_status=0;
 						num_array[6]	=	test_arg_6_step_status		;
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						printf("\n clear sticky register should reset,then over write ....\n");
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 				else
 					return 1;
@@ -31918,48 +30904,48 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 		//if((test_arg_6_step_status==0))   //0 test left edge begin     1 test left edge ongoing     2//left_finish     3 right edge ongoing    4 right finish  //5 kernel left edge ongoing 6 kernel left finish    7 kernel right ongoing
 		//  uboot find from pass to fail offset 0->max
-		//kernel find from fail to pass offset from max ->0 
-		if((test_arg_6_step_status<4))  ////  uboot find from pass to fail offset 0->max
+		//kernel find from fail to pass offset from max ->0
+		if ((test_arg_6_step_status<4))  ////  uboot find from pass to fail offset 0->max
 		{
-			if((test_arg_6_step_status==0)||(test_arg_6_step_status==2)
+			if ((test_arg_6_step_status == 0) || (test_arg_6_step_status == 2)
 					||(test_arg_6_step_status==4)||(test_arg_6_step_status==6)
 			  )
 			{
 				test_arg_6_step_status=test_arg_6_step_status+1;
 				num_array[6]	=	test_arg_6_step_status		;
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			}
 
-			if((test_arg_6_step_status==1)||(test_arg_6_step_status==3)||(test_arg_6_step_status==5)||(test_arg_6_step_status==7))
+			if ((test_arg_6_step_status == 1) || (test_arg_6_step_status == 3) || (test_arg_6_step_status == 5) || (test_arg_6_step_status == 7))
 			{
-				if(test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_PASS) //pass 2 error 1
+				if (test_arg_5_pass_fail_flag_add_sticky_offset == DDR_TEST_PASS) //pass 2 error 1
 				{
 					//	test_arg_6_step_status=test_arg_6_step_status+1;
 
 					test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_NULL;
 					num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					if((test_arg_6_step_status==1)||(test_arg_6_step_status==5))
+					if ((test_arg_6_step_status == 1) || (test_arg_6_step_status == 5))
 					{
 
-						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 
-								if((((num_array[lane_step_count/2])>>0)&0xffff)<=test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>0)&0xffff) <= test_arg_7_lcdlr_offset_l)
 								{
 									test_lcdlr_reach_lcdlr_limited_flag=test_lcdlr_reach_lcdlr_limited_flag+1;
 								}
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
-								if((((num_array[lane_step_count/2])>>16)&0xffff)<=test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>16)&0xffff) <= test_arg_7_lcdlr_offset_l)
 								{
 									test_lcdlr_reach_lcdlr_limited_flag=test_lcdlr_reach_lcdlr_limited_flag+1;
 								}
@@ -31971,15 +30957,15 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 
 					}
-					if(test_lcdlr_reach_lcdlr_limited_flag)
+					if (test_lcdlr_reach_lcdlr_limited_flag)
 					{
-						test_arg_6_step_status=test_arg_6_step_status+1;			
+						test_arg_6_step_status=test_arg_6_step_status+1;
 						num_array[6]	=	test_arg_6_step_status		;
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 				}
 
@@ -31988,18 +30974,18 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 					//  test_arg_7_lcdlr_offset_l=(test_arg_7_lcdlr_offset&0xffff);
 					// test_arg_7_lcdlr_offset_r=((test_arg_7_lcdlr_offset>>16)&0xffff);
-					if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+					if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 					{
 						test_arg_7_lcdlr_offset_l=test_arg_7_lcdlr_offset_l-1;
 					}
 					else 	if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
 					{
-						test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r-1;  
+						test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r-1;
 					}
 					test_arg_7_lcdlr_offset=(test_arg_7_lcdlr_offset_l|(test_arg_7_lcdlr_offset_r<<16));
 					num_array[7]	=	test_arg_7_lcdlr_offset		;
 					temp_count=7;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
@@ -32007,16 +30993,16 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 					test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_NULL;
 					num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					test_arg_6_step_status=test_arg_6_step_status+1;			
+					test_arg_6_step_status=test_arg_6_step_status+1;
 					num_array[6]	=	test_arg_6_step_status		;
 					temp_count=6;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 			}
 
@@ -32024,24 +31010,24 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 			//    test_arg_7_lcdlr_offset_l=(test_arg_7_lcdlr_offset&0xffff);
 			// test_arg_7_lcdlr_offset_r=((test_arg_7_lcdlr_offset>>16)&0xffff);
-			if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+			if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 			{
 				test_arg_7_lcdlr_offset_l=test_arg_7_lcdlr_offset_l+1;
 			}
 			else 		if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
 			{
-				test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r+1;  
+				test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r+1;
 			}
 			test_arg_7_lcdlr_offset=(test_arg_7_lcdlr_offset_l|(test_arg_7_lcdlr_offset_r<<16));
 			num_array[7]	=	test_arg_7_lcdlr_offset		;
 			temp_count=7;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;  //pass 2 error 1
 			num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 			temp_count=5;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			ddr_test_watchdog_enable(test_watchdog_time_s); //s
@@ -32051,34 +31037,34 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 			{
 
-				for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+				for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 				{
 					printf("\n                    (num_array[%d]) ==%08x \n",lane_step_count/2,(num_array[lane_step_count/2]));
-					if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+					if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 					{
-						if((lane_step_count%2)==0)
+						if ((lane_step_count%2) == 0)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff)-test_arg_7_lcdlr_offset_l;
-							if((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
+							if ((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
 							{test_lcdlr_temp_value=0;
 							}
 						}
-						if((lane_step_count%2)==1)
+						if ((lane_step_count%2) == 1)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff)-test_arg_7_lcdlr_offset_l;
-							if((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
+							if ((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
 							{test_lcdlr_temp_value=0;
 							}
 						}
 					}
 
-					if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
+					if (((test_arg_6_step_status == 3)) || (test_arg_6_step_status == 7))
 					{
-						if((lane_step_count%2)==0)
+						if ((lane_step_count%2) == 0)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff)+test_arg_7_lcdlr_offset_r;
 						}
-						if((lane_step_count%2)==1)
+						if ((lane_step_count%2) == 1)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff)+test_arg_7_lcdlr_offset_r;
 
@@ -32097,17 +31083,17 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 			}
 
 			//here will dead
-			if(test_arg_6_step_status>4)
+			if (test_arg_6_step_status>4)
 			{
 				//ddr_test_watchdog_disable(); //s
 				ddr_test_watchdog_enable(kernel_test_watchdog_time_s); //s
 				//  test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;  //pass 2 error 1
 				// num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 				// temp_count=5;
-				// read_write_window_test_parameter(data_source, 
+				// read_write_window_test_parameter(data_source,
 				// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("run storeboot",0);
-				while(1);
+				while (1) ;
 			} else
 			{
 				temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
@@ -32116,7 +31102,7 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 			if (temp_test_error)
 			{
 				run_command("reset",0);
-				while(1);
+				while (1) ;
 			}
 			else
 			{
@@ -32126,13 +31112,13 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 				{
 					//write org value
-					for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+					for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 					{
-						if((lane_step_count%2)==0)
+						if ((lane_step_count%2) == 0)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff);
 						}
-						if((lane_step_count%2)==1)
+						if ((lane_step_count%2) == 1)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff);
 						}
@@ -32148,10 +31134,10 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 				test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_PASS;  //pass 2 error 1
 				num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 				temp_count=5;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("reset",0);
-				while(1);
+				while (1) ;
 
 
 
@@ -32161,62 +31147,62 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 		}
 
 
-		if((test_arg_6_step_status==4)||(test_arg_6_step_status==6))
+		if ((test_arg_6_step_status == 4) || (test_arg_6_step_status == 6))
 		{
 			test_arg_4_step_flag_add_sticky_offset=DDR_TEST_STATUS_UBOOT_FINISH;
 			num_array[4]	=	test_arg_4_step_flag_add_sticky_offset		;
 			temp_count=4;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;//DDR_TEST_NULL;
 			num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 			temp_count=5;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 		}
-		if((test_arg_6_step_status>=4))   ////kernel find from fail to pass offset from max ->0 
+		if ((test_arg_6_step_status >= 4))   ////kernel find from fail to pass offset from max ->0
 		{
-			if((test_arg_6_step_status==0)||(test_arg_6_step_status==2)
+			if ((test_arg_6_step_status == 0) || (test_arg_6_step_status == 2)
 					||(test_arg_6_step_status==4)||(test_arg_6_step_status==6)
 			  )
 			{
 				test_arg_6_step_status=test_arg_6_step_status+1;
 				num_array[6]	=	test_arg_6_step_status		;
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			}
 
-			if((test_arg_6_step_status==1)||(test_arg_6_step_status==3)||(test_arg_6_step_status==5)||(test_arg_6_step_status==7))
+			if ((test_arg_6_step_status == 1) || (test_arg_6_step_status == 3) || (test_arg_6_step_status == 5) || (test_arg_6_step_status == 7))
 			{
-				if(test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_PASS) //pass 2 error 1
+				if (test_arg_5_pass_fail_flag_add_sticky_offset == DDR_TEST_PASS) //pass 2 error 1
 				{
 					//	test_arg_6_step_status=test_arg_6_step_status+1;
 
 					test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_NULL;
 					num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					if((test_arg_6_step_status==1)||(test_arg_6_step_status==5))
+					if ((test_arg_6_step_status == 1) || (test_arg_6_step_status == 5))
 					{
 
-						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 
-								if((((num_array[lane_step_count/2])>>0)&0xffff)<=test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>0)&0xffff) <= test_arg_7_lcdlr_offset_l)
 								{
 									test_lcdlr_reach_lcdlr_limited_flag=test_lcdlr_reach_lcdlr_limited_flag+1;
 								}
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
-								if((((num_array[lane_step_count/2])>>16)&0xffff)<=test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>16)&0xffff) <= test_arg_7_lcdlr_offset_l)
 								{
 									test_lcdlr_reach_lcdlr_limited_flag=test_lcdlr_reach_lcdlr_limited_flag+1;
 								}
@@ -32230,35 +31216,35 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 					}
 					// if(test_lcdlr_reach_lcdlr_limited_flag)
 					{
-						test_arg_6_step_status=test_arg_6_step_status+1;			
+						test_arg_6_step_status=test_arg_6_step_status+1;
 						num_array[6]	=	test_arg_6_step_status		;
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 				}
 
-				else 	if((test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_FAIL) 
+				else 	if((test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_FAIL)
 						//||(test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_NULL))//pass 2 error 1
 					)
 					{
 
 						//  test_arg_7_lcdlr_offset_l=(test_arg_7_lcdlr_offset&0xffff);
 						// test_arg_7_lcdlr_offset_r=((test_arg_7_lcdlr_offset>>16)&0xffff);
-						if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+						if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 						{
 							test_arg_7_lcdlr_offset_l=test_arg_7_lcdlr_offset_l-1;
 						}
 						else 	if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
 						{
-							test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r-1;  
+							test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r-1;
 						}
 						test_arg_7_lcdlr_offset=(test_arg_7_lcdlr_offset_l|(test_arg_7_lcdlr_offset_r<<16));
 						num_array[7]	=	test_arg_7_lcdlr_offset		;
 						temp_count=7;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
@@ -32267,7 +31253,7 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 						test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;
 						num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 						temp_count=5;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
@@ -32282,34 +31268,34 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 
 				{
 
-					for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+					for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 					{
 						printf("\n                    (num_array[%d]) ==%08x \n",lane_step_count/2,(num_array[lane_step_count/2]));
-						if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+						if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff)-test_arg_7_lcdlr_offset_l;
-								if((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
 								{test_lcdlr_temp_value=0;
 								}
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff)-test_arg_7_lcdlr_offset_l;
-								if((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
 								{test_lcdlr_temp_value=0;
 								}
 							}
 						}
 
-						if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
+						if (((test_arg_6_step_status == 3)) || (test_arg_6_step_status == 7))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff)+test_arg_7_lcdlr_offset_r;
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff)+test_arg_7_lcdlr_offset_r;
 
@@ -32328,17 +31314,17 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 				}
 
 				//here will dead
-				if(test_arg_6_step_status>4)
+				if (test_arg_6_step_status>4)
 				{
 					//ddr_test_watchdog_disable(); //s
 					ddr_test_watchdog_enable(kernel_test_watchdog_time_s); //s
 					//  test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;  //pass 2 error 1
 					// num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					// temp_count=5;
-					// read_write_window_test_parameter(data_source, 
+					// read_write_window_test_parameter(data_source,
 					// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					run_command("run storeboot",0);
-					while(1);
+					while (1) ;
 				} else
 				{
 					temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
@@ -32347,43 +31333,43 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 				if (temp_test_error)
 				{
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 				else
 				{
 					ddr_test_watchdog_clear();
 					{
 						//write org value
-						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff);
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff);
 							}
 							do_ddr_read_write_ddr_data_window_lcdlr( rank_index,lane_step_count,
 									(test_lcdlr_temp_value),DDR_PARAMETER_WRITE);
-						}							 
+						}
 
 					}
 
 					test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_PASS;  //pass 2 error 1
 					num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 
 				}
 			}
 		}
 	}
 
-	if(test_arg_6_step_status>=8) //finish
+	if (test_arg_6_step_status >= 8) //finish
 	{
 		ddr_test_watchdog_disable(); //s
 		printf("close  watchdog\n");
@@ -32404,7 +31390,7 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 			test_arg_4_step_flag_add_sticky_offset=DDR_TEST_STATUS_KERNEL_FINISH;
 			num_array[4]	=	test_arg_4_step_flag_add_sticky_offset		;
 			temp_count=4;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		}
 	}
@@ -32414,13 +31400,13 @@ int do_ddr_uboot_window_use_source_all_same_increase(cmd_tbl_t *cmdtp, int flag,
 		//	test_arg_6_step_status=test_arg_6_step_status+1;
 		num_array[6]	=	test_arg_6_step_status		;
 		temp_count=6;
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	}
 	ddr_test_watchdog_disable(); //s
 	//  test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;  //pass 2 error 1
 	run_command("run storeboot",0);
-	while(1);
+	while (1) ;
 	return 1;
 }
 
@@ -32576,7 +31562,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 	printf("test_arg_6 lcdlr_temp_count=%d\n",num_arry[6]);
 	printf("test_arg_7=%d\n",num_arry[7]);
 
-	if((num_arry[7]==DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
+	if ((num_arry[7] == DMC_STICKY_MAGIC_1)) //for check magic number make sume enter test command
 	{boot_times++;
 
 	}
@@ -32596,7 +31582,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 
 
 
-	if(test_arg_2_step==0)
+	if (test_arg_2_step == 0)
 	{
 
 		test_arg_0_cmd0=0x28;
@@ -32627,7 +31613,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 
 	ddr_feq_test_step=rd_reg(sticky_reg_base_add+(8<<2));
 	//
-	//p_char_ddr_test_step= getenv("ddr_feq_test_step");
+	//p_char_ddr_test_step= env_get("ddr_feq_test_step");
 	// if (p_char_ddr_test_step)
 	{
 		//	printf("%s",p_char_ddr_test_step);
@@ -32636,7 +31622,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 		printf("ddr_feq_test_step=%d\n",ddr_feq_test_step);
 	}
 	if (ddr_feq_test_step) {
-		//p_char_freq_org= getenv("ddr_feq_org");
+		//p_char_freq_org= env_get("ddr_feq_org");
 		//if (p_char_freq_org)
 		{
 			//printf("%s",p_char_freq_org);
@@ -32652,7 +31638,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 		ddr_clk_org=ddr_clk;
 		sprintf(char_freq_org,"%04d",ddr_clk);
 		printf("\nddr_org_freq=%s\n",char_freq_org);
-		//setenv("ddr_feq_org", char_freq_org);
+		//env_set("ddr_feq_org", char_freq_org);
 		writel(ddr_clk,(sticky_reg_base_add+(9<<2)));
 
 
@@ -32662,8 +31648,8 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 			// sprintf(freq_table,"%s%04d %01d %01d  ",freq_table,(temp_count*12),0,0);
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*24))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
-			//setenv(char_freq_name_table, "0");
-			//setenv("ddr_feq_test_step", "1");
+			//env_set(char_freq_name_table, "0");
+			//env_set("ddr_feq_test_step", "1");
 			writel(0,(sticky_reg_base_add+((10+temp_count-(start_freq/24))<<2)));
 			writel(1,(sticky_reg_base_add+(8<<2)));
 			temp_count++;
@@ -32674,8 +31660,8 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 			// sprintf(freq_table,"%s%04d %01d %01d  ",freq_table,(temp_count*12),0,0);
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*24))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
-			//setenv(char_freq_name_table, "3");
-			//setenv("ddr_feq_test_step", "1");
+			//env_set(char_freq_name_table, "3");
+			//env_set("ddr_feq_test_step", "1");
 			writel(3,(sticky_reg_base_add+((10+temp_count-(start_freq/24))<<2)));
 			writel(1,(sticky_reg_base_add+(8<<2)));
 			temp_count++;
@@ -32685,18 +31671,18 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 			// sprintf(freq_table,"%s%04d %01d %01d  ",freq_table,(temp_count*12),0,0);
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*24))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
-			//setenv(char_freq_name_table, "3");
-			//setenv("ddr_feq_test_step", "1");
+			//env_set(char_freq_name_table, "3");
+			//env_set("ddr_feq_test_step", "1");
 			writel(3,(sticky_reg_base_add+((10+temp_count-(start_freq/24))<<2)));
 			writel(1,(sticky_reg_base_add+(8<<2)));
 			temp_count++;
 		}
 
-		//p_char_store_boot= getenv("storeboot");
+		//p_char_store_boot= env_get("storeboot");
 		//if (p_char_store_boot)
 		//printf("storeboot   %s\n",p_char_store_boot);
 		//	sprintf(char_cmd_table,"ddr_test_cmd 0x1c  0x%08x %d %d %d;%s;",ddr_test_size,start_freq,end_freq,test_loops,p_char_store_boot);
-		//	setenv("storeboot", char_cmd_table);
+		//	env_set("storeboot", char_cmd_table);
 
 		//	 run_command("save",0);
 
@@ -32716,7 +31702,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*24))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
 			ddr_feq_test_step=rd_reg(sticky_reg_base_add+(8<<2));
-			//	p_char_freq_name_table= getenv(char_freq_name_table);
+			//	p_char_freq_name_table= env_get(char_freq_name_table);
 			// if (p_char_freq_name_table)
 			{
 				//	printf("%s\n",p_char_freq_name_table);
@@ -32744,14 +31730,14 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 					sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count_sub*24))));
 					printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
 					// freq_table_test_value[temp_count_sub] =1;
-					//	setenv(char_freq_name_table, "3");
+					//	env_set(char_freq_name_table, "3");
 					writel(3,(sticky_reg_base_add+((10+temp_count_sub-(start_freq/24))<<2)));
 
 					temp_count_sub++;
 				}
 				{
 					ddr_feq_test_step++;
-					//setenv("ddr_feq_test_step", "2");
+					//env_set("ddr_feq_test_step", "2");
 					// run_command("save",0);
 					writel(2,(sticky_reg_base_add+(8<<2)));
 
@@ -32777,7 +31763,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 					sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*24))));
 					printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
 					freq_table_test_value[temp_count] =1;
-					// setenv(char_freq_name_table, "1");
+					// env_set(char_freq_name_table, "1");
 					// run_command("save",0);
 					writel(1,(sticky_reg_base_add+((10+temp_count-(start_freq/24))<<2)));
 
@@ -32793,13 +31779,13 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 					if (temp_test_error)
 					{
 						freq_table_test_value[temp_count] =1;
-						// setenv(char_freq_name_table, "1");
+						// env_set(char_freq_name_table, "1");
 						writel(1,(sticky_reg_base_add+((10+temp_count-(start_freq/24))<<2)));
 					}
 					else
 					{
 						freq_table_test_value[temp_count] =2;
-						// setenv(char_freq_name_table, "2");
+						// env_set(char_freq_name_table, "2");
 						writel(2,(sticky_reg_base_add+((10+temp_count-(start_freq/24))<<2)));
 					}
 					// run_command("save",0);
@@ -32826,7 +31812,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 			temp_count++;
 		}
 		ddr_feq_test_step++;
-		//setenv("ddr_feq_test_step", "2");
+		//env_set("ddr_feq_test_step", "2");
 		//run_command("save",0);
 		writel(2,(sticky_reg_base_add+(8<<2)));
 
@@ -32841,7 +31827,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*24))));
 			printf("\nchar_freq_name_table=%s\n",char_freq_name_table);
 
-			//	p_char_freq_name_table= getenv(char_freq_name_table);
+			//	p_char_freq_name_table= env_get(char_freq_name_table);
 			// if (p_char_freq_name_table)
 			{
 				//	printf("%s\n",p_char_freq_name_table);
@@ -32858,7 +31844,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 		while (temp_count<((DDR_TEST_MAX_FREQ)/24)) {
 
 			sprintf(char_freq_name_table,"ddr_fre_%04d",(pll_convert_to_ddr_clk(ddr_clk_convert_to_pll(temp_count*24))));
-			//	p_char_freq_name_table= getenv(char_freq_name_table);
+			//	p_char_freq_name_table= env_get(char_freq_name_table);
 			// if (p_char_freq_name_table)
 			{
 				//	printf("%s\n",p_char_freq_name_table);
@@ -32888,7 +31874,7 @@ int do_ddr4_test_dram_clk_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char 
 	//	printf("\nstr=%s\n",str);
 
 	//sprintf(str, "%lx", value);
-	//  setenv("env_ddrtest", str);
+	//  env_set("env_ddrtest", str);
 
 	//run_command("save",0);
 	//*/
@@ -32930,7 +31916,7 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 #define DDR3_ODT_20OHM		4
 #define DDR3_ODT_30OHM		5
 
-	// lpddr2 drv odt 
+	// lpddr2 drv odt
 #define LPDDR2_DRV_34OHM	1
 #define LPDDR2_DRV_40OHM	2
 #define LPDDR2_DRV_48OHM	3
@@ -32939,7 +31925,7 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 #define LPDDR2_DRV_120OHM	7
 #define LPDDR2_ODT_0OHM		0
 
-	// lpddr3 drv odt 
+	// lpddr3 drv odt
 #define LPDDR3_DRV_34OHM	1
 #define LPDDR3_DRV_40OHM	2
 #define LPDDR3_DRV_48OHM	3
@@ -32996,7 +31982,7 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 		zqcr = 0;
 	}
 	bist_test_dq_index=0xff;
-	if(zqcr==0xffffffff)
+	if (zqcr == 0xffffffff)
 	{
 		ddr_full_test_enable=1;
 		zqcr=0;}
@@ -33085,25 +32071,25 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 			soc_dram_drv_odt_use_vlaue = 0;
 		}
 	}
-	if(soc_dram_drv_odt_use_vlaue)
+	if (soc_dram_drv_odt_use_vlaue)
 	{if(zqcr)
 		{printf("zqcr[0x%08x],\n", zqcr);
 			{
 				soc_ac_drv=zqcr%100;
-				if(soc_ac_drv>100)
+				if (soc_ac_drv>100)
 				{soc_ac_drv=0;}
-				if(soc_ac_drv==0)
+				if (soc_ac_drv == 0)
 				{soc_ac_drv=1;}
 				soc_ac_drv=(480/soc_ac_drv)-1;
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
-					if(soc_ac_drv>0xf)
+					if (soc_ac_drv>0xf)
 					{soc_ac_drv=zq0pr_org&0xf;}
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
-					if(soc_ac_drv>0xf)
+					if (soc_ac_drv>0xf)
 					{soc_ac_drv=(zq0pr_org>>8)&0xf;}
 				}
 			}
@@ -33111,22 +32097,22 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 
 			{
 				soc_ac_odt=zqcr/100;
-				if(soc_ac_odt>240)
+				if (soc_ac_odt>240)
 				{soc_ac_odt=480;}
-				if(soc_ac_odt==0)
+				if (soc_ac_odt == 0)
 				{soc_ac_odt=1;}
 
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
 					soc_ac_odt=(360/soc_ac_odt)-1;
-					if(soc_ac_odt>0xf)
+					if (soc_ac_odt>0xf)
 					{soc_ac_odt=(zq0pr_org>>4)&0xf;}
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
 					soc_ac_odt=(480/soc_ac_odt)-1;
-					if(soc_ac_odt>0xf)
+					if (soc_ac_odt>0xf)
 					{soc_ac_odt=(zq0pr_org>>16)&0xf;}
 				}
 			}
@@ -33134,16 +32120,16 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 			zqcr=(soc_ac_odt<<16)|(soc_ac_drv<<12)|(soc_ac_drv<<8)|(soc_ac_odt<<4)|(soc_ac_drv);
 			printf("zqcr[0x%08x],soc_ac_odt [0x%08x],soc_ac_drv [0x%08x]\n", zqcr,soc_ac_odt,soc_ac_drv);
 		}
-		if(zqpr_soc_dram)
+		if (zqpr_soc_dram)
 		{printf("zqpr_soc_dram[0x%08x],\n", zqpr_soc_dram);
 			{
 				soc_data_drv=zqpr_soc_dram%100;
 				printf("soc_data_drv[%d],\n", soc_data_drv);
-				if(soc_data_drv>100)
+				if (soc_data_drv>100)
 				{soc_data_drv=0;
 
 				}
-				if(soc_data_drv==0)
+				if (soc_data_drv == 0)
 				{soc_data_drv=1;
 					//soc_data_drv_odt_adj_enable=0;
 				}
@@ -33152,14 +32138,14 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 				}
 				soc_data_drv=(480/soc_data_drv)-1;
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
-					if(soc_data_drv>0xf)
+					if (soc_data_drv>0xf)
 					{soc_data_drv=zq1pr_org&0xf;}
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
-					if(soc_data_drv>0xf)
+					if (soc_data_drv>0xf)
 					{soc_data_drv=(zq1pr_org>>8)&0xf;}
 				}
 			}
@@ -33168,22 +32154,22 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 			{
 				soc_data_odt=(zqpr_soc_dram/100)%1000;
 				printf("soc_data_odt[%d],\n", soc_data_odt);
-				if(soc_data_odt>240)
+				if (soc_data_odt>240)
 				{soc_data_odt=360;}
-				if(soc_data_odt==0)
+				if (soc_data_odt == 0)
 				{soc_data_odt=1;}
 
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
 					soc_data_odt=(360/soc_data_odt)-1;
-					if(soc_data_odt>0xf)
+					if (soc_data_odt>0xf)
 					{soc_data_odt=(zq1pr_org>>4)&0xf;}
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
 					soc_data_odt=(480/soc_data_odt)-1;
-					if(soc_data_odt>0xf)
+					if (soc_data_odt>0xf)
 					{soc_data_odt=(zq1pr_org>>16)&0xf;}
 				}
 
@@ -33195,18 +32181,18 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 				dram_drv=(zqpr_soc_dram/100000)%100;
 				printf("dram_drv[%d],\n", dram_drv);
 
-				if(dram_drv>100)
+				if (dram_drv>100)
 				{dram_drv=0;}
-				if(dram_drv==0)
+				if (dram_drv == 0)
 				{
 					dram_data_drv_adj_enable=0;}
 				else
 				{dram_data_drv_adj_enable=1;
 				}
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
-					if(dram_drv>=40)
+					if (dram_drv >= 40)
 					{dram_drv=0;}
 
 					else
@@ -33215,9 +32201,9 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 				}
 
 
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
-					if(dram_drv<48)
+					if (dram_drv<48)
 					{dram_drv=0;}
 
 					else
@@ -33230,9 +32216,9 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 			{
 				dram_odt=(zqpr_soc_dram/100000)/100;
 				printf("dram_odt[%d],\n", dram_odt);
-				if(dram_odt>240)
+				if (dram_odt>240)
 				{dram_odt=480;}
-				if(dram_odt==0)
+				if (dram_odt == 0)
 				{
 					dram_data_odt_adj_enable=0;
 				}
@@ -33241,9 +32227,9 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 				}
 
 
-				if(ddr_type==DDR_TYPE_DDR3)
+				if (ddr_type == DDR_TYPE_DDR3)
 				{
-					if(dram_odt>160)
+					if (dram_odt>160)
 					{dram_odt=0;}
 					else if (dram_odt>90)
 					{dram_odt=2;}
@@ -33257,9 +32243,9 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 					{dram_odt=4;}
 
 				}
-				if(ddr_type==DDR_TYPE_DDR4)
+				if (ddr_type == DDR_TYPE_DDR4)
 				{
-					if(dram_odt>280)
+					if (dram_odt>280)
 					{dram_odt=0;}
 					else if (dram_odt>180)
 					{dram_odt=4;}
@@ -33373,7 +32359,7 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 	printf("soc_data_drv_odt [0x%08x],dram_drv [0x%08x],dram_odt [0x%08x]\n", soc_data_drv_odt,dram_drv,dram_odt);
 	pll=pll|(bist_test_dq_index<<12);
 
-	if(ddr_full_test_enable)
+	if (ddr_full_test_enable)
 	{
 		pll=(ddr_full_test_enable<<21)|pll;
 		printf("ddr_full_test_enable %08x,set sticky reg1 bit 21 1\n", ddr_full_test_enable);
@@ -33406,7 +32392,7 @@ int do_ddr4_test_bist_test_use_sticky(cmd_tbl_t *cmdtp, int flag, int argc, char
 	// *P_WATCHDOG_RESET = 0;
 	ddr_test_watchdog_reset_system();
 #endif
-	while(1);
+	while (1) ;
 	return 0;
 
 usage:
@@ -33505,16 +32491,16 @@ unsigned int do_ddr_read_write_ddr_add__data_window_lcdlr(unsigned int rank_inde
 {
 	unsigned reg_add=0;
 
-	if(add_index==0)
+	if (add_index == 0)
 		reg_add=(DDR0_PUB_ACLCDLR);
-	if(add_index==1)
+	if (add_index == 1)
 		reg_add=(DDR0_PUB_ACBDLR0);
 	{
-		if(read_write_flag==DDR_PARAMETER_READ)
+		if (read_write_flag == DDR_PARAMETER_READ)
 		{
 			lcdlr_value=(((readl(reg_add))>>0)&0x1ff);
 		}
-		if(read_write_flag==DDR_PARAMETER_WRITE)
+		if (read_write_flag == DDR_PARAMETER_WRITE)
 		{
 			wr_reg(reg_add, ((lcdlr_value&0x1ff)<<0));
 		}
@@ -33535,7 +32521,7 @@ unsigned int do_ddr_read_write_ddr_add__data_window_lcdlr(unsigned int rank_inde
 //dwc_ddrphy_apb_wr((0<<20)|(2<<16)|(0<<12)|(0xb0),0);
 //dwc_ddrphy_apb_wr(0xd0000,0);
 //dwc_ddrphy_apb_wr(0xd0000,1);
-                                                                                        
+
 //*(volatile uint32_t *)(int_convter_p(test_addr))=des_pattern(temp_i,2,temp_k,temp_i);
 //dwc_ddrphy_apb_wr((ps<<20)|(0<<16)|(instance_num<<12)|(0x80),);
 
@@ -33545,7 +32531,7 @@ unsigned int do_ddr_read_write_ddr_add__data_window_lcdlr(unsigned int rank_inde
 //argv[1],a
 //argv[2],test length
 //argv[3],test step
-//argv[4],test_mode,direction,0,up;    1,down;    2,down first,up follow;                                                    
+//argv[4],test_mode,direction,0,up;    1,down;    2,down first,up follow;
 //argv[5],ACx;0-AC0,1-AC1,2-AC2...,9-AC9
 
 #if 0
@@ -33577,23 +32563,23 @@ int do_ddr_test_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	{
 		goto usage;
 	}
-	else 
+	else
 	{
 		ddr_test_size = simple_strtoull_ddr(argv[2], &endp, 16);
 		if (*argv[2] == 0 || *endp != 0)
 		{
 			ddr_test_size = DDR_CORSS_TALK_TEST_SIZE;
-		}  
+		}
 	}
-	if (argc >3) 
+	if (argc >3)
 	{
 		test_step = simple_strtoull_ddr(argv[3], &endp, 16);
 		if (*argv[3] == 0 || *endp != 0)
 		{
 			test_step = 1;
-		}  
+		}
 	}
-	if (argc >4) 
+	if (argc >4)
 	{
 		test_mode = simple_strtoull_ddr(argv[4], &endp, 16); //测试方向
 		if (*argv[4] == 0 || *endp != 0)
@@ -33608,7 +32594,7 @@ int do_ddr_test_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	if (test_mode >2) test_mode = 2;
 
 	test_ACx =0;
-	if (argc >5) 
+	if (argc >5)
 	{
 
 		test_ACx= simple_strtoull_ddr(argv[5], &endp, 16);
@@ -33640,10 +32626,10 @@ int do_ddr_test_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 				while (dq_lcd_bdl_temp_reg_value>0)
 				{
 					temp_test_error=0;
-					for(temp_count=0;temp_count < test_step;temp_count++)
+					for (temp_count=0;temp_count < test_step;temp_count++)
 					{
-						if(dq_lcd_bdl_temp_reg_value==0) break;
-						dq_lcd_bdl_temp_reg_value--;       
+						if (dq_lcd_bdl_temp_reg_value == 0) break;
+						dq_lcd_bdl_temp_reg_value--;
 					};
 					dq_lcd_bdl_temp_reg_value--;
 					printf("\n reg_add==0x%08x,right temp==0x%08x\n,value==0x%08x",reg_add,dq_lcd_bdl_temp_reg_value,
@@ -33664,11 +32650,11 @@ int do_ddr_test_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 				printf("\n org==0x%08x,left edge==0x%08x\n ",acbdlr_x_reg_org,dq_lcd_bdl_temp_reg_value);
 
 				acbdlr_x_reg_min= (int)dq_lcd_bdl_temp_reg_value;
-				printf("acbdlr_x_reg_min==0x%08x\n",acbdlr_x_reg_min);       
+				printf("acbdlr_x_reg_min==0x%08x\n",acbdlr_x_reg_min);
 
 				dq_lcd_bdl_temp_reg_value=0;
 				//恢复默认值
-				dwc_ddrphy_apb_wr((0<<20)|(0<<16)|(test_ACx<<12)|(0x80),(uint16_t)acbdlr_x_reg_org);      
+				dwc_ddrphy_apb_wr((0<<20)|(0<<16)|(test_ACx<<12)|(0x80),(uint16_t)acbdlr_x_reg_org);
 			}
 
 			if ((test_mode == 0) || (test_mode == 2))
@@ -33679,10 +32665,10 @@ int do_ddr_test_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 				while (dq_lcd_bdl_temp_reg_value<ACX_MAX)
 				{
 					temp_test_error = 0;
-					for(temp_count=0;temp_count < test_step;temp_count++)
+					for (temp_count=0;temp_count < test_step;temp_count++)
 					{
-						if(dq_lcd_bdl_temp_reg_value>=ACX_MAX) break;
-						dq_lcd_bdl_temp_reg_value++;       
+						if (dq_lcd_bdl_temp_reg_value >= ACX_MAX) break;
+						dq_lcd_bdl_temp_reg_value++;
 					};
 					printf("\n reg_add==0x%08x,right temp==0x%08x\n,value==0x%08x",reg_add,dq_lcd_bdl_temp_reg_value,
 							dq_lcd_bdl_temp_reg_value-acbdlr_x_reg_org);
@@ -33714,8 +32700,8 @@ int do_ddr_test_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 				//先往下测，再往上测，测试结束，打印结果
 				printf("test AC%d window finish\n ",test_ACx);
 				printf("acbdlr_x_reg_min = 0x%08x\n",acbdlr_x_reg_min);
-				printf("acbdlr_x_reg_max = 0x%08x\n",acbdlr_x_reg_max);    
-			}  
+				printf("acbdlr_x_reg_max = 0x%08x\n",acbdlr_x_reg_max);
+			}
 		}
 		dwc_ddrphy_apb_wr(0xd0000,1);
 		return dq_lcd_bdl_temp_reg_value;
@@ -33740,15 +32726,15 @@ U_BOOT_CMD(
 //argv[1],a         ,no use,reserve,just for flag
 //argv[2],rd/wr,0=read,1=write
 //argv[3],AC0
-//argv[4],AC1                                                    
+//argv[4],AC1
 //argv[5],AC2;...,9-AC9
 
 int do_ddr_read_write_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{  
-	unsigned int     read_write_flag= 0;  
+{
+	unsigned int     read_write_flag= 0;
 	//unsigned int   temp_test_error= 0;
 	unsigned int     temp_count= 0;
-	//unsigned int   temp_reg_value[40];  
+	//unsigned int   temp_reg_value[40];
 	uint16_t         ACx[10];
 	char             *endp;
 
@@ -33759,17 +32745,17 @@ int do_ddr_read_write_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	{
 		goto usage;
 	}
-	else 
+	else
 	{
 		read_write_flag = simple_strtoull_ddr(argv[2], &endp, 16);
 		if (*argv[2] == 0 || *endp != 0)
 		{
 			read_write_flag = 0;
-		}  
+		}
 	}
-	if ((argc >12) && (read_write_flag == 1)) 
+	if ((argc >12) && (read_write_flag == 1))
 	{
-		for(temp_count=0;temp_count < 10;temp_count++)
+		for (temp_count=0;temp_count < 10;temp_count++)
 		{
 			//read AC0-AC9 to ACx[0-9]
 			ACx[temp_count] = simple_strtoull_ddr(argv[temp_count+3], &endp, 16);
@@ -33786,21 +32772,21 @@ int do_ddr_read_write_acx_g12a(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	{
 		if (read_write_flag == 0)
 		{
-			for(temp_count=0;temp_count < 10;temp_count++)
+			for (temp_count=0;temp_count < 10;temp_count++)
 			{
 				ACx[temp_count]=dwc_ddrphy_apb_rd((0<<20)|(0<<16)|(temp_count<<12)|(0x80));
-				printf("Read: AC%d[0x%08x]==0x%08x\n",temp_count,(((0<<20)|(0<<16)|(temp_count<<12)|(0x80))<<1) + 0xfe000000,ACx[temp_count]);    
+				printf("Read: AC%d[0x%08x]==0x%08x\n",temp_count,(((0<<20)|(0<<16)|(temp_count<<12)|(0x80))<<1) + 0xfe000000,ACx[temp_count]);
 			};
 		}
 
 		if (read_write_flag == 1)
 		{
 
-			for(temp_count=0;temp_count < 10;temp_count++)
+			for (temp_count=0;temp_count < 10;temp_count++)
 			{
 				dwc_ddrphy_apb_wr(((0<<20)|(0<<16)|(temp_count<<12)|(0x80)),ACx[temp_count]);
-				printf("Write: AC%d[0x%08x]==0x%08x\n",temp_count,(((0<<20)|(0<<16)|(temp_count<<12)|(0x80))<<1) + 0xfe000000,dwc_ddrphy_apb_rd((0<<20)|(0<<16)|(temp_count<<12)|(0x80)));    
-			};    
+				printf("Write: AC%d[0x%08x]==0x%08x\n",temp_count,(((0<<20)|(0<<16)|(temp_count<<12)|(0x80))<<1) + 0xfe000000,dwc_ddrphy_apb_rd((0<<20)|(0<<16)|(temp_count<<12)|(0x80)));
+			};
 		}
 		dwc_ddrphy_apb_wr(0xd0000,1);
 		return 0;
@@ -33852,15 +32838,15 @@ uint32_t  ddr_cacl_phy_delay_all_step(char test_index,uint32_t value)
 	   }
 	   */
 #if 0
-	if ((test_index <= DMC_TEST_WINDOW_INDEX_TXDQDLY) ){
+	if ((test_index <= DMC_TEST_WINDOW_INDEX_TXDQDLY) ) {
 		result=(32*(((value>>6)&0xf)+((value>>5)&1))+(value&0x1f));
 	}
 	if (test_index == DMC_TEST_WINDOW_INDEX_TXDQSDLY) {
-		result=(32*(((value>>6)&0xf)+(((value>>5)&1)*1))+(value&0x1f)); //bit 5 change to 1 UI 20180711 
-		//result=(32*((((value>>5)&1)*1))+(value&0x1f)); //bit 5 change to 1 UI 20180711 
+		result=(32*(((value>>6)&0xf)+(((value>>5)&1)*1))+(value&0x1f)); //bit 5 change to 1 UI 20180711
+		//result=(32*((((value>>5)&1)*1))+(value&0x1f)); //bit 5 change to 1 UI 20180711
 	}
 
-	if ((test_index == DMC_TEST_WINDOW_INDEX_RXENDLY)){
+	if ((test_index == DMC_TEST_WINDOW_INDEX_RXENDLY)) {
 		result=(32*(((value>>6)&0x1f)+(((value>>5)&1)*1))+(value&0x1f));
 	}
 	if (test_index == DMC_TEST_WINDOW_INDEX_RXPBDLY) {
@@ -33886,7 +32872,7 @@ uint32_t  ddr_cacl_phy_delay_all_step(char test_index,uint32_t value)
 
 uint32_t ddr_cacl_phy_over_ride_back_reg(char test_index,uint32_t value )
 {
-	//#define DMC_TEST_WINDOW_INDEX_ATXDLY 
+	//#define DMC_TEST_WINDOW_INDEX_ATXDLY
 	//#define DMC_TEST_WINDOW_INDEX_TXDQSDLY 2
 	//#define DMC_TEST_WINDOW_INDEX_RXCLKDLY  3
 	//#define DMC_TEST_WINDOW_INDEX_TXDQDLY  4
@@ -33913,7 +32899,7 @@ uint32_t ddr_cacl_phy_over_ride_back_reg(char test_index,uint32_t value )
 			   ||(test_index==DMC_TEST_WINDOW_INDEX_RXENDLY)) {
 		   //result=((value/32)<<6)+value%64;
 		   result=value%64;
-			if ((test_index == DMC_TEST_WINDOW_INDEX_TXDQDLY)||(test_index == DMC_TEST_WINDOW_INDEX_RXENDLY)) {  //use for txdqdly register ,because of this register bit 5 is no use jiaxing 20180814
+			if ((test_index == DMC_TEST_WINDOW_INDEX_TXDQDLY) || (test_index == DMC_TEST_WINDOW_INDEX_RXENDLY)) {  //use for txdqdly register ,because of this register bit 5 is no use jiaxing 20180814
 			   result=((value/32)<<6)+value%32;
 		   }
 	   }
@@ -33924,9 +32910,9 @@ uint32_t ddr_cacl_phy_over_ride_back_reg(char test_index,uint32_t value )
 #if 1
 		   result=((value/32)<<6)+value%32;
 		/*
-		   if(enable_bit5)
+		   if (enable_bit5)
 		   {
-			   if((result>>6)&1)
+			   if ((result>>6)&1)
 			   {result=(result&0xffbf)|(1<<5);
 			   }
 		   }
@@ -33947,12 +32933,12 @@ unsigned int do_ddr_g12_read_write_ddr_add_window_lcdlr(unsigned int rank_index,
 	dwc_ddrphy_apb_wr(0xd0000,0);//mw fe1a0000  0
 	//  reg_base_adj=0xfe000000;
 	// reg_add=(((0<<20)|(0<<16)|(test_ACx<<12)|(0x80))<<1) + reg_base_adj;
-		if(read_write_flag==DDR_PARAMETER_READ)
+		if (read_write_flag == DDR_PARAMETER_READ)
 		{
 
 			lcdlr_value=dwc_ddrphy_apb_rd((0<<20)|(0<<16)|(add_index<<12)|(0x80));
 		}
-		if(read_write_flag==DDR_PARAMETER_WRITE)
+		if (read_write_flag == DDR_PARAMETER_WRITE)
 		{
 
 			dwc_ddrphy_apb_wr(((0<<20)|(0<<16)|(add_index<<12)|(0x80)), lcdlr_value);
@@ -33960,47 +32946,6 @@ unsigned int do_ddr_g12_read_write_ddr_add_window_lcdlr(unsigned int rank_index,
 
 	printf("rank_index %d   add_index %d  lcdlr== %d \n", rank_index,add_index,lcdlr_value);
 	return lcdlr_value;
-}
-
-
-void dwc_window_reg_after_training_update_increas_dq(char over_ride_index,uint32_t over_ride_sub_index,uint32_t over_ride_increase_decrease,
-	uint32_t step_value)
-{
-	uint32_t delay_old_value=0;
-	uint32_t delay_reg_value=0;
-
-	uint64_t reg_add=0;
-	if (!over_ride_index)
-		return;
-	
-	
-	if (over_ride_index == DMC_TEST_WINDOW_INDEX_TXDQDLY) {
-		reg_add=((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(0xc0+((over_ride_sub_index%9)<<8)+(over_ride_sub_index/36)));
-		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
-		delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
-		{
-			delay_reg_value=delay_reg_value+step_value;
-			if(delay_reg_value>255)
-				delay_reg_value=255;
-		}
-		if(over_ride_increase_decrease!=0)
-		{
-			if(delay_reg_value>step_value)
-				delay_reg_value=delay_reg_value-step_value;
-			else 
-				delay_reg_value=0;
-		}
-		delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
-		dwc_ddrphy_apb_wr(reg_add,delay_reg_value);
-		//	dwc_ddrphy_apb_wr(reg_add+4,delay_reg_value);
-
-	}
-	
-printf("reg_add %08x old_value %08x update_to %08x dec %d to %d \n",((unsigned int)(((reg_add) << 1)+0xfe000000)),
-			delay_old_value,dwc_ddrphy_apb_rd(reg_add),ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value),
-			(unsigned int)ddr_cacl_phy_delay_all_step(over_ride_index, dwc_ddrphy_apb_rd(reg_add)));
-
 }
 
 void dwc_window_reg_after_training_update(char over_ride_index,uint32_t over_ride_sub_index,uint32_t over_ride_value)
@@ -34094,15 +33039,15 @@ void dwc_window_reg_after_training_update_increas_sub(char over_ride_index,uint3
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		//delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, over_ride_value);
 		delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
+		if (over_ride_increase_decrease == 0)
 		{
 			delay_reg_value=delay_reg_value+step_value;
-			if(delay_reg_value>95)
+			if (delay_reg_value>95)
 			delay_reg_value=95;
 		}
-		if(over_ride_increase_decrease!=0)
+		if (over_ride_increase_decrease == 1)
 		{
-			if(delay_reg_value>=step_value)
+			if (delay_reg_value >= step_value)
 			delay_reg_value=delay_reg_value-step_value;
 			else
 				delay_reg_value=0;
@@ -34115,42 +33060,17 @@ void dwc_window_reg_after_training_update_increas_sub(char over_ride_index,uint3
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 	//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|((over_ride_sub_index%4)<<12)|(0xd0+(over_ride_sub_index/4)),delay_reg_value);
 	//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|((over_ride_sub_index%4)<<12)|(0x1d0+(over_ride_sub_index/4)),delay_reg_value);
-
-
-//some case will happen tdqs from 0x1f to 0x0 or 0x0 to 0x1f ,then fast boot write back will happen error ,because
-// fast boot write back will re-calculate coarse UI,then result dq phase fail.
-/*
-	if(over_ride_increase_decrease==0)
+	if (over_ride_increase_decrease == 0)
     //  if(over_ride_value>ddr_cacl_phy_delay_all_step(over_ride_index,delay_old_value))
-      	{dwc_ddrphy_apb_wr(reg_add,((delay_old_value&0x3f)+step_value)|(delay_old_value&0xffc0));
-	if(((delay_old_value&0x3f)+step_value)>0x3f)
+		{dwc_ddrphy_apb_wr(reg_add,((delay_old_value&0x3f)+step_value)|(delay_old_value&0xffc0));
+	if (((delay_old_value&0x3f)+step_value)>0x3f)
 		dwc_ddrphy_apb_wr(reg_add,0x3f|(delay_old_value&0xffc0));
-      	}
-	else 
-		{//dwc_ddrphy_apb_wr(reg_add,((delay_old_value&0x3f)-step_value)|(delay_old_value&0xffc0));
-		if(((delay_old_value&0x3f)<step_value))
-		dwc_ddrphy_apb_wr(reg_add,(delay_old_value&0xffc0));
-		else
-		dwc_ddrphy_apb_wr(reg_add,((delay_old_value&0x3f)-step_value)|(delay_old_value&0xffc0));	
 		}
-
-*/
-if((over_ride_sub_index%2)==0)
-{
-							char	temp_test_index=DMC_TEST_WINDOW_INDEX_TXDQDLY;
-							char temp_count=0;
-						//	if(over_ride_increase_decrease==0)
-								{
-								for ( temp_count=0;temp_count<9;temp_count++)
-								{
-									dwc_window_reg_after_training_update_increas_dq(temp_test_index
-									,(((over_ride_sub_index)>>1)*9+temp_count),		(!over_ride_increase_decrease),step_value) ;
-								}
-								}
-								
-							}
-
-	
+	else
+		{dwc_ddrphy_apb_wr(reg_add,((delay_old_value&0x3f)-step_value)|(delay_old_value&0xffc0));
+		if (((delay_old_value&0x3f)<step_value))
+		dwc_ddrphy_apb_wr(reg_add,(delay_old_value&0xffc0));
+		}
 	//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|((over_ride_sub_index%4)<<12)|(0x1d0+(over_ride_sub_index/4)),delay_reg_value|(delay_old_value&0xffc0));
 
 		//	{enable_bit5=(delay_old_value>>5)&1;}
@@ -34160,17 +33080,17 @@ if((over_ride_sub_index%2)==0)
 		reg_add=((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(0xc0+((over_ride_sub_index%9)<<8)+(over_ride_sub_index/36)));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
+		if (over_ride_increase_decrease == 0)
 		{
 			delay_reg_value=delay_reg_value+step_value;
-			if(delay_reg_value>255)
+			if (delay_reg_value>255)
 				delay_reg_value=255;
 		}
-		if(over_ride_increase_decrease!=0)
+		if (over_ride_increase_decrease == 1)
 		{
-			if(delay_reg_value>step_value)
+			if (delay_reg_value>step_value)
 				delay_reg_value=delay_reg_value-step_value;
-			else 
+			else
 				delay_reg_value=0;
 		}
 		delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
@@ -34182,17 +33102,17 @@ if((over_ride_sub_index%2)==0)
 		reg_add=((0<<20)|(1<<16)|(((over_ride_sub_index%8)>>1)<<12)|(0x8c+(over_ride_sub_index/8)+((over_ride_sub_index%2)<<8)));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
+		if (over_ride_increase_decrease == 0)
 		{
 			delay_reg_value=delay_reg_value+step_value;
-			if(delay_reg_value>95)
+			if (delay_reg_value>95)
 				delay_reg_value=95;
 		}
-		if(over_ride_increase_decrease!=0)
+		if (over_ride_increase_decrease == 1)
 		{
-			if(delay_reg_value>step_value)
+			if (delay_reg_value>step_value)
 				delay_reg_value=delay_reg_value-step_value;
-			else 
+			else
 				delay_reg_value=0;
 		}
 		delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
@@ -34204,17 +33124,17 @@ if((over_ride_sub_index%2)==0)
 		reg_add=((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(0x68+((over_ride_sub_index%9)<<8)+(over_ride_sub_index/36)));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
+		if (over_ride_increase_decrease == 0)
 		{
 			delay_reg_value=delay_reg_value+step_value;
-			if(delay_reg_value>63)
+			if (delay_reg_value>63)
 				delay_reg_value=63;
 		}
-		if(over_ride_increase_decrease!=0)
+		if (over_ride_increase_decrease == 1)
 		{
-			if(delay_reg_value>step_value)
+			if (delay_reg_value>step_value)
 				delay_reg_value=delay_reg_value-step_value;
-			else 
+			else
 				delay_reg_value=0;
 		}
 		delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
@@ -34225,17 +33145,17 @@ if((over_ride_sub_index%2)==0)
 		reg_add=((0<<20)|(1<<16)|((over_ride_sub_index%8)<<12)|(0x80+(over_ride_sub_index/8)));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
+		if (over_ride_increase_decrease == 0)
     //  if(over_ride_value>ddr_cacl_phy_delay_all_step(over_ride_index,delay_old_value))
-      	{
+		{
 			dwc_ddrphy_apb_wr(reg_add,((delay_old_value&0x3f)+step_value)|(delay_old_value&0xffc0));
-			if(((delay_old_value&0x3f)+step_value)>0x3f)
+			if (((delay_old_value&0x3f)+step_value)>0x3f)
 				dwc_ddrphy_apb_wr(reg_add,0x3f|(delay_old_value&0xffc0));
 	    }
 		else
 		{
 			dwc_ddrphy_apb_wr(reg_add,((delay_old_value&0x3f)-step_value)|(delay_old_value&0xffc0));
-			if(((delay_old_value&0x3f)<step_value))
+			if (((delay_old_value&0x3f)<step_value))
 			dwc_ddrphy_apb_wr(reg_add,(delay_old_value&0xffc0));
 		}
 	//	delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
@@ -34249,17 +33169,17 @@ if((over_ride_sub_index%2)==0)
 		reg_add=((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(((over_ride_sub_index%36)%9)<<8)|(0x40));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		delay_reg_value=delay_old_value;
-				if(over_ride_increase_decrease==0)
+				if (over_ride_increase_decrease == 0)
 			{
 		delay_reg_value=delay_reg_value+step_value;
-		if(delay_reg_value>127)
+		if (delay_reg_value>127)
 			delay_reg_value=127;
 			}
-				if(over_ride_increase_decrease!=0)
+				if (over_ride_increase_decrease == 1)
 		{
-				if(delay_reg_value>=step_value)
+				if (delay_reg_value >= step_value)
 				delay_reg_value=delay_reg_value-step_value;
-				else 
+				else
 				delay_reg_value=0;
 			}
 //delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
@@ -34295,7 +33215,7 @@ void dwc_window_reg_after_training_update_increas(char over_ride_index,uint32_t 
 	if (over_ride_index == DMC_TEST_WINDOW_INDEX_ATXDLY) {
 		reg_add=((0<<20)|(0<<16)|(over_ride_sub_index<<12)|(0x80));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
-		for( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
+		for ( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
 		{
 			dwc_window_reg_after_training_update_increas_sub(over_ride_index
 			,((over_ride_sub_index)),		over_ride_increase_decrease,1) ;
@@ -34309,17 +33229,17 @@ void dwc_window_reg_after_training_update_increas(char over_ride_index,uint32_t 
 		//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|((over_ride_sub_index%4)<<12)|(0xd0+(over_ride_sub_index/4)),delay_reg_value);
 		//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|((over_ride_sub_index%4)<<12)|(0x1d0+(over_ride_sub_index/4)),delay_reg_value);
 		delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
+		if (over_ride_increase_decrease == 0)
 		{
 			delay_reg_value=delay_reg_value+offset_value;
-			if(delay_reg_value>96)
+			if (delay_reg_value>96)
 				delay_reg_value=96;
 		}
-		if(over_ride_increase_decrease==1)
+		if (over_ride_increase_decrease == 1)
 		{
-			if(delay_reg_value>=offset_value)
+			if (delay_reg_value >= offset_value)
 				delay_reg_value=delay_reg_value-offset_value;
-			else 
+			else
 				delay_reg_value=0;
 		}
 		delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
@@ -34329,7 +33249,7 @@ void dwc_window_reg_after_training_update_increas(char over_ride_index,uint32_t 
 		//	{enable_bit5=(delay_old_value>>5)&1;}
 		//delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, over_ride_value,enable_bit5);
 	*/
-	for( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
+	for ( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
 	{
 		dwc_window_reg_after_training_update_increas_sub(over_ride_index
 		,((over_ride_sub_index)),		over_ride_increase_decrease,1) ;
@@ -34340,24 +33260,24 @@ void dwc_window_reg_after_training_update_increas(char over_ride_index,uint32_t 
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		/*
 		delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
+		if (over_ride_increase_decrease == 0)
 		{
 			delay_reg_value=delay_reg_value+offset_value;
-			if(delay_reg_value>96)
+			if (delay_reg_value>96)
 				delay_reg_value=96;
 		}
-		if(over_ride_increase_decrease==1)
+		if (over_ride_increase_decrease == 1)
 		{
-				if(delay_old_value>=offset_value)
+				if (delay_old_value >= offset_value)
 				delay_reg_value=delay_reg_value-offset_value;
-				else 
+				else
 				delay_reg_value=0;
 			}
 		delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
 		dwc_ddrphy_apb_wr(reg_add,delay_reg_value|(delay_old_value&0xffc0));
 		dwc_ddrphy_apb_wr(reg_add+4,delay_reg_value|(delay_old_value&0xffc0));
 		*/
-			for( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
+			for ( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
 		{
 	dwc_window_reg_after_training_update_increas_sub(over_ride_index
 		,((over_ride_sub_index)),		over_ride_increase_decrease,1) ;
@@ -34365,30 +33285,30 @@ void dwc_window_reg_after_training_update_increas(char over_ride_index,uint32_t 
 
 		/*
 		   delay_old_value=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|((over_ride_sub_index%8)<<12)|(0x18c+(over_ride_sub_index/8)));
-		   if(over_ride_increase_decrease==0)
+		   if (over_ride_increase_decrease == 0)
 		   delay_reg_value=delay_old_value+1;
-		   if(over_ride_increase_decrease==1)
+		   if (over_ride_increase_decrease == 1)
 		   delay_reg_value=delay_old_value-1;
 		   dwc_ddrphy_apb_wr((0<<20)|(1<<16)|((over_ride_sub_index%8)<<12)|(0x18c+(over_ride_sub_index/8)),delay_reg_value|(delay_old_value&0xffc0));
 		   dwc_ddrphy_apb_wr((0<<20)|(1<<16)|((over_ride_sub_index%8)<<12)|(0x190+(over_ride_sub_index/8)),delay_reg_value|(delay_old_value&0xffc0));
-		   */	
+		   */
 	}
 	if (over_ride_index == DMC_TEST_WINDOW_INDEX_TXDQDLY) {
 		reg_add=((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(0xc0+((over_ride_sub_index%9)<<8)+(over_ride_sub_index/36)));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		/*
 			delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-		if(over_ride_increase_decrease==0)
+		if (over_ride_increase_decrease == 0)
 			{
 		delay_reg_value=delay_reg_value+offset_value;
-		if(delay_reg_value>96)
+		if (delay_reg_value>96)
 			delay_reg_value=96;
 			}
-				if(over_ride_increase_decrease==1)
+				if (over_ride_increase_decrease == 1)
 		{
-				if(delay_reg_value>=offset_value)
+				if (delay_reg_value >= offset_value)
 				delay_reg_value=delay_reg_value-offset_value;
-				else 
+				else
 				delay_reg_value=0;
 			}
 		//delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index,delay_old_value)+1;
@@ -34398,7 +33318,7 @@ void dwc_window_reg_after_training_update_increas(char over_ride_index,uint32_t 
 delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
 		dwc_ddrphy_apb_wr(reg_add,delay_reg_value);
 		*/
-					for( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
+					for ( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
 		{
 	dwc_window_reg_after_training_update_increas_sub(over_ride_index
 		,((over_ride_sub_index)),		over_ride_increase_decrease,1) ;
@@ -34410,23 +33330,23 @@ delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		/*
 		delay_reg_value=delay_old_value;
-				if(over_ride_increase_decrease==0)
+				if (over_ride_increase_decrease == 0)
 			{
 		delay_reg_value=delay_reg_value+offset_value;
-		if(delay_reg_value>96)
+		if (delay_reg_value>96)
 			delay_reg_value=96;
 			}
-				if(over_ride_increase_decrease==1)
+				if (over_ride_increase_decrease == 1)
 		{
-				if(delay_reg_value>=offset_value)
+				if (delay_reg_value >= offset_value)
 				delay_reg_value=delay_reg_value-offset_value;
-				else 
+				else
 				delay_reg_value=0;
 			}
 delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
 		dwc_ddrphy_apb_wr(reg_add,delay_reg_value);
 		*/
-					for( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
+					for ( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
 		{
 	dwc_window_reg_after_training_update_increas_sub(over_ride_index
 		,((over_ride_sub_index)),		over_ride_increase_decrease,1) ;
@@ -34434,28 +33354,28 @@ delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value
 	}
 
 	if (over_ride_index == DMC_TEST_WINDOW_INDEX_RXENDLY) {
-		
+
 		reg_add=((0<<20)|(1<<16)|((over_ride_sub_index%8)<<12)|(0x80+(over_ride_sub_index/8)));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		/*
 	delay_reg_value=ddr_cacl_phy_delay_all_step(over_ride_index, delay_old_value);
-			if(over_ride_increase_decrease==0)
+			if (over_ride_increase_decrease == 0)
 			{
 		delay_reg_value=delay_reg_value+offset_value;
-		if(delay_reg_value>96)
+		if (delay_reg_value>96)
 			delay_reg_value=96;
 			}
-		if(over_ride_increase_decrease==1)
+		if (over_ride_increase_decrease == 1)
 		{
-				if(delay_reg_value>=offset_value)
+				if (delay_reg_value >= offset_value)
 				delay_reg_value=delay_reg_value-offset_value;
-				else 
+				else
 				delay_reg_value=0;
 			}
 		delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
 		dwc_ddrphy_apb_wr(reg_add,delay_reg_value|(delay_old_value&0xffc0));
 		*/
-					for( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
+					for ( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
 		{
 	dwc_window_reg_after_training_update_increas_sub(over_ride_index
 		,((over_ride_sub_index)),		over_ride_increase_decrease,1) ;
@@ -34464,30 +33384,30 @@ delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value
 
 
 if (over_ride_index == DMC_TEST_WINDOW_INDEX_SOC_VREF) {
-	
+
 		//dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(((over_ride_sub_index%36)%9)<<8)|(0x40),over_ride_value);
 		//reg_add=((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(0x68+((over_ride_sub_index%9)<<8)+(over_ride_sub_index/36)));
 		reg_add=((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(((over_ride_sub_index%36)%9)<<8)|(0x40));
 		delay_old_value=dwc_ddrphy_apb_rd(reg_add);
 		/*
 		delay_reg_value=delay_old_value;
-				if(over_ride_increase_decrease==0)
+				if (over_ride_increase_decrease == 0)
 			{
 		delay_reg_value=delay_reg_value+offset_value;
-		if(delay_reg_value>127)
+		if (delay_reg_value>127)
 			delay_reg_value=127;
 			}
-				if(over_ride_increase_decrease==1)
+				if (over_ride_increase_decrease == 1)
 		{
-				if(delay_reg_value>=offset_value)
+				if (delay_reg_value >= offset_value)
 				delay_reg_value=delay_reg_value-offset_value;
-				else 
+				else
 				delay_reg_value=0;
 			}
 //delay_reg_value=ddr_cacl_phy_over_ride_back_reg(over_ride_index, delay_reg_value);
 		dwc_ddrphy_apb_wr(reg_add,delay_reg_value);
 */
-	for( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
+	for ( temp_count_3=0;temp_count_3<offset_value;temp_count_3++)
 		{
 	dwc_window_reg_after_training_update_increas_sub(over_ride_index
 		,((over_ride_sub_index)),		over_ride_increase_decrease,1) ;
@@ -34496,21 +33416,21 @@ if (over_ride_index == DMC_TEST_WINDOW_INDEX_SOC_VREF) {
 
 printf("over_ride_increase_decrease==%d\n",over_ride_increase_decrease);
 
-if(over_ride_increase_decrease==1)
+if (over_ride_increase_decrease == 1)
 {
 unsigned int org_cacl_value=(delay_old_value)&0x3f;
 printf("org_cacl_value==%d\n",org_cacl_value);
 printf("offset_value==%d\n",offset_value);
-	if((org_cacl_value&0x3f)<offset_value){
+	if ((org_cacl_value&0x3f)<offset_value) {
 
 	char temp_test_index_2=0;
 	char temp_count_4=0;
 	char temp_count_2=0;
-	if(over_ride_index == DMC_TEST_WINDOW_INDEX_TXDQSDLY)
+	if (over_ride_index == DMC_TEST_WINDOW_INDEX_TXDQSDLY)
 		{
 	temp_test_index_2=DMC_TEST_WINDOW_INDEX_TXDQDLY;
-	if(over_ride_sub_index%2==0){
-	for(temp_count_2=0;temp_count_2<9;temp_count_2++)
+	if (over_ride_sub_index%2 == 0) {
+	for (temp_count_2=0;temp_count_2<9;temp_count_2++)
 		{for(temp_count_4=0;temp_count_4<(offset_value-org_cacl_value);temp_count_4++)
 {
 	dwc_window_reg_after_training_update_increas_sub(temp_test_index_2
@@ -34525,43 +33445,43 @@ printf("offset_value==%d\n",offset_value);
 		(over_ride_index-1):
 		(over_ride_index+1)),		0) ;
 		}
-*/	
+*/
 		}
-if(over_ride_index == DMC_TEST_WINDOW_INDEX_RXCLKDLY)
+if (over_ride_index == DMC_TEST_WINDOW_INDEX_RXCLKDLY)
 {
 	temp_test_index_2=DMC_TEST_WINDOW_INDEX_RXPBDLY;
 
-for( temp_count_2=0;temp_count_2<4;temp_count_2++)
-	for(temp_count_4=0;temp_count_4<(((offset_value-org_cacl_value)*ui_1_32_100step)/bdlr_100step);temp_count_4++)
+for ( temp_count_2=0;temp_count_2<4;temp_count_2++)
+	for (temp_count_4=0;temp_count_4<(((offset_value-org_cacl_value)*ui_1_32_100step)/bdlr_100step);temp_count_4++)
 		{
 {
 	dwc_window_reg_after_training_update_increas_sub(temp_test_index_2
 		,((over_ride_sub_index/2)*9+
 		temp_count_2+(over_ride_sub_index%2)*4),		0,1) ;
-	
+
 				}
 		}
 }
 
-			if(over_ride_index == DMC_TEST_WINDOW_INDEX_RXPBDLY)
+			if (over_ride_index == DMC_TEST_WINDOW_INDEX_RXPBDLY)
 			{
 				temp_test_index_2=DMC_TEST_WINDOW_INDEX_RXPBDLY;
 
-				for( temp_count_2=0;temp_count_2<4;temp_count_2++)
+				for ( temp_count_2=0;temp_count_2<4;temp_count_2++)
 				{
-					if(temp_count_2==((over_ride_sub_index%9)%4))
+					if (temp_count_2 == ((over_ride_sub_index%9)%4))
 						temp_count_2++;
-for(temp_count_4=0;temp_count_4<(offset_value-org_cacl_value);temp_count_4++)
+for (temp_count_4=0;temp_count_4<(offset_value-org_cacl_value);temp_count_4++)
 					dwc_window_reg_after_training_update_increas_sub(temp_test_index_2
 							,((over_ride_sub_index/9)*9+
 		temp_count_2+(((over_ride_sub_index%9)>3)?4:0)),		0,1) ;
 
 				}
 				//bdlr_100step  (org_cacl_value<offset_value)
-				if((((offset_value-org_cacl_value)*bdlr_100step)/ui_1_32_100step))
+				if ((((offset_value-org_cacl_value)*bdlr_100step)/ui_1_32_100step))
 				{
 					temp_test_index_2=DMC_TEST_WINDOW_INDEX_RXCLKDLY;
-	for(temp_count_4=0;temp_count_4<(((offset_value-org_cacl_value)*bdlr_100step)/ui_1_32_100step);temp_count_4++)
+	for (temp_count_4=0;temp_count_4<(((offset_value-org_cacl_value)*bdlr_100step)/ui_1_32_100step);temp_count_4++)
 					dwc_window_reg_after_training_update_increas_sub(temp_test_index_2
 							,(((over_ride_sub_index/9)<<1)+
 								(((over_ride_sub_index%9)>3)?1:0)
@@ -34584,7 +33504,7 @@ int do_ddr2pll_g12_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 #define DMC_WINDOW_CMD   20180010  //g12_d2pll 1584 0 0 0 0 0x8
 	//g12_d2pll 1600 5 0 0x10 1
 	//g12_d2pll 1600 0 0 0 0 0x10 0 1
-	//g12_d2pll 1400 0 0 0 0 0 0 0 0 1 1200  1900    test ddr frequency 
+	//g12_d2pll 1400 0 0 0 0 0 0 0 0 1 1200  1900    test ddr frequency
 	//g12_d2pll 1400 0 0 0 0 0 0 0 0 3 1200  1900    test ddr frequency with EE voltage
 	//g12_d2pll 1600 0 0 0 0 0 0 0 1  //full test
 	//g12_d2pll 1600 0 0 0 0 0 0 0 1  0 0 0 872 //full test with 872mv EE
@@ -34641,7 +33561,7 @@ int do_ddr2pll_g12_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	unsigned int  window_test_stick_cmd_value=0;
 #if 0
 	unsigned int stick_test_cmd_index=0;  //  1  override_cmd   2
-	unsigned int stick_test_ddr_window_delay_override_enable=0; // bit 0 ac  1  data dqs write   2 data dqs read  3 data bit write   4 data bit read  5//data write vref   6 //data read vref  
+	unsigned int stick_test_ddr_window_delay_override_enable=0; // bit 0 ac  1  data dqs write   2 data dqs read  3 data bit write   4 data bit read  5//data write vref   6 //data read vref
 	unsigned int stick_test_ddr_window_delay_override_index=0;
 	unsigned int stick_test_ddr_window_delay_override_value=0;
 	unsigned int stick_test_ddr_window_delay_override_before_after_training_setting=0;  //0  before  ,1 after training
@@ -34672,7 +33592,7 @@ int do_ddr2pll_g12_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	}
 	unsigned int argc_count=1;
 	unsigned int  para_meter[30]={0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0,};
-	while(argc_count<argc)
+	while (argc_count<argc)
 	{para_meter[argc_count-1]= simple_strtoul(argv[argc_count], &endp, 0);
 		if (*argv[argc_count] == 0 || *endp != 0) {
 			para_meter[argc_count-1] = 0;
@@ -34775,7 +33695,7 @@ int do_ddr2pll_g12_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	wr_reg(PREG_STICKY_REG0,0 | (0xf13 << 20));
 #endif
 
-	if(stick_dmc_ddr_window_test_enable)
+	if (stick_dmc_ddr_window_test_enable)
 	{
 		wr_reg(PREG_STICKY_REG0,((stick_dmc_ddr_window_test_enable_spec_sub_index&0xff)<<8)|(stick_dmc_ddr_window_test_enable&0xff) | (0xf12<< 20));
 	}
@@ -34784,7 +33704,7 @@ int do_ddr2pll_g12_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	wr_reg(PREG_STICKY_REG2,(stick_test_ddr_window_delay_override_value&0xffff) |((stick_test_ddr_window_delay_override_index&0xff)<<16)
 			|((stick_test_ddr_window_delay_override_enable&0x7)<<29)
 			|((stick_test_ddr_window_delay_override_before_after_training_setting&0x1)<<28));
-	if(stick_dmc_ddr_window_test_enable_mask)
+	if (stick_dmc_ddr_window_test_enable_mask)
 	{
 		wr_reg(PREG_STICKY_REG3,(stick_dmc_ddr_window_test_enable_mask));
 	}
@@ -34792,32 +33712,32 @@ int do_ddr2pll_g12_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	{
 		wr_reg(PREG_STICKY_REG4,(stick_dmc_ddr_window_test_dmc_full_test_enable<<31)|(stick_dmc_ddr_bl2_sweep_frequency_ee_voltage_enable<<29));
 	}
-	if(stick_dmc_ddr_bl2_sweep_frequency_ee_voltage_enable)
+	if (stick_dmc_ddr_bl2_sweep_frequency_ee_voltage_enable)
 	{
 		wr_reg(PREG_STICKY_REG5,(stick_dmc_ddr_bl2_sweep_frequency_min<<0)|(stick_dmc_ddr_bl2_sweep_frequency_max<<16));
 	}
-	if(stick_dmc_ddr_bl2_ee_voltage)
+	if (stick_dmc_ddr_bl2_ee_voltage)
 	{
 		wr_reg(PREG_STICKY_REG6,(stick_dmc_ddr_bl2_ee_voltage<<0));
 	}
-#endif 
+#endif
 	argc_count=2;
 	window_test_stick_cmd_value=para_meter[argc_count-1];
-	if((window_test_stick_cmd_value==G12_D2PLL_CMD_OVER_RIDE)||(window_test_stick_cmd_value==G12_D2PLL_CMD_OVER_RIDE_PLUS_FULLTEST))
+	if ((window_test_stick_cmd_value == G12_D2PLL_CMD_OVER_RIDE) || (window_test_stick_cmd_value == G12_D2PLL_CMD_OVER_RIDE_PLUS_FULLTEST))
 	{
 		para_meter[3]=(para_meter[3]<<24)|(para_meter[4]<<16)|(para_meter[5]<<0);
 		para_meter[4]=(para_meter[6]<<24)|(para_meter[7]<<16)|(para_meter[8]<<0);
 		para_meter[5]=(para_meter[9]<<24)|(para_meter[10]<<16)|(para_meter[11]<<0);
 
 	}
-	if((window_test_stick_cmd_value==G12_D2PLL_CMD_WINDOW_TEST)||(window_test_stick_cmd_value==G12_D2PLL_CMD_WINDOW_TEST_AND_STICKY_OVERRIDE))
+	if ((window_test_stick_cmd_value == G12_D2PLL_CMD_WINDOW_TEST) || (window_test_stick_cmd_value == G12_D2PLL_CMD_WINDOW_TEST_AND_STICKY_OVERRIDE))
 	{
 		//para_meter[8]  size   9  stick_dmc_ddr_window_test_no_use_dqs_dq_correction   10 disable_scramble_use_define_pattern  11 stick_dmc_window_test_loop_flag window loop test
-		//12 if reinit when test dq  13 pass_to_fail_flag    14  test_dmc_or_cpu
-		para_meter[5]=(para_meter[9]<<28)|(para_meter[10]<<24)|(para_meter[11]<<20)|(para_meter[12]<<21)|(para_meter[13]<<22)|(para_meter[14]<<25)|(para_meter[5]<<0);
+		//12 if reinit when test dq
+		para_meter[5]=(para_meter[9]<<28)|(para_meter[10]<<24)|(para_meter[11]<<20)|(para_meter[12]<<21)|(para_meter[5]<<0);
 
 	}
-	if((window_test_stick_cmd_value==G12_D2PLL_CMD_DDR_EYE_TEST)||(window_test_stick_cmd_value==G12_D2PLL_CMD_DDR_EYE_TEST_AND_STICKY_OVERRIDE))
+	if ((window_test_stick_cmd_value == G12_D2PLL_CMD_DDR_EYE_TEST) || (window_test_stick_cmd_value == G12_D2PLL_CMD_DDR_EYE_TEST_AND_STICKY_OVERRIDE))
 	{
 
 		para_meter[3]=(para_meter[3]<<0)|(para_meter[4]<<8)|(para_meter[5]<<16)|(para_meter[6]<<24);
@@ -34832,13 +33752,13 @@ int do_ddr2pll_g12_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	printf("P_PREG_STICKY_REG [0x%08x]  [0x%08x]==[0x%08x]\n", argc_count,(PREG_STICKY_REG0+(argc_count<<2)),rd_reg(PREG_STICKY_REG0+(argc_count<<2)));
 	argc_count=1;
 	//while(argc_count<argc)
-	while(argc_count<10)
+	while (argc_count<10)
 	{
 		wr_reg(PREG_STICKY_REG0+(argc_count<<2),para_meter[argc_count-1]);
 		printf("P_PREG_STICKY_REG [0x%08x]  [0x%08x]==[0x%08x]\n", argc_count,(PREG_STICKY_REG0+(argc_count<<2)),rd_reg(PREG_STICKY_REG0+(argc_count<<2)));
 		argc_count++;
 	}
-	/*	
+	/*
 		printf("P_PREG_STICKY_REG0 [0x%08x]\n", rd_reg(PREG_STICKY_REG0));
 		printf("P_PREG_STICKY_REG1 [0x%08x]\n", rd_reg(PREG_STICKY_REG1));
 		printf("P_PREG_STICKY_REG2 [0x%08x]\n", rd_reg(PREG_STICKY_REG2));
@@ -34886,7 +33806,7 @@ int do_ddr_g12_uboot_dmc_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const
 
 	unsigned int argc_count=1;
 	unsigned int  para_meter[30]={0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0,};
-	while(argc_count<argc)
+	while (argc_count<argc)
 	{para_meter[argc_count-1]= simple_strtoul(argv[argc_count], &endp, 0);
 	if (*argv[argc_count] == 0 || *endp != 0) {
 	para_meter[argc_count-1] = 0;
@@ -34907,10 +33827,10 @@ dmc_test_start_end=dmc_test_start_end?dmc_test_start_end:DMC_TEST_END_ADD_DEFAUL
 test_write_loops=test_write_loops?test_write_loops:DMC_TEST_WRITE_LOOP_DEFAULT;
 test_read_loops=test_read_loops?test_read_loops:DMC_TEST_READ_LOOP_DEFAULT;
 
-while((test_write_loops)||(test_read_loops))
+while ((test_write_loops) || (test_read_loops))
 {
 
-if(test_write_loops)
+if (test_write_loops)
 ddr_bist_test_error=dmc_ddr_test(dram_base,1,0,0,test_size,1,0)+ddr_bist_test_error;
 
 
@@ -34920,15 +33840,15 @@ _udelay(test_delay_time_ms*1000);
 
 
 #ifdef CFG_ENABLE_DDR_DMC_TEST
-if(test_read_loops)
+if (test_read_loops)
 ddr_bist_test_error=dmc_ddr_test(dram_base,0,1,1,test_size,1,0)+ddr_bist_test_error;
 serial_puts("\ndmc full test result==");
 serial_put_dec(ddr_bist_test_error);
 serial_puts("\n");
 #endif
-if(test_write_loops)
+if (test_write_loops)
 test_write_loops--;
-if(test_read_loops)
+if (test_read_loops)
 test_read_loops--;
 }
 
@@ -34942,7 +33862,7 @@ uint32_t  add_offset=0;
 dwc_ddrphy_apb_wr(0xd0000,0x0);
 
 	{printf("\n write dq_bit delay * 1/32UI");
-		for(t_count=0;t_count<72;t_count++)
+		for (t_count=0;t_count<72;t_count++)
 		{
 			add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(0xc0+((t_count%9)<<8)+(t_count/36)));
 			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
@@ -35046,7 +33966,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 			lane_disable= 0;
 		}
 	}
-	printf("lane_disable==0x%08x\n",lane_disable);   
+	printf("lane_disable==0x%08x\n",lane_disable);
 
 	if (argc >5) {
 		ddr_data_test_size = simple_strtoull_ddr(argv[5], &endp, 0);
@@ -35125,9 +34045,9 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 	ddr_test_data_array_max=8;
 
-	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++) 
+	for (temp_count= 0;temp_count < ddr_test_data_array_max; temp_count++)
 	{
-		num_array[temp_count]= read_write_window_test_parameter(data_source, 
+		num_array[temp_count]= read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_READ );
 		printf("read numarry[%d]==%d\n",temp_count,num_array[temp_count]);
 	}
@@ -35141,7 +34061,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 	unsigned int test_arg_5_pass_fail_flag_add_sticky_offset =0; //use for kernel
 
 	unsigned int test_arg_6_step_status =0; //uboot test we should read error then done status.  0 no test 1 ongoing 2 this step done  fail or pass
-	unsigned int test_arg_7_lcdlr_offset =0; //left_lcdlr+right_lcdlr<<16 
+	unsigned int test_arg_7_lcdlr_offset =0; //left_lcdlr+right_lcdlr<<16
 	unsigned int test_arg_7_lcdlr_offset_l =0; //left_lcdlr
 	unsigned int test_arg_7_lcdlr_offset_r=0; //right_lcdlr
 	unsigned int  delay_step_x100= 0;
@@ -35177,25 +34097,25 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 
 
-	//for (temp_count= 0;temp_count < 8; temp_count++) 
+	//for (temp_count= 0;temp_count < 8; temp_count++)
 	//	{
-	//	 read_write_window_test_parameter(data_source, 
+	//	 read_write_window_test_parameter(data_source,
 	// 	 temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	//}
 
 
-	if(ddr_test_clear_flag)
+	if (ddr_test_clear_flag)
 	{            test_arg_6_step_status=0;
 		num_array[6]	=	test_arg_6_step_status		;
 		temp_count=6;
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		printf("\n clear sticky register should reset,then over write ....\n");
 		run_command("reset",0);
-		while(1);
+		while (1) ;
 	}
 
-	if(test_arg_6_step_status==0)
+	if (test_arg_6_step_status == 0)
 	{
 		{
 
@@ -35218,7 +34138,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 		test_arg_5_pass_fail_flag_add_sticky_offset=0;
 		test_arg_6_step_status=0;
 		test_arg_7_lcdlr_offset=0;
-		if(ddr_test_init_offset)
+		if (ddr_test_init_offset)
 		{test_arg_7_lcdlr_offset=ddr_test_init_offset;
 		}
 		//num_array[0]	=	reg_def_value_data[0]		;
@@ -35232,9 +34152,9 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 
 
-		for (temp_count= 0;temp_count < 8; temp_count++) 
+		for (temp_count= 0;temp_count < 8; temp_count++)
 		{
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		}
 
@@ -35255,7 +34175,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 		}
 	}
 
-	if(ddr_test_uboot_kernel_enable_mask&1)
+	if (ddr_test_uboot_kernel_enable_mask&1)
 	{printf("skip uboot test should init kernel offset  value==0x%08x\n",num_array[7]);
 	}
 
@@ -35279,7 +34199,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 		printf("test_arg_6_step_status=%d\n",num_array[6]);
 		printf("test_arg_7_lcdlr_offset=%d\n",num_array[7]);
 
-		if(test_arg_6_step_status==4) //uboot finish
+		if (test_arg_6_step_status == 4) //uboot finish
 		{
 			ddr_test_watchdog_disable(); //s
 			printf("close  watchdog\n");
@@ -35302,21 +34222,21 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 
 			}
-			if(ddr_test_uboot_kernel_enable_mask&2)
+			if (ddr_test_uboot_kernel_enable_mask&2)
 			{
-				if(ddr_test_uboot_loop)
+				if (ddr_test_uboot_loop)
 				{
 					{            test_arg_6_step_status=0;
 						num_array[6]	=	test_arg_6_step_status		;
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						printf("\n clear sticky register should reset,then over write ....\n");
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 				else
 					return 1;
@@ -35327,50 +34247,50 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 		//if((test_arg_6_step_status==0))   //0 test left edge begin     1 test left edge ongoing     2//left_finish     3 right edge ongoing    4 right finish  //5 kernel left edge ongoing 6 kernel left finish    7 kernel right ongoing
 		//  uboot find from pass to fail offset 0->max
-		//kernel find from fail to pass offset from max ->0 
-		if((test_arg_6_step_status<4))  ////  uboot find from pass to fail offset 0->max
+		//kernel find from fail to pass offset from max ->0
+		if ((test_arg_6_step_status<4))  ////  uboot find from pass to fail offset 0->max
 		{
-			if((test_arg_6_step_status==0)||(test_arg_6_step_status==2)
+			if ((test_arg_6_step_status == 0) || (test_arg_6_step_status == 2)
 					||(test_arg_6_step_status==4)||(test_arg_6_step_status==6)
 			  )
 			{
 				test_arg_6_step_status=test_arg_6_step_status+1;
 				num_array[6]	=	test_arg_6_step_status		;
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			}
 
-			if((test_arg_6_step_status==1)||(test_arg_6_step_status==3)||(test_arg_6_step_status==5)||(test_arg_6_step_status==7))
+			if ((test_arg_6_step_status == 1) || (test_arg_6_step_status == 3) || (test_arg_6_step_status == 5) || (test_arg_6_step_status == 7))
 			{
-				if(test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_PASS) //pass 2 error 1
+				if (test_arg_5_pass_fail_flag_add_sticky_offset == DDR_TEST_PASS) //pass 2 error 1
 				{
 					//	test_arg_6_step_status=test_arg_6_step_status+1;
 
 					test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_NULL;
 					num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					if((test_arg_6_step_status==1)||(test_arg_6_step_status==5))
+					if ((test_arg_6_step_status == 1) || (test_arg_6_step_status == 5))
 					{
 
-						// for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+						// for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 						{
 							lane_step_count=6;
 							//if((lane_step_count%2)==0)
 							{
 
-								if((((num_array[lane_step_count/2])>>0)&0xffff)<=test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>0)&0xffff) <= test_arg_7_lcdlr_offset_l)
 								{
 									test_lcdlr_reach_lcdlr_limited_flag=test_lcdlr_reach_lcdlr_limited_flag+1;
 								}
 							}
 							/*
-							   if((lane_step_count%2)==1)
+							   if ((lane_step_count%2) == 1)
 							   {
-							   if((((num_array[lane_step_count/2])>>16)&0xffff)<=test_arg_7_lcdlr_offset_l)
+							   if ((((num_array[lane_step_count/2])>>16)&0xffff) <= test_arg_7_lcdlr_offset_l)
 							   {
 							   test_lcdlr_reach_lcdlr_limited_flag=test_lcdlr_reach_lcdlr_limited_flag+1;
 							   }
@@ -35383,15 +34303,15 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 
 					}
-					if(test_lcdlr_reach_lcdlr_limited_flag)
+					if (test_lcdlr_reach_lcdlr_limited_flag)
 					{
-						test_arg_6_step_status=test_arg_6_step_status+1;			
+						test_arg_6_step_status=test_arg_6_step_status+1;
 						num_array[6]	=	test_arg_6_step_status		;
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 				}
 
@@ -35400,18 +34320,18 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 					//  test_arg_7_lcdlr_offset_l=(test_arg_7_lcdlr_offset&0xffff);
 					// test_arg_7_lcdlr_offset_r=((test_arg_7_lcdlr_offset>>16)&0xffff);
-					if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+					if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 					{
 						test_arg_7_lcdlr_offset_l=test_arg_7_lcdlr_offset_l-1;
 					}
 					else 	if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
 					{
-						test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r-1;  
+						test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r-1;
 					}
 					test_arg_7_lcdlr_offset=(test_arg_7_lcdlr_offset_l|(test_arg_7_lcdlr_offset_r<<16));
 					num_array[7]	=	test_arg_7_lcdlr_offset		;
 					temp_count=7;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
@@ -35419,16 +34339,16 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 					test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_NULL;
 					num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					test_arg_6_step_status=test_arg_6_step_status+1;			
+					test_arg_6_step_status=test_arg_6_step_status+1;
 					num_array[6]	=	test_arg_6_step_status		;
 					temp_count=6;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 			}
 
@@ -35436,24 +34356,24 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 			//(test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_NULL)
 			//    test_arg_7_lcdlr_offset_l=(test_arg_7_lcdlr_offset&0xffff);
 			// test_arg_7_lcdlr_offset_r=((test_arg_7_lcdlr_offset>>16)&0xffff);
-			if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+			if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 			{
 				test_arg_7_lcdlr_offset_l=test_arg_7_lcdlr_offset_l+1;
 			}
 			else 		if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
 			{
-				test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r+1;  
+				test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r+1;
 			}
 			test_arg_7_lcdlr_offset=(test_arg_7_lcdlr_offset_l|(test_arg_7_lcdlr_offset_r<<16));
 			num_array[7]	=	test_arg_7_lcdlr_offset		;
 			temp_count=7;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;  //pass 2 error 1
 			num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 			temp_count=5;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			ddr_test_watchdog_enable(test_watchdog_time_s); //s
@@ -35463,35 +34383,35 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 			{
 
-				// for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+				// for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 				{
 					lane_step_count=6;
 					printf("\n                    (num_array[%d]) ==%08x \n",lane_step_count/2,(num_array[lane_step_count/2]));
-					if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+					if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 					{
-						if((lane_step_count%2)==0)
+						if ((lane_step_count%2) == 0)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff)-test_arg_7_lcdlr_offset_l;
-							if((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
+							if ((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
 							{test_lcdlr_temp_value=0;
 							}
 						}
-						if((lane_step_count%2)==1)
+						if ((lane_step_count%2) == 1)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff)-test_arg_7_lcdlr_offset_l;
-							if((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
+							if ((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
 							{test_lcdlr_temp_value=0;
 							}
 						}
 					}
 
-					if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
+					if (((test_arg_6_step_status == 3)) || (test_arg_6_step_status == 7))
 					{
-						if((lane_step_count%2)==0)
+						if ((lane_step_count%2) == 0)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff)+test_arg_7_lcdlr_offset_r;
 						}
-						if((lane_step_count%2)==1)
+						if ((lane_step_count%2) == 1)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff)+test_arg_7_lcdlr_offset_r;
 
@@ -35508,7 +34428,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 						printf("\nstr=%s\n",str);
 						run_command(str,0);
 						//          run_command("reset",0);
-						while(1);
+						while (1) ;
 
 					}
 					// 	do_ddr_g12_read_write_ddr_add_window_lcdlr( rank_index,lane_step_count,
@@ -35521,17 +34441,17 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 			}
 
 			//here will dead
-			if(test_arg_6_step_status>4)
+			if (test_arg_6_step_status>4)
 			{
 				//ddr_test_watchdog_disable(); //s
 				ddr_test_watchdog_enable(kernel_test_watchdog_time_s); //s
 				//  test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;  //pass 2 error 1
 				// num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 				// temp_count=5;
-				// read_write_window_test_parameter(data_source, 
+				// read_write_window_test_parameter(data_source,
 				// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("run storeboot",0);
-				while(1);
+				while (1) ;
 			} else
 			{
 				temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
@@ -35540,7 +34460,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 			if (temp_test_error)
 			{
 				run_command("reset",0);
-				while(1);
+				while (1) ;
 			}
 			else
 			{
@@ -35550,13 +34470,13 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 				{
 					//write org value
-					for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+					for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 					{
-						if((lane_step_count%2)==0)
+						if ((lane_step_count%2) == 0)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff);
 						}
-						if((lane_step_count%2)==1)
+						if ((lane_step_count%2) == 1)
 						{
 							test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff);
 						}
@@ -35572,10 +34492,10 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 				test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_PASS;  //pass 2 error 1
 				num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 				temp_count=5;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 				run_command("reset",0);
-				while(1);
+				while (1) ;
 
 
 
@@ -35585,62 +34505,62 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 		}
 
 
-		if((test_arg_6_step_status==4)||(test_arg_6_step_status==6))
+		if ((test_arg_6_step_status == 4) || (test_arg_6_step_status == 6))
 		{
 			test_arg_4_step_flag_add_sticky_offset=DDR_TEST_STATUS_UBOOT_FINISH;
 			num_array[4]	=	test_arg_4_step_flag_add_sticky_offset		;
 			temp_count=4;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 			test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;//DDR_TEST_NULL;
 			num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 			temp_count=5;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 		}
-		if((test_arg_6_step_status>=4))   ////kernel find from fail to pass offset from max ->0 
+		if ((test_arg_6_step_status >= 4))   ////kernel find from fail to pass offset from max ->0
 		{
-			if((test_arg_6_step_status==0)||(test_arg_6_step_status==2)
+			if ((test_arg_6_step_status == 0) || (test_arg_6_step_status == 2)
 					||(test_arg_6_step_status==4)||(test_arg_6_step_status==6)
 			  )
 			{
 				test_arg_6_step_status=test_arg_6_step_status+1;
 				num_array[6]	=	test_arg_6_step_status		;
 				temp_count=6;
-				read_write_window_test_parameter(data_source, 
+				read_write_window_test_parameter(data_source,
 						temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 			}
 
-			if((test_arg_6_step_status==1)||(test_arg_6_step_status==3)||(test_arg_6_step_status==5)||(test_arg_6_step_status==7))
+			if ((test_arg_6_step_status == 1) || (test_arg_6_step_status == 3) || (test_arg_6_step_status == 5) || (test_arg_6_step_status == 7))
 			{
-				if(test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_PASS) //pass 2 error 1
+				if (test_arg_5_pass_fail_flag_add_sticky_offset == DDR_TEST_PASS) //pass 2 error 1
 				{
 					//	test_arg_6_step_status=test_arg_6_step_status+1;
 
 					test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_NULL;
 					num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
-					if((test_arg_6_step_status==1)||(test_arg_6_step_status==5))
+					if ((test_arg_6_step_status == 1) || (test_arg_6_step_status == 5))
 					{
 
-						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 
-								if((((num_array[lane_step_count/2])>>0)&0xffff)<=test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>0)&0xffff) <= test_arg_7_lcdlr_offset_l)
 								{
 									test_lcdlr_reach_lcdlr_limited_flag=test_lcdlr_reach_lcdlr_limited_flag+1;
 								}
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
-								if((((num_array[lane_step_count/2])>>16)&0xffff)<=test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>16)&0xffff) <= test_arg_7_lcdlr_offset_l)
 								{
 									test_lcdlr_reach_lcdlr_limited_flag=test_lcdlr_reach_lcdlr_limited_flag+1;
 								}
@@ -35654,35 +34574,35 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 					}
 					// if(test_lcdlr_reach_lcdlr_limited_flag)
 					{
-						test_arg_6_step_status=test_arg_6_step_status+1;			
+						test_arg_6_step_status=test_arg_6_step_status+1;
 						num_array[6]	=	test_arg_6_step_status		;
 						temp_count=6;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 						run_command("reset",0);
-						while(1);
+						while (1) ;
 					}
 				}
 
-				else 	if((test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_FAIL) 
+				else 	if((test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_FAIL)
 						//||(test_arg_5_pass_fail_flag_add_sticky_offset==DDR_TEST_NULL))//pass 2 error 1
 					)
 					{
 
 						//  test_arg_7_lcdlr_offset_l=(test_arg_7_lcdlr_offset&0xffff);
 						// test_arg_7_lcdlr_offset_r=((test_arg_7_lcdlr_offset>>16)&0xffff);
-						if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+						if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 						{
 							test_arg_7_lcdlr_offset_l=test_arg_7_lcdlr_offset_l-1;
 						}
 						else 	if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
 						{
-							test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r-1;  
+							test_arg_7_lcdlr_offset_r=test_arg_7_lcdlr_offset_r-1;
 						}
 						test_arg_7_lcdlr_offset=(test_arg_7_lcdlr_offset_l|(test_arg_7_lcdlr_offset_r<<16));
 						num_array[7]	=	test_arg_7_lcdlr_offset		;
 						temp_count=7;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
@@ -35691,7 +34611,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 						test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;
 						num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 						temp_count=5;
-						read_write_window_test_parameter(data_source, 
+						read_write_window_test_parameter(data_source,
 								temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 
 
@@ -35706,34 +34626,34 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 
 				{
 
-					for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+					for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 					{
 						printf("\n                    (num_array[%d]) ==%08x \n",lane_step_count/2,(num_array[lane_step_count/2]));
-						if(((test_arg_6_step_status==1))||(test_arg_6_step_status==5))
+						if (((test_arg_6_step_status == 1)) || (test_arg_6_step_status == 5))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff)-test_arg_7_lcdlr_offset_l;
-								if((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
 								{test_lcdlr_temp_value=0;
 								}
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff)-test_arg_7_lcdlr_offset_l;
-								if((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
+								if ((((num_array[lane_step_count/2])>>0)&0xffff)<test_arg_7_lcdlr_offset_l)
 								{test_lcdlr_temp_value=0;
 								}
 							}
 						}
 
-						if(((test_arg_6_step_status==3))||(test_arg_6_step_status==7))
+						if (((test_arg_6_step_status == 3)) || (test_arg_6_step_status == 7))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff)+test_arg_7_lcdlr_offset_r;
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff)+test_arg_7_lcdlr_offset_r;
 
@@ -35752,17 +34672,17 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 				}
 
 				//here will dead
-				if(test_arg_6_step_status>4)
+				if (test_arg_6_step_status>4)
 				{
 					//ddr_test_watchdog_disable(); //s
 					ddr_test_watchdog_enable(kernel_test_watchdog_time_s); //s
 					//  test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;  //pass 2 error 1
 					// num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					// temp_count=5;
-					// read_write_window_test_parameter(data_source, 
+					// read_write_window_test_parameter(data_source,
 					// temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					run_command("run storeboot",0);
-					while(1);
+					while (1) ;
 				} else
 				{
 					temp_test_error=ddr_test_s_cross_talk_pattern(ddr_test_size);
@@ -35771,43 +34691,43 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 				if (temp_test_error)
 				{
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 				}
 				else
 				{
 					ddr_test_watchdog_clear();
 					{
 						//write org value
-						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))   
+						for ((lane_step_count=0);(lane_step_count<8);(lane_step_count++))
 						{
-							if((lane_step_count%2)==0)
+							if ((lane_step_count%2) == 0)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>0)&0xffff);
 							}
-							if((lane_step_count%2)==1)
+							if ((lane_step_count%2) == 1)
 							{
 								test_lcdlr_temp_value=(((num_array[lane_step_count/2])>>16)&0xffff);
 							}
 							do_ddr_g12_read_write_ddr_add_window_lcdlr( rank_index,lane_step_count,
 									(test_lcdlr_temp_value),DDR_PARAMETER_WRITE);
-						}							 
+						}
 
 					}
 
 					test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_PASS;  //pass 2 error 1
 					num_array[5]	=	test_arg_5_pass_fail_flag_add_sticky_offset		;
 					temp_count=5;
-					read_write_window_test_parameter(data_source, 
+					read_write_window_test_parameter(data_source,
 							temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 					run_command("reset",0);
-					while(1);
+					while (1) ;
 
 				}
 			}
 		}
 	}
 
-	if(test_arg_6_step_status>=8) //finish
+	if (test_arg_6_step_status >= 8) //finish
 	{
 		ddr_test_watchdog_disable(); //s
 		printf("close  watchdog\n");
@@ -35829,7 +34749,7 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 			test_arg_4_step_flag_add_sticky_offset=DDR_TEST_STATUS_KERNEL_FINISH;
 			num_array[4]	=	test_arg_4_step_flag_add_sticky_offset		;
 			temp_count=4;
-			read_write_window_test_parameter(data_source, 
+			read_write_window_test_parameter(data_source,
 					temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 		}
 	}
@@ -35839,16 +34759,16 @@ int do_ddr_uboot_window_g12a_use_source_test_add_clk(cmd_tbl_t *cmdtp, int flag,
 		//	test_arg_6_step_status=test_arg_6_step_status+1;
 		num_array[6]	=	test_arg_6_step_status		;
 		temp_count=6;
-		read_write_window_test_parameter(data_source, 
+		read_write_window_test_parameter(data_source,
 				temp_count ,num_array[temp_count],DDR_PARAMETER_WRITE);
 	}
 	ddr_test_watchdog_disable(); //s
 	//  test_arg_5_pass_fail_flag_add_sticky_offset=DDR_TEST_FAIL;  //pass 2 error 1
 	run_command("run storeboot",0);
-	while(1);
+	while (1) ;
 	return 1;
 }
-#endif 
+#endif
 #if ( CONFIG_DDR_PHY >= P_DDR_PHY_G12)
 
 int do_ddr_g12_override_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -35932,7 +34852,7 @@ int do_ddr_g12_override_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
 
 
 	}
-	else { 
+	else {
 		return 1;
 	}
 	printf("lcdlr_max %d,\n",lcdlr_max);
@@ -36069,13 +34989,13 @@ int do_ddr_g12_offset_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 
 
 	}
-	else { 
+	else {
 		return 1;
 	}
 	printf("lcdlr_max %d,\n",lcdlr_max);
-	if(left_right_flag==DDR_PARAMETER_RIGHT)
+	if (left_right_flag == DDR_PARAMETER_RIGHT)
 		printf("offset right ++  left_right_flag %d,\n",left_right_flag);
-	if(left_right_flag==DDR_PARAMETER_LEFT)
+	if (left_right_flag == DDR_PARAMETER_LEFT)
 		printf("offset left --left_right_flag %d,\n",left_right_flag);
 
 	if (test_index == DMC_TEST_WINDOW_INDEX_ATXDLY) {
@@ -36127,15 +35047,15 @@ int do_ddr_g12_offset_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 			}
 		}
 
-		//	for (count1=0;count1<offset_value;count1++) 
+		//	for (count1=0;count1<offset_value;count1++)
 		{
-			if(left_right_flag==DDR_PARAMETER_RIGHT)
+			if (left_right_flag == DDR_PARAMETER_RIGHT)
 			{
 				dwc_window_reg_after_training_update_increas(test_index,
 						count,
 						0,offset_value);
 			}
-			if(left_right_flag==DDR_PARAMETER_LEFT)
+			if (left_right_flag == DDR_PARAMETER_LEFT)
 			{
 				dwc_window_reg_after_training_update_increas(test_index,
 						count,
@@ -36159,19 +35079,17 @@ U_BOOT_CMD(
 #endif
 
 
-#if 0 
+#if 0
 U_BOOT_CMD(
 	ddr_g12_offset_data_lcdlr,	10,	1,	do_ddr_g12_offset_data_lcdlr,
 	"ddr_g12_offset_data_lcdlr  0 1  2  2  3",
 	"ddr_g12_offset_data_lcdlr  rank_index  dq_index  write_read left/right  offset_value \n"
 );
 #endif
-char CMD_VER[] = "Ver_10";
 int do_ddr_test_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	//ddr_test_watchdog_init(4000);
 	//printf("\nopen watchdog %dms\n",4000);
-	printf("\n ddr test cmd version== %s\n", CMD_VER);
 	printf("\nargc== 0x%08x\n", argc);
 	int i ;
 	for (i = 0;i<argc;i++)
@@ -36295,7 +35213,7 @@ int do_ddr_test_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	{
 		run_command("dcache off",0);
 		run_command("dcache on",0);
-		printf("\n cache off on");	
+		printf("\n cache off on");
 		switch (ddr_test_cmd)
 		{case(DDR_TEST_CMD__NONE):
 			{
@@ -36324,28 +35242,28 @@ int do_ddr_test_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				printf("\n  0x16 test ee mdlr                              ddr_test_cmd 0x16  voltage pwm_id loops   ");
 				printf("\n  0x17 d2pll                                  ddr_test_cmd 0x17 clk zq_ac zq_soc_dram soc_vref dram_vref dec_hex zq_vref 0\n \
 						example ddr_test_cmd 0x17 1200 0x2aa4a 0x2015995d 50 81 1 50 \n \
-						or  ddr_test_cmd 0x17 1200 0x2aa4a 0x2015995d 0x09 0x20 0 50 \n"); 
+						or  ddr_test_cmd 0x17 1200 0x2aa4a 0x2015995d 0x09 0x20 0 50 \n");
 				printf("or  ddr_test_cmd 0x17 1200 6034 60346034 0 0 0 0 1 \n");
 				printf("\n  0x18 test data_lane_setup_hold          ddr_test_cmd 0x18 a 0 size range start_pin_id end_pin_id  ddr_test_cmd 0x18 a 0 0x80000 1 0 96 ");
 				printf("\n  0x19 test phy vref                             ddr_test_cmd 0x19 a 0 0x80000  1 seed step vref_all vref_lcdlr_offset test_down_up_step seed_hex_dec  \
 						ddr_test_cmd 0x19 a 0 0x1000000  1  63  1 1  0x8 0 1 ");
 				printf("\n  0x1a test dram vref                           ddr_test_cmd 0x1A a 0 0x80000  clear seed step vref_all vref_lcdlr_offset test_down_up_step vref_range seed_hex_dec \
-						\n setenv  ddr_test_ddr4ram_vref ddr_test_cmd 0x1A a 0 0x0800000  0  0x14 1  0  0x8 0 0 0 ; setenv  storeboot  run ddr_test_ddr4ram_vref ;save;reset ");
+						\n env_set  ddr_test_ddr4ram_vref ddr_test_cmd 0x1A a 0 0x0800000  0  0x14 1  0  0x8 0 0 0 ; env_set  storeboot  run ddr_test_ddr4ram_vref ;save;reset ");
 				printf("\n  0x1b test ac vref                               ddr_test_cmd 0x1B a 0 0x80000  clear seed step vref_all vref_lcdlr_offset seed_hex_dec");
 				printf("\n  0x1c sweep dram clk use d2pll_env     ddr_test_cmd 0x1c  test_size start_freq end_freq test_loops  ddr_test_cmd 0x1c 0x8000000 800 1500 1");
 				printf("\n  0x1d test shift clk                               ddr_test_cmd 0x1d type delay_ms times");
 				printf("\n  0x1e test write_read                          ddr_test_cmd 0x1e write_read pattern_id loop start_add test_size");
 				printf("\n  0x1f test pwm_cmd                           ddr_test_cmd 0x1f pwmid   pwm_low pwm_high");
 				printf("\n  0x22 test ddr_window use env           ddr_test_cmd 0x22 a 0 test_size watchdog_time \
-						lane_disable_masrk add_test_size  setenv bootcmd  ddr_test_cmd 0x22 a 0 0x800000 15 0 0x8000000");
-				printf("\n defenv;save;setenv bootcmd ddr_test_cmd 0x22 a 0 0x800000 18 0x0 0x8000000");
-				printf("\n setenv env_ddrtest_data_lane  0x22;save;reset");	
+						lane_disable_masrk add_test_size  env_set bootcmd  ddr_test_cmd 0x22 a 0 0x800000 15 0 0x8000000");
+				printf("\n defenv;save;env_set bootcmd ddr_test_cmd 0x22 a 0 0x800000 18 0x0 0x8000000");
+				printf("\n env_set env_ddrtest_data_lane  0x22;save;reset");
 				printf("\n  0x23 test shift ddr frequency          ddr_test_cmd 0x23");
 				printf("\n  0x24 display ddr_information          ddr_test_cmd 0x24");
 				printf("\n  0x25 offset ddr_lcdlr          ddr_test_cmd 0x25");
 				printf("\n  0x26 set watchdog_value        ddr_test_cmd 0x26 30");
 				printf("\n  0x27 test ddr_window use sticky register        ddr_test_cmd 0x27 a 0 test_size watchdog_time \
-						lane_disable_masrk add_test_size  setenv bootcmd  ddr_test_cmd 0x27 a 0 0x800000 15 0 0x8000000");
+						lane_disable_masrk add_test_size  env_set bootcmd  ddr_test_cmd 0x27 a 0 0x800000 15 0 0x8000000");
 				printf("\n  0x28  sweep dram clk use d2pll_sticky     ddr_test_cmd 0x28  test_size start_freq end_freq test_loops  ddr_test_cmd 0x28 0x8000000 800 1500 1");
 
 				/*
@@ -36355,31 +35273,31 @@ int do_ddr_test_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				   ddr_tune_aclcdlr_step  a 0 0x8000000 1 2	lane0-1	min
 				   ddr_tune_aclcdlr_step  a 0 0x8000000 1 1	lane0-1	max
 
-				   setenv bootcmd  "ddr_test_cmd 0x22 a 0 0x800000 18 0 0x8000000"		 watchdog_time ，lane_disable_mask,add_test_size
-				   setenv env_ddrtest_data_lane  0x22	设置命令开始标志	
-				   save	 watchdog_time ，lane_disable_mask,add_test_size	
-				   d2pll 1200		
+				   env_set bootcmd  "ddr_test_cmd 0x22 a 0 0x800000 18 0 0x8000000"		 watchdog_time ，lane_disable_mask,add_test_size
+				   env_set env_ddrtest_data_lane  0x22	设置命令开始标志
+				   save	 watchdog_time ，lane_disable_mask,add_test_size
+				   d2pll 1200
 
-				   setenv ddr_soc_iovref_test_ddr_clk "0x0000000";		
-				   setenv ddr_soc_iovref_lef "0x0000000";		
-				   setenv ddr_soc_iovref_org "0x0";		
-				   setenv ddr_soc_iovref_rig  "0x000000 ";		
-				   save		
-				   d2pll 1104		
-				   ddr_test_cmd 0x19 a 0 0x80000  1  70  1 1  0x8 0 1		
+				   env_set ddr_soc_iovref_test_ddr_clk "0x0000000";
+				   env_set ddr_soc_iovref_lef "0x0000000";
+				   env_set ddr_soc_iovref_org "0x0";
+				   env_set ddr_soc_iovref_rig  "0x000000 ";
+				   save
+				   d2pll 1104
+				   ddr_test_cmd 0x19 a 0 0x80000  1  70  1 1  0x8 0 1
 
 
 
-				   重测要掉电，数据存在stick 寄存器了		
-				   setenv ddr_dram_iovref_test_ddr_clk "0x0000000";		
-				   setenv ddr_dram_iovref_lef "0x0000000";		
-				   setenv ddr_dram_iovref_org "0x0";		
-				   setenv ddr_dram_iovref_rig  "0x000000 ";		
-				   setenv  ddr_test_ddr4ram_vref "ddr_test_cmd 0x1A a 0 0x080000  0  70 0  0  0x08 0 0 1"		
-				   setenv bootcmd   "run ddr_test_ddr4ram_vref"		
-				   save		
-				   掉电上电		
-				   d2pll 1104		
+				   重测要掉电，数据存在stick 寄存器了
+				   env_set ddr_dram_iovref_test_ddr_clk "0x0000000";
+				   env_set ddr_dram_iovref_lef "0x0000000";
+				   env_set ddr_dram_iovref_org "0x0";
+				   env_set ddr_dram_iovref_rig  "0x000000 ";
+				   env_set  ddr_test_ddr4ram_vref "ddr_test_cmd 0x1A a 0 0x080000  0  70 0  0  0x08 0 0 1"
+				   env_set bootcmd   "run ddr_test_ddr4ram_vref"
+				   save
+				   掉电上电
+				   d2pll 1104
 				   */
 
 
@@ -36566,8 +35484,8 @@ int do_ddr_test_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			{
 				//	run_command("ddr_test_cmd 0x1A a 0 0x80000  clear seed step vref_all vref_lcdlr_offset test_down_up_step vref_range seed_hex_dec",0);
 				//ddr_test_cmd 0x1A a 0 0x1000000  0  0 3  0  0x10
-				//setenv  ddr_test_ddr4ram_vref "ddr_test_cmd 0x1A a 0 0x0800000  0  0x14 0  0  0x8 0 0 0"
-				//setenv storeboot "run ddr_test_ddr4ram_vref"
+				//env_set  ddr_test_ddr4ram_vref "ddr_test_cmd 0x1A a 0 0x0800000  0  0x14 0  0  0x8 0 0 0"
+				//env_set storeboot "run ddr_test_ddr4ram_vref"
 				printf("\ntest ddr4 DRAM vref  \n");
 
 				do_ddr4_test_dram_vref((cmd_tbl_t * )cmdtp, (int) flag,( int) argc2, (argv2));
@@ -36668,7 +35586,7 @@ int do_ddr_test_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 			case(DDR_TEST_CMD__DDR4_SWEEP_DRAM_CLK_USE_D2PLL_STICKY):
 			{
-				//	run_command("ddr_test_cmd 0x28 
+				//	run_command("ddr_test_cmd 0x28
 				printf("\ntest ddr frequency use sticky register\n");
 
 				do_ddr4_test_dram_clk_use_sticky((cmd_tbl_t * )cmdtp, (int) flag,( int) argc2, (argv2));
@@ -36676,7 +35594,7 @@ int do_ddr_test_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			break;
 			case(DDR_TEST_CMD__DDR4_DDR_BIST_TEST_USE_D2PLL_STICKY):
 			{
-				//	run_command("ddr_test_cmd 0x29 
+				//	run_command("ddr_test_cmd 0x29
 				printf("\ntest ddr bist test use sticky register\n");
 
 				do_ddr4_test_bist_test_use_sticky((cmd_tbl_t * )cmdtp, (int) flag,( int) argc2, (argv2));
@@ -36734,7 +35652,7 @@ int do_ddr_test_cmd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			#endif
 			case(DDR_TEST_CMD__DDR_TUNE_DDR_DATA_WINDOW_STICKY):
 			{
-				//	run_command("ddr_test_cmd 0x27 
+				//	run_command("ddr_test_cmd 0x27
 				printf("\ntest dqs window use sticky register\n");
 
 				do_ddr_test_dqs_window_sticky((cmd_tbl_t * )cmdtp, (int) flag,( int) argc2, (argv2));
@@ -36808,7 +35726,7 @@ int do_ddr_auto_test_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 	printf("\nargc== 0x%08x\n", argc);
 	printf("\nargc== 0x%08x\n", argc);
 	int i ;
-	for (i = 0;i<argc;i++)		
+	for (i = 0;i<argc;i++)
 	{
 		printf("\nargv[%d]=%s\n",i,argv[i]);
 	}
@@ -36825,7 +35743,7 @@ int do_ddr_auto_test_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 	//num_arry = (uint16_t *)(uint64_t )(sticky_reg_base_add);
 	for (i = 0; i < 32; i++) {
 			num_arry[i]=ddr_rd_8_16bit_on_32reg(temp_reg_add,8,i);
-			if((i==0)||(i==16)){
+			if ((i == 0) || (i == 16)) {
 				printf("\n numarry[%d]" ,i);
 			}
 		printf(" %d ",num_arry[i]);
@@ -36853,9 +35771,9 @@ int do_ddr_auto_test_window(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 	test_index_enable=((num_arry[TEST_ARG_TEST_INDEX_ENALBE_INDEX])|((num_arry[TEST_ARG_TEST_INDEX_ENALBE_INDEX+1])<<8));
 	all_toghter_enable=(num_arry[TEST_ARG_3_ALL_TOGHTER]);
 	switch (ddr_test_cmd)
-	{	
+	{
 		case(DMC_STICKY_UBOOT_WINDOW_MAGIC_1):
-		if(num_arry[1]==DMC_STICKY_UBOOT_WINDOW_MAGIC_1)
+		if (num_arry[1] == DMC_STICKY_UBOOT_WINDOW_MAGIC_1)
 		{
 			//argc2=10;
 			sprintf(str,"ddr_test_cmd 0x27 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x \
@@ -36882,7 +35800,7 @@ U_BOOT_CMD(
 	"ddr_test_cmd cmd arg1 arg2 arg3...",
 	"ddr_test_cmd cmd arg1 arg2 arg3... \n dcache off ? \n"
 	);
-	
+
 int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	// ddr_type 2 lpddr4   rank_config
@@ -36896,7 +35814,7 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 
 	char *string_print_flag=   " window-loop \n";
 	global_boot_times=rd_reg(PREG_STICKY_G12A_REG0);
-  
+
 	printf("\nargc== 0x%08x\n", argc);
 	printf("\nargc== 0x%08x\n", argc);
 	int i ;
@@ -36963,7 +35881,7 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	i=52/2;
 	ddr_frequency=ddr_rd_8_16bit_on_32reg(temp_reg_add,16,i);
 	//ddr_frequency=global_ddr_clk;
-	if(global_boot_times==1)
+	if (global_boot_times == 1)
 	{
 		printf("\norg_global_boot_times== %d %s", global_boot_times,string_print_flag);
 		//printf("\nmax_counter=%d  %d %s",max_counter_total,max_counter_total*2,string_print_flag);
@@ -36975,7 +35893,7 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 		printf("\ndram_data_odt_ohm=%d %s",dram_data_odt_ohm,string_print_flag);
 		printf("\ndram_data_wr_odt_ohm=%d %s",dram_data_wr_odt_ohm,string_print_flag);
 	}
-	unsigned int soc_data_drv_ohm_p_t[]={34,40,48,60};	
+	unsigned int soc_data_drv_ohm_p_t[]={34,40,48,60};
 	// unsigned int soc_data_drv_ohm_n_t[]={34,40,48,60};
 
 	unsigned int dram_data_odt_ohm_t_ddr3[]={40,60,120};	//ddr3
@@ -36986,7 +35904,7 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	unsigned int dram_data_drv_ohm_t_ddr4[]={34,48};	//ddr4
 	unsigned int dram_data_drv_ohm_t_lpddr4[]={40,48,60};	//lpddr4
 
-	unsigned int soc_data_odt_ohm_p_t[]={40,48,60,80,120};	
+	unsigned int soc_data_odt_ohm_p_t[]={40,48,60,80,120};
 	unsigned int soc_data_odt_ohm_n_t[]={40,48,60,80,120};
 
 	unsigned int dram_data_wr_odt_ohm_t_ddr3[]={60,120,0};	//ddr3
@@ -37017,12 +35935,12 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	unsigned int max_counter_loop_r1=(sizeof(dram_data_drv_ohm_t_ddr3))/(sizeof(dram_data_drv_ohm_t_ddr3[0]));
 	unsigned int max_counter_loop_r2=(sizeof(soc_data_odt_ohm_p_t))/(sizeof(soc_data_odt_ohm_p_t[0]));
 	unsigned int max_counter_loop_wr1=1;
-	if(ddr_channel_rank_config)
+	if (ddr_channel_rank_config)
 	{
 		max_counter_loop_wr1=(sizeof(dram_data_wr_odt_ohm_t_ddr3))/(sizeof(dram_data_wr_odt_ohm_t_ddr3[0]));
 	}
-	//ddr_channel_rank_configCONFIG_DDR0_32BIT_RANK01_CH0	
-	if(ddr_type==AUTO_SCAN_DDR4)
+	//ddr_channel_rank_configCONFIG_DDR0_32BIT_RANK01_CH0
+	if (ddr_type == AUTO_SCAN_DDR4)
 	{
 		p_dram_data_drv_ohm=dram_data_drv_ohm_t_ddr4;
 		p_dram_data_odt_ohm=dram_data_odt_ohm_t_ddr4;
@@ -37030,12 +35948,12 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 		max_counter_loop_w2=(sizeof(dram_data_odt_ohm_t_ddr4))/(sizeof(dram_data_odt_ohm_t_ddr4[0]));
 		max_counter_loop_r1=(sizeof(dram_data_drv_ohm_t_ddr4))/(sizeof(dram_data_drv_ohm_t_ddr4[0]));
 
-		if(ddr_channel_rank_config)
+		if (ddr_channel_rank_config)
 		{
 			max_counter_loop_wr1=(sizeof(dram_data_wr_odt_ohm_t_ddr4))/(sizeof(dram_data_wr_odt_ohm_t_ddr4[0]));
 		}
 	}
-	if(ddr_type==AUTO_SCAN_LPDDR4)
+	if (ddr_type == AUTO_SCAN_LPDDR4)
 	{
 		p_dram_data_drv_ohm=dram_data_drv_ohm_t_lpddr4;
 		p_dram_data_odt_ohm=dram_data_odt_ohm_t_lpddr4;
@@ -37045,17 +35963,17 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 		max_counter_loop_r2=(sizeof(soc_data_odt_ohm_n_t))/(sizeof(soc_data_odt_ohm_n_t[0]));
 
 		//	unsigned int  *p_dram_data_wr_odt_ohm=dram_data_wr_odt_ohm_t_lpddr4;
-		if(ddr_channel_rank_config)
+		if (ddr_channel_rank_config)
 		{
 			max_counter_loop_wr1=1;
 		}
 	}
 
     unsigned int max_counter_total=(max_counter_loop_w1*max_counter_loop_w2+max_counter_loop_r1*max_counter_loop_r2+2)*max_counter_loop_wr1;
-	//add 2 times recover 
+	//add 2 times recover
 	/*
 	switch (global_boot_times)
-	{	
+	{
 		case(1):
 		{
 			break;
@@ -37065,11 +35983,11 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	//each arrary test 2 times ,for maybe 1times will fail,then next time will recovery //jiaxing 20181114
 	counter_loop=(((global_boot_times-1)/2)%max_counter_total);
 	dram_data_wr_odt_ohm=0;
-	if(max_counter_loop_wr1>1)
+	if (max_counter_loop_wr1>1)
 	{
 		dram_data_wr_odt_ohm=p_dram_data_wr_odt_ohm[(counter_loop/(max_counter_loop_w1*max_counter_loop_w2+max_counter_loop_r1*max_counter_loop_r2+2))];
 	}
-	if((counter_loop%(max_counter_loop_w1*max_counter_loop_w2+max_counter_loop_r1*max_counter_loop_r2+2))<(max_counter_loop_w1*max_counter_loop_w2))
+	if ((counter_loop%(max_counter_loop_w1*max_counter_loop_w2+max_counter_loop_r1*max_counter_loop_r2+2))<(max_counter_loop_w1*max_counter_loop_w2))
 	{
 		soc_data_drv_ohm_p=p_soc_data_drv_ohm_p[(((counter_loop%(max_counter_loop_w1*max_counter_loop_w2+max_counter_loop_r1*max_counter_loop_r2+2)))%max_counter_loop_w1)];
 		soc_data_drv_ohm_n=soc_data_drv_ohm_p;
@@ -37087,7 +36005,7 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 		dram_data_drv_ohm=p_dram_data_drv_ohm[((((counter_loop%(max_counter_loop_w1*max_counter_loop_w2+max_counter_loop_r1*max_counter_loop_r2+2)))-(max_counter_loop_w1*max_counter_loop_w2+1))%max_counter_loop_r1)];
 		soc_data_odt_ohm_p=p_soc_data_odt_ohm_p[((((counter_loop%(max_counter_loop_w1*max_counter_loop_w2+max_counter_loop_r1*max_counter_loop_r2+2)))-(max_counter_loop_w1*max_counter_loop_w2+1))/max_counter_loop_r1)];
 		soc_data_odt_ohm_n=0;
-		if(ddr_type==CONFIG_DDR_TYPE_LPDDR4)
+		if (ddr_type == CONFIG_DDR_TYPE_LPDDR4)
 		{
 			soc_data_odt_ohm_p=0;
 			soc_data_odt_ohm_n=p_soc_data_odt_ohm_n[((((counter_loop%(max_counter_loop_w1*max_counter_loop_w2+max_counter_loop_r1*max_counter_loop_r2+2)))-(max_counter_loop_w1*max_counter_loop_w2+1))/max_counter_loop_r1)];
@@ -37098,9 +36016,9 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 		ddr_test_watchdog_reset_system();
 	}
 	printf("\nglobal_boot_times== %d %s", global_boot_times,string_print_flag);
-	if(loop)
+	if (loop)
 	{
-		if(((global_boot_times-1)/2)>max_counter_total)
+		if (((global_boot_times-1)/2)>max_counter_total)
 			return 1;
 	}
 	printf("\nmax_counter=%d  %d %s",max_counter_total,max_counter_total*2,string_print_flag);
@@ -37112,42 +36030,42 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	printf("\ndram_data_odt_ohm=%d %s",dram_data_odt_ohm,string_print_flag);
 	printf("\ndram_data_wr_odt_ohm=%d %s",dram_data_wr_odt_ohm,string_print_flag);
 {
-	if(soc_data_drv_ohm_p)
+	if (soc_data_drv_ohm_p)
 	{
 		sprintf(str,"ddr_test_cmd 0x36 0x20180030 0x1 74 %d 2  0   ",
 		soc_data_drv_ohm_p);
 		printf("\nstr=%s\n",str);
 		run_command(str,0);
 	}
-	if(soc_data_drv_ohm_n)
+	if (soc_data_drv_ohm_n)
 	{
 		sprintf(str,"ddr_test_cmd 0x36 0x20180030 0x1 76 %d 2  0   ",
 		soc_data_drv_ohm_n);
 		printf("\nstr=%s\n",str);
 		run_command(str,0);
 	}
-	if(soc_data_odt_ohm_p)
+	if (soc_data_odt_ohm_p)
 	{
 		sprintf(str,"ddr_test_cmd 0x36 0x20180030 0x1 78 %d 2  0   ",
 		soc_data_odt_ohm_p);
 		printf("\nstr=%s\n",str);
 		run_command(str,0);
 	}
-	if(soc_data_odt_ohm_n)
+	if (soc_data_odt_ohm_n)
 	{
 		sprintf(str,"ddr_test_cmd 0x36 0x20180030 0x1 80 %d 2  0   ",
 		soc_data_odt_ohm_n);
 		printf("\nstr=%s\n",str);
 		run_command(str,0);
 	}
-	if(dram_data_drv_ohm)
+	if (dram_data_drv_ohm)
 	{
 		sprintf(str,"ddr_test_cmd 0x36 0x20180030 0x1 82 %d 2  0   ",
 		dram_data_drv_ohm);
 		printf("\nstr=%s\n",str);
 		run_command(str,0);
 	}
-	if(dram_data_odt_ohm)
+	if (dram_data_odt_ohm)
 	{
 		sprintf(str,"ddr_test_cmd 0x36 0x20180030 0x1 84 %d 2  0   ",
 		dram_data_odt_ohm);
@@ -37169,387 +36087,8 @@ int do_ddr_auto_scan_drv(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 
 return 1;
 }
-
-int do_ddr_auto_fastboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-#define DMC_TEST_SLT_ENABLE_DDR_AUTO_FAST_BOOT (1<<5)
-#define  AUTO_WINDOW_TEST_ENABLE_ITEM   ((1<<1)|(1<<2))
-//	int i=0;
-//	int count=0;
-	char *endp;
-	//unsigned int enable_ddr_fast_boot=0;  // 0 pause 1,resume
-	char auto_window_test_enable_item=DMC_TEST_SLT_ENABLE_DDR_AUTO_FAST_BOOT;
-	uint32_t auto_window_test_dq_size=0;
-	char pattern_dis_scramble=0;
-	if (argc>1)
-	{
-		auto_window_test_enable_item = simple_strtoull_ddr(argv[1], &endp, 0);
-		if (*argv[1] == 0 || *endp != 0)
-			auto_window_test_enable_item=DMC_TEST_SLT_ENABLE_DDR_AUTO_FAST_BOOT;
-	}
-		if (argc>2)
-	{
-		auto_window_test_dq_size = simple_strtoull_ddr(argv[2], &endp, 0);
-		if (*argv[2] == 0 || *endp != 0)
-			auto_window_test_dq_size=0;
-	}
-				if (argc>3)
-	{
-		pattern_dis_scramble = simple_strtoull_ddr(argv[3], &endp, 0);
-		if (*argv[3] == 0 || *endp != 0)
-			pattern_dis_scramble=0;
-	}
-	char str[1024]="";
-	ddr_set_t *ddr_set_t_p=NULL;
-	ddr_set_t_p=(ddr_set_t *)(ddr_set_t_p_arrary);
-	//ddr_set_t_p= (ddr_set_t *)G12_DMC_STICKY_0;
-	//if (sizeof(ddr_set_t)<loop_max)
-	uint32_t  ddr_set_add=0;
-	uint32_t  ddr_set_size=0;
-	ddr_set_add=(uint32_t)(uint64_t)(ddr_set_t_p);
-	ddr_set_size=sizeof(ddr_set_t);
-	printf("\nddr_set_t_p==0x%08x\n",ddr_set_add);
-	uint32_t loop=0;
-	uint32_t loop_max = (4+(0x3f<<2));//((DMC_STICKY_63-DMC_STICKY_0));
-			//	loop_max=sizeof(ddr_set_t);
-			for (loop = 0; loop <loop_max; loop+=4) {
-				wr_reg(((uint64_t)(ddr_set_t_p) + loop), rd_reg(G12_DMC_STICKY_0 + loop));
-			}
-	
-
-		//	if((ddr_set_t_p->slt_test_function[0])&DMC_TEST_SLT_ENABLE_DDR_AUTO_FAST_BOOT)
-	//	if((ddr_set_t_p->fast_boot[0])>=0xfe)
-			if((ddr_set_t_p->fast_boot[0]))
-				{
-				printf("\nuboot enable auto fast boot funciton \n");
-				}
-else 
-	  return 1 ;
-
-	if((ddr_set_t_p->fast_boot[0])==0xff)
-				{	printf("\nuboot  auto fast boot  auto window test is done \n");
-	 return 1 ;
-				}
-
-printf("\n(ddr_set_t_p->fast_boot[0])==0x%08x\n",(ddr_set_t_p->fast_boot[0]));
-{
-		uint16_t	dq_bit_delay[72];
-		unsigned	char t_count=0;
-		uint16_t  delay_org=0;
-		uint16_t  delay_temp=0;
-		uint32_t  add_offset=0;
-		dwc_ddrphy_apb_wr(0xd0000,0x0);
-
-		{
-
-			
-
-	//	printf("\n ARdPtrInitVal");
-		add_offset=((0<<20)|(0<<16)|(0<<12)|(0x2e));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-		ddr_set_t_p->ARdPtrInitVal=delay_org;
-	//	printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		
-	//	printf("\n dfimrl0 dfimrl1 dfimrl2 dfimrl3 HwtMRL");
-		add_offset=((0<<20)|(1<<16)|(0<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-		ddr_set_t_p->dfi_mrl=delay_org;
-	//	printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(1<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-	//	printf("\n t_count: %04d %04d  %08x %08x",1,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(2<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-	//	printf("\n t_count: %04d %04d  %08x %08x",2,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(1<<16)|(3<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-	//	printf("\n t_count: %04d %04d  %08x %08x",3,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		add_offset=((0<<20)|(2<<16)|(0<<12)|(0x20));
-		delay_org=dwc_ddrphy_apb_rd(add_offset);
-
-		ddr_set_t_p->dfi_hwtmrl=delay_org;
-	//	printf("\n t_count: %04d %04d  %08x %08x",0,delay_org,((((add_offset) << 1)+0xfe000000)),delay_org);
-		}
-	{
-	//	printf("\n count_index     delay_value     register_add     register_value \n ");
-	//	printf("\n address delay * 1/32UIx100==%d ps bit0-4 fine tune  --step==1/32UI ,bit 6 is coarse  --step==1UI",ui_1_32_100step);
-		for(t_count=0;t_count<10;t_count++)
-		{
-			add_offset=((0<<20)|(0<<16)|(t_count<<12)|(0x80));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			ddr_set_t_p->ac_trace_delay[t_count]=delay_temp;
-	//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	}
-	{
-	//	printf("\n tdqs delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI ,bit 6-9 is coarse  --step==1UI",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0xd0+(t_count/8)+((t_count%2)<<8)));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			
-			ddr_set_t_p->write_dqs_delay[t_count]=delay_temp;
-			
-		//	printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	}
-	{
-	//	printf("\n rxdqs delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI,no coarse",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0x8c+(t_count/8)+((t_count%2)<<8)));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-			ddr_set_t_p->read_dqs_delay[t_count]=delay_temp;
-	//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	}
-	{
-	//	printf("\n write dq_bit delay * 1/32UIx100==%d ps bit0-4 fine tune --step==1/32UI ,bit 6-8 is coarse  --step==1U",ui_1_32_100step);
-			for(t_count=0;t_count<72;t_count++)
-			{
-				add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(0xc0+((t_count%9)<<8)+(t_count/36)));
-				dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-				delay_org=dq_bit_delay[t_count];
-				delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-
-				ddr_set_t_p->write_dq_bit_delay[t_count]=delay_temp;
-
-				
-		//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-			}
-	}
-	{
-	//	printf("\n read dq_bit delay * BDLRx100==%d ps bit0-4 fine tune --step==bdlr step size about 5ps,no coarse",bdlr_100step);
-		for(t_count=0;t_count<72;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(0x68+((t_count%9)<<8)+(t_count/36)));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=((delay_org&0x3f));
-			
-			ddr_set_t_p->read_dq_bit_delay[t_count]=delay_temp;
-		//	printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	}
-	{
-	//	printf("\n read dqs gate delay * 1/32UIx100==%d ps bit0-4 fine tune ,bit 6-10 is coarse",ui_1_32_100step);
-		for(t_count=0;t_count<16;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%8)>>1)<<12)|(0x80+(t_count/8)+((t_count%2)<<8)));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=(32*(((delay_org>>6)&0xf)+((delay_org>>5)&1))+(delay_org&0x1f));
-
-			ddr_set_t_p->read_dqs_gate_delay[t_count]=delay_temp;
-
-			
-	//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-
-	//	printf("\n soc vref : lpddr4-- VREF = VDDQ*(0.047 + VrefDAC0[6:0]*0.00367   DDR4 --VREF = VDDQ*(0.510 + VrefDAC0[6:0]*0.00345");
-		//((0<<20)|(1<<16)|(((over_ride_sub_index%36)/9)<<12)|(((over_ride_sub_index%36)%9)<<8)|(0x40),over_ride_value)	
-		uint32_t vref_t_count=0;
-		for(t_count=0;t_count<72;t_count++)
-		{
-			add_offset=((0<<20)|(1<<16)|(((t_count%36)/9)<<12)|(((t_count%36)%9)<<8)|(0x40));
-			dq_bit_delay[t_count]=dwc_ddrphy_apb_rd(add_offset);
-			delay_org=dq_bit_delay[t_count];
-			delay_temp=((delay_org));
-
-if(t_count<35)
-{
-			vref_t_count=((((t_count%36)/9)*8)+(t_count%9));
-
-			ddr_set_t_p->soc_bit_vref[vref_t_count]=delay_temp;
-}
-
-			
-	//		printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-
-
-
-//	printf("\n dram vref : lpddr4-- VREF = VDDQ*(0. + VrefDAC0[6:0]*0.   DDR4 --VREF = VDDQ*(0. + VrefDAC0[6:0]*0.");
-	add_offset=((0<<20)|(1<<16)|(0<<12)|(0x082));
-delay_temp=dwc_ddrphy_apb_rd(add_offset);
-					for(t_count=0;t_count<32;t_count++)
-		{
-
-		
-			ddr_set_t_p->dram_bit_vref[t_count]=delay_temp;
-
-
-			
-		//	printf("\n t_count: %04d %04d  %08x %08x",t_count,delay_temp,((((add_offset) << 1)+0xfe000000)),dq_bit_delay[t_count]);
-		}
-	//	printf("\n t_count: %04d %04d  %08x %08x",0,delay_temp,((((add_offset) << 1)+0xfe000000)),delay_temp);
-	}
-						for(t_count=0;t_count<4;t_count++)
-		{//p_dev->p_ddrs->tdqs2dq=lpddr4_tdqs2dq;
-		//ddr_set_t_p->retraining[0]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xaa));  //PptCtlStatic
-		//ddr_set_t_p->retraining[1]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xae));  //PptDqsCntInvTrnTg0  ps0 rank0
-		//ddr_set_t_p->retraining[2]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0xaf));  //PptDqsCntInvTrnTg0  ps0 rank1
-		ddr_set_t_p->retraining[4*t_count+0]=(dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaa)))&0xff;  //PptCtlStatic
-		ddr_set_t_p->retraining[4*t_count+1]=(dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaa)))>>8;  //PptCtlStatic
-		ddr_set_t_p->retraining[4*t_count+2]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xae));  //PptDqsCntInvTrnTg0  ps0 rank0 lane 0-3
-		ddr_set_t_p->retraining[4*t_count+3]=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(t_count<<12)|(0xaf));  //PptDqsCntInvTrnTg0  ps0 rank1 lane 0-3
-		}
-}
-
-
-
-
-	if((ddr_set_t_p->fast_boot[0])<0xfe)
-	{
-		printf("\nuboot  auto fast boot  auto window test begin \n");
-		{
-		ddr_set_t_p->fast_boot[0]=0xfe;
-		#ifdef DEBUG_DDR_FASTBOOT_SHA
-		printf("&ddr_sha.ddrs : 0x%x\n", (uint32_t)(uint64_t)&ddr_sha.ddrs);
-		printf("&ddr_sha.sha2 : 0x%x\n", (uint32_t)(uint64_t)&ddr_sha.sha2);
-		printf("ddr_set_add : 0x%x\n", (uint32_t)(uint64_t)ddr_set_add);
-		#endif
-		sha256_csum_wd((unsigned char *)(uint64_t)ddr_set_add, sizeof(ddr_set_t), ddr_sha.sha2, 0);
-		#ifdef DEBUG_DDR_FASTBOOT_SHA
-		printf("print sha\n");
-		sprintf(str,"md %08x 0x100", (uint32_t)(uint64_t)(ddr_set_add-32));
-		run_command(str,0);
-		#endif
-{
-		#ifdef USE_FOR_UBOOT_2018
-		sprintf(str,"store rsv write ddr-parameter 0x%08x 0x%08x ",ddr_set_add-SHA256_SUM_LEN,ddr_set_size+SHA256_SUM_LEN);
-	#else
-		sprintf(str,"store ddr_parameter write 0x%08x 0x%08x ",ddr_set_add-SHA256_SUM_LEN,ddr_set_size+SHA256_SUM_LEN);
-	#endif
-	//		sprintf(str,"store ddr_parameter write 0x%08x 0x%08x ",ddr_set_add,ddr_set_size);
-//	sprintf(str,"store rsv write ddr-parameter 0x%08x 0x%08x ",ddr_set_add,ddr_set_size);
-
-			printf("\nstr=%s\n",str);
-
-			run_command(str,0);
-			}
-
-			sprintf(str,"g12_d2pll %d 0x11 %d 0 0 0 0 0 0x%08x  0 %d",ddr_set_t_p->DRAMFreq[0],auto_window_test_enable_item,auto_window_test_dq_size,pattern_dis_scramble);
-
-			printf("\nstr=%s\n",str);
-
-			run_command(str,0);
-			}
-	 return 1 ;
-				}
-
-	if((ddr_set_t_p->fast_boot[0])==0xfe)
-		{
-	char dmc_test_worst_window_rx=0;
-		char dmc_test_worst_window_tx=0;
-
-{
-	dwc_ddrphy_apb_wr((0<<20)|(0xd<<16)|(0<<12)|(0x0),0); // DWC_DDRPHYA_APBONLY0_MicroContMuxSel
-
-	dmc_test_worst_window_tx=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0x0c2));
-	dmc_test_worst_window_rx=dwc_ddrphy_apb_rd((0<<20)|(1<<16)|(0<<12)|(0x0c3));
-	printf("\ndmc_test_worst_window_tx =%d \n",dmc_test_worst_window_tx);
-	printf("\ndmc_test_worst_window_rx=%d \n",dmc_test_worst_window_rx);
-	if(dmc_test_worst_window_tx>30)
-		dmc_test_worst_window_tx=30;
-	if(dmc_test_worst_window_rx>30)
-		dmc_test_worst_window_rx=30;
-//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(0<<12)|(0x1c2),t4_write_worst_margin_rank1);
-//	dwc_ddrphy_apb_wr((0<<20)|(1<<16)|(0<<12)|(0x1c3),t4_read_worst_margin_rank1);
-ddr_set_t_p->fast_boot[1]=(((dmc_test_worst_window_tx/2)<<4))|(((dmc_test_worst_window_rx/2)));
-				}
-	
-		ddr_set_t_p->fast_boot[0]=0xff;
-				{	printf("\nuboot  auto fast boot  auto window test finish \n");
-
-            if(ddr_set_t_p->fast_boot[2])
-            	{
-            	if((ddr_set_t_p->fast_boot[2])&0x7)
-            		{
-            	  if(((ddr_set_t_p->fast_boot[2])&0x8))
-            				sprintf(str,"ddr_g12_offset_data 3 0x0  0 0 1 %d ",(ddr_set_t_p->fast_boot[2])&0x7);
-				  else
-				  	sprintf(str,"ddr_g12_offset_data 3 0x0  0 0 2 %d ",(ddr_set_t_p->fast_boot[2])&0x7);
-	
-			printf("\nstr=%s\n",str);
-
-			run_command(str,0);
-            		}
-	if((ddr_set_t_p->fast_boot[2])&0x70)
-		{
-		 if(((ddr_set_t_p->fast_boot[2])&0x80))
-            				sprintf(str,"ddr_g12_offset_data 2 0x0  0 0 1 %d ",((ddr_set_t_p->fast_boot[2])>>4)&0x7);
-				  else
-				  	sprintf(str,"ddr_g12_offset_data 2 0x0  0 0 2 %d ",((ddr_set_t_p->fast_boot[2])>>4)&0x7);
-
-			printf("\nstr=%s\n",str);
-
-			run_command(str,0);
-		}
-
-			sprintf(str,"ddr_fast_boot 1 ");
-
-			printf("\nstr=%s\n",str);
-
-			run_command(str,0);
-
-            	}
-  	else
-	{
-		#ifdef DEBUG_DDR_FASTBOOT_SHA
-		printf("&ddr_sha.ddrs : 0x%x\n", (uint32_t)(uint64_t)&ddr_sha.ddrs);
-		printf("&ddr_sha.sha2 : 0x%x\n", (uint32_t)(uint64_t)&ddr_sha.sha2);
-		printf("ddr_set_add : 0x%x\n", (uint32_t)(uint64_t)ddr_set_add);
-		#endif
-		sha256_csum_wd((unsigned char *)(uint64_t)ddr_set_add, sizeof(ddr_set_t), ddr_sha.sha2, 0);
-		#ifdef DEBUG_DDR_FASTBOOT_SHA
-		printf("print sha\n");
-		sprintf(str,"md %08x 0x100", (uint32_t)(uint64_t)(ddr_set_add-32));
-		run_command(str,0);
-		#endif
-
-	{
-		#ifdef USE_FOR_UBOOT_2018
-		sprintf(str,"store rsv write ddr-parameter 0x%08x 0x%08x ",ddr_set_add-SHA256_SUM_LEN,ddr_set_size+SHA256_SUM_LEN);
-		#else
-		sprintf(str,"store ddr_parameter write 0x%08x 0x%08x ",ddr_set_add-SHA256_SUM_LEN,ddr_set_size+SHA256_SUM_LEN);
-		#endif
-		//	sprintf(str,"store ddr_parameter write 0x%08x 0x%08x ",ddr_set_add,ddr_set_size);
-	//	sprintf(str,"store rsv write ddr-parameter 0x%08x 0x%08x ",ddr_set_add,ddr_set_size);
-			printf("\nstr=%s\n",str);
-
-			run_command(str,0);
-		}
-			}
-	 return 1 ;
-				}
-		}
-
-
-
-	return 1;
-
-
-}
 U_BOOT_CMD(
 	ddr_auto_scan_drv,	30,	1,	do_ddr_auto_scan_drv,
 	"ddr_test_cmd cmd arg1 arg2 arg3...",
 	"ddr_test_cmd cmd arg1 arg2 arg3... \n dcache off ? \n"
 	);
-U_BOOT_CMD(
-	ddr_fast_boot,	30,	1,	do_ddr_fastboot_config,
-	"ddr_fastboot_config cmd arg1 arg2 arg3...",
-	"ddr_fastboot_config cmd arg1 arg2 arg3... \n dcache off ? \n"
-	);
-U_BOOT_CMD(
-	ddr_auto_fast_boot_check,	30,	1,	do_ddr_auto_fastboot_check,
-	"ddr_fastboot_config cmd arg1 arg2 arg3...",
-	"ddr_fastboot_config cmd arg1 arg2 arg3... \n dcache off ? \n"
-	);
-

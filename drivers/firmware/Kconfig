@@ -21,4 +21,3 @@ config TI_SCI_PROTOCOL
 
 	  This protocol library is used by client drivers to use the features
 	  provided by the system controller.
-

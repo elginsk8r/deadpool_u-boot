@@ -8,14 +8,12 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#define LOG_CATEGORY LOGC_BOOT
-
 #ifdef USE_HOSTCC
 #include "mkimage.h"
 #include <time.h>
-#include <linux/libfdt.h>
 #else
 #include <linux/compiler.h>
+#include <linux/kconfig.h>
 #include <common.h>
 #include <errno.h>
 #include <mapmem.h>
@@ -26,7 +24,6 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #include <image.h>
 #include <bootstage.h>
-#include <linux/kconfig.h>
 #include <u-boot/crc.h>
 #include <u-boot/md5.h>
 #include <u-boot/sha1.h>
@@ -169,7 +166,7 @@ static void fit_image_print_data(const void *fit, int noffset, const char *p,
 	int value_len;
 	char *algo;
 	const char *padding;
-	bool required;
+	int required;
 	int ret, i;
 
 	debug("%s  %s node:    '%s'\n", p, type,
@@ -180,8 +177,8 @@ static void fit_image_print_data(const void *fit, int noffset, const char *p,
 		return;
 	}
 	printf("%s", algo);
-	keyname = fdt_getprop(fit, noffset, FIT_KEY_HINT, NULL);
-	required = fdt_getprop(fit, noffset, FIT_KEY_REQUIRED, NULL) != (void *)NULL;
+	keyname = fdt_getprop(fit, noffset, "key-name-hint", NULL);
+	required = fdt_getprop(fit, noffset, "required", NULL) != NULL;
 	if (keyname)
 		printf(":%s", keyname);
 	if (required)
@@ -987,8 +984,10 @@ int fit_image_get_data_and_size(const void *fit, int noffset,
 	if (external_data) {
 		debug("External Data\n");
 		ret = fit_image_get_data_size(fit, noffset, &len);
-		*data = fit + offset;
-		*size = len;
+		if (!ret) {
+			*data = fit + offset;
+			*size = len;
+		}
 	} else {
 		ret = fit_image_get_data(fit, noffset, data, size);
 	}
@@ -1288,31 +1287,21 @@ error:
  */
 int fit_image_verify(const void *fit, int image_noffset)
 {
-	const char *name = fit_get_name(fit, image_noffset, NULL);
 	const void	*data;
 	size_t		size;
+	int		noffset = 0;
 	char		*err_msg = "";
 
-	if (strchr(name, '@')) {
-		/*
-		 * We don't support this since libfdt considers names with the
-		 * name root but different @ suffix to be equal
-		 */
-		err_msg = "Node name contains @";
-		goto err;
-	}
 	/* Get image data and data length */
 	if (fit_image_get_data_and_size(fit, image_noffset, &data, &size)) {
 		err_msg = "Can't get image data/size";
-		goto err;
+		printf("error!\n%s for '%s' hash node in '%s' image node\n",
+		       err_msg, fit_get_name(fit, noffset, NULL),
+		       fit_get_name(fit, image_noffset, NULL));
+		return 0;
 	}
 
 	return fit_image_verify_with_data(fit, image_noffset, data, size);
-
-err:
-	printf("error!\n%s in '%s' image node\n", err_msg,
-	       fit_get_name(fit, image_noffset, NULL));
-	return 0;
 }
 
 /**
@@ -1463,99 +1452,41 @@ int fit_image_check_comp(const void *fit, int noffset, uint8_t comp)
 }
 
 /**
- * fdt_check_no_at() - Check for nodes whose names contain '@'
+ * fit_check_format - sanity check FIT image format
+ * @fit: pointer to the FIT format image header
  *
- * This checks the parent node and all subnodes recursively
+ * fit_check_format() runs a basic sanity FIT image verification.
+ * Routine checks for mandatory properties, nodes, etc.
  *
- * @fit: FIT to check
- * @parent: Parent node to check
- * @return 0 if OK, -EADDRNOTAVAIL is a node has a name containing '@'
+ * returns:
+ *     1, on success
+ *     0, on failure
  */
-static int fdt_check_no_at(const void *fit, int parent)
+int fit_check_format(const void *fit)
 {
-	const char *name;
-	int node;
-	int ret;
-
-	name = fdt_get_name(fit, parent, NULL);
-	if (!name || strchr(name, '@'))
-		return -EADDRNOTAVAIL;
-
-	fdt_for_each_subnode(node, fit, parent) {
-		ret = fdt_check_no_at(fit, node);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
-int fit_check_format(const void *fit, ulong size)
-{
-	int ret;
-
-	/* A FIT image must be a valid FDT */
-	ret = fdt_check_header(fit);
-	if (ret) {
-		log_debug("Wrong FIT format: not a flattened device tree (err=%d)\n",
-			  ret);
-		return -ENOEXEC;
-	}
-
-	if (CONFIG_IS_ENABLED(FIT_FULL_CHECK)) {
-		/*
-		 * If we are not given the size, make do with calculating it.
-		 * This is not as secure, so we should consider a flag to
-		 * control this.
-		 */
-		if (size == IMAGE_SIZE_INVAL)
-			size = fdt_totalsize(fit);
-		ret = fdt_check_full(fit, size);
-		if (ret)
-			ret = -EINVAL;
-
-		/*
-		 * U-Boot stopped using unit addressed in 2017. Since libfdt
-		 * can match nodes ignoring any unit address, signature
-		 * verification can see the wrong node if one is inserted with
-		 * the same name as a valid node but with a unit address
-		 * attached. Protect against this by disallowing unit addresses.
-		 */
-		if (!ret && CONFIG_IS_ENABLED(FIT_SIGNATURE)) {
-			ret = fdt_check_no_at(fit, 0);
-
-			if (ret) {
-				log_debug("FIT check error %d\n", ret);
-				return ret;
-			}
-		}
-		if (ret) {
-			log_debug("FIT check error %d\n", ret);
-			return ret;
-		}
-	}
 	/* mandatory / node 'description' property */
-	if (!fdt_getprop(fit, 0, FIT_DESC_PROP, NULL)) {
-		log_debug("Wrong FIT format: no description\n");
-		return -ENOMSG;
+	if (fdt_getprop(fit, 0, FIT_DESC_PROP, NULL) == NULL) {
+		debug("Wrong FIT format: no description\n");
+		return 0;
 	}
 
 	if (IMAGE_ENABLE_TIMESTAMP) {
 		/* mandatory / node 'timestamp' property */
-		if (!fdt_getprop(fit, 0, FIT_TIMESTAMP_PROP, NULL)) {
-			log_debug("Wrong FIT format: no timestamp\n");
-			return -ENODATA;
+		if (fdt_getprop(fit, 0, FIT_TIMESTAMP_PROP, NULL) == NULL) {
+			debug("Wrong FIT format: no timestamp\n");
+			return 0;
 		}
 	}
 
 	/* mandatory subimages parent '/images' node */
 	if (fdt_path_offset(fit, FIT_IMAGES_PATH) < 0) {
-		log_debug("Wrong FIT format: no images parent node\n");
-		return -ENOENT;
+		debug("Wrong FIT format: no images parent node\n");
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
+
 
 /**
  * fit_conf_find_compat
@@ -1885,13 +1816,10 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 	printf("## Loading %s from FIT Image at %08lx ...\n", prop_name, addr);
 
 	bootstage_mark(bootstage_id + BOOTSTAGE_SUB_FORMAT);
-	ret = fit_check_format(fit, IMAGE_SIZE_INVAL);
-	if (ret) {
-		printf("Bad FIT %s image format! (err=%d)\n", prop_name, ret);
-		if (CONFIG_IS_ENABLED(FIT_SIGNATURE) && ret == -EADDRNOTAVAIL)
-			printf("Signature checking prevents use of unit addresses (@) in nodes\n");
+	if (!fit_check_format(fit)) {
+		printf("Bad FIT %s image format!\n", prop_name);
 		bootstage_error(bootstage_id + BOOTSTAGE_SUB_FORMAT);
-		return ret;
+		return -ENOEXEC;
 	}
 	bootstage_mark(bootstage_id + BOOTSTAGE_SUB_FORMAT_OK);
 	if (fit_uname) {
@@ -1942,7 +1870,7 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 		fit_uname = fit_get_name(fit, noffset, NULL);
 	}
 	if (noffset < 0) {
-		printf("Could not find subimage node type '%s'\n", prop_name);
+		puts("Could not find subimage node\n");
 		bootstage_error(bootstage_id + BOOTSTAGE_SUB_SUBNODE);
 		return -ENOENT;
 	}

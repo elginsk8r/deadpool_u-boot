@@ -1,21 +1,6 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/amlogic/media/vout/lcd/lcd_extern/i2c_DLPC3439.c
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include <common.h>
@@ -55,13 +40,13 @@ static int lcd_extern_power_on(void)
 {
 	int ret = 0;
 
-	lcd_extern_pinmux_set(1);
+	lcd_extern_pinmux_set(ext_config, 1);
 
-	lcd_extern_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_1, 9);
-	lcd_extern_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_2, 5);
-	lcd_extern_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_3, 5);
-	lcd_extern_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_4, 2);
-	lcd_extern_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_5, 2);
+	aml_lcd_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_1, 9);
+	aml_lcd_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_2, 5);
+	aml_lcd_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_3, 5);
+	aml_lcd_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_4, 2);
+	aml_lcd_i2c_write(ext_config->i2c_bus, ext_config->i2c_addr, data_5, 2);
 
 	EXTPR("%s\n", __func__);
 	return ret;
@@ -71,7 +56,7 @@ static int lcd_extern_power_off(void)
 {
 	int ret = 0;
 
-	lcd_extern_pinmux_set(0);
+	lcd_extern_pinmux_set(ext_config, 0);
 	return ret;
 }
 

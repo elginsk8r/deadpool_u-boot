@@ -1,23 +1,7 @@
-
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * arch/arm/cpu/armv8/txl/firmware/scp_task/user_task.c
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #include "config.h"
 #include "data.h"
@@ -81,7 +65,7 @@ void secure_task(void)
 
 	/*init bss */
 	bss_init();
-	pr_info("secure task start!\n");
+	dbg_prints("secure task start!\n");
 
 	/* suspend pwr ops init*/
 	suspend_pwr_ops_init();
@@ -129,7 +113,7 @@ void high_task(void)
 	    (unsigned *)(&(high_task_share_mem[TASK_RESPONSE_OFFSET]));
 	unsigned command;
 
-	pr_info("high task start!\n");
+	dbg_prints("high task start!\n");
 	*pcommand = 0;
 
 	while (1) {
@@ -170,7 +154,7 @@ void low_task(void)
 	unsigned command;
 
 	*pcommand = 0;
-	pr_info("low task start!\n");
+	dbg_prints("low task start!\n");
 
 	while (1) {
 		/* do low task process */

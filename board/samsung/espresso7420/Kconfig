@@ -14,4 +14,3 @@ config SYS_CONFIG_NAME
 	default "espresso7420"
 
 endif
-

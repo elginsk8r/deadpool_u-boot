@@ -138,4 +138,3 @@ config FASTBOOT_CMD_OEM_FORMAT
 endif # FASTBOOT
 
 endmenu
-

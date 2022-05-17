@@ -1,21 +1,6 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/amlogic/media/vout/lcd/lcd_extern/i2c_T5800Q.c
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include <common.h>
@@ -60,7 +45,7 @@ static int lcd_extern_reg_read(unsigned char reg, unsigned char *buf)
 	return ret;
 }
 
-static int lcd_extern_reg_write(unsigned char reg, unsigned char value)
+static int lcd_extern_reg_write(unsigned char *buf, unsigned int len)
 {
 	int ret = 0;
 
@@ -112,10 +97,10 @@ static int lcd_extern_power_cmd_dynamic_size(unsigned char *table, int flag)
 			if (delay_ms > 0)
 				mdelay(delay_ms);
 		} else if (type == LCD_EXT_CMD_TYPE_CMD) {
-			ret = lcd_extern_i2c_write(ext_config->i2c_bus,
+			ret = aml_lcd_i2c_write(ext_config->i2c_bus,
 				ext_config->i2c_addr, &table[i+2], cmd_size);
 		} else if (type == LCD_EXT_CMD_TYPE_CMD_DELAY) {
-			ret = lcd_extern_i2c_write(ext_config->i2c_bus,
+			ret = aml_lcd_i2c_write(ext_config->i2c_bus,
 				ext_config->i2c_addr, &table[i+2], (cmd_size-1));
 			if (table[i+1+cmd_size] > 0)
 				mdelay(table[i+1+cmd_size]);
@@ -171,11 +156,11 @@ static int lcd_extern_power_cmd_fixed_size(unsigned char *table, int flag)
 			if (delay_ms > 0)
 				mdelay(delay_ms);
 		} else if (type == LCD_EXT_CMD_TYPE_CMD) {
-			ret = lcd_extern_i2c_write(ext_config->i2c_bus,
+			ret = aml_lcd_i2c_write(ext_config->i2c_bus,
 				ext_config->i2c_addr,
 				&table[i+1], (cmd_size-1));
 		} else if (type == LCD_EXT_CMD_TYPE_CMD_DELAY) {
-			ret = lcd_extern_i2c_write(ext_config->i2c_bus,
+			ret = aml_lcd_i2c_write(ext_config->i2c_bus,
 				ext_config->i2c_addr,
 				&table[i+1], (cmd_size-2));
 			if (table[i+cmd_size-1] > 0)
@@ -195,7 +180,7 @@ static int lcd_extern_power_ctrl(int flag)
 {
 	unsigned char *table;
 	unsigned char cmd_size;
-	int ret = -1;
+	int ret = 0;
 
 	cmd_size = ext_config->cmd_size;
 	if (flag)
@@ -204,10 +189,12 @@ static int lcd_extern_power_ctrl(int flag)
 		table = ext_config->table_init_off;
 	if (cmd_size < 1) {
 		EXTERR("%s: cmd_size %d is invalid\n", __func__, cmd_size);
+		ret = -1;
 		goto power_ctrl_next;
 	}
 	if (table == NULL) {
 		EXTERR("%s: init_table %d is NULL\n", __func__, flag);
+		ret = -1;
 		goto power_ctrl_next;
 	}
 	if (cmd_size == LCD_EXT_CMD_SIZE_DYNAMIC)
@@ -230,7 +217,7 @@ static int lcd_extern_power_on(void)
 {
 	int ret;
 
-	lcd_extern_pinmux_set(1);
+	lcd_extern_pinmux_set(ext_config, 1);
 	ret = lcd_extern_power_ctrl(1);
 	return ret;
 }
@@ -240,7 +227,7 @@ static int lcd_extern_power_off(void)
 	int ret;
 
 	ret = lcd_extern_power_ctrl(0);
-	lcd_extern_pinmux_set(0);
+	lcd_extern_pinmux_set(ext_config, 0);
 
 	return ret;
 }

@@ -36,4 +36,3 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	imply SIFIVE_SERIAL
 
 endif
-

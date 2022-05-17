@@ -16,4 +16,3 @@ config DM_SCSI
 	  which supports SCSI and SATA HDDs. For every device configuration
 	  (IDs/LUNs) a block device is created with RAW read/write and
 	  filesystem support.
-

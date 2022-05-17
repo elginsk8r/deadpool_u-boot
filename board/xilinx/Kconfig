@@ -39,4 +39,3 @@ config XILINX_PS_INIT_FILE
 	     before the build.
 
 endif
-

@@ -63,4 +63,3 @@ config SYS_CONFIG_NAME
 	default "secomx6quq7" if SECOMX6_UQ7 && SECOMX6Q
 
 endif
-

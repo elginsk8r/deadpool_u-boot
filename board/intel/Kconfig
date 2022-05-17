@@ -84,4 +84,3 @@ source "board/intel/galileo/Kconfig"
 source "board/intel/minnowmax/Kconfig"
 
 endif
-

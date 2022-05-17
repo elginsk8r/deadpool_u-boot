@@ -32,6 +32,8 @@
 # Default values for build configurations
 #
 
+export CROSS_COMPILE=/opt/gcc-linaro-aarch64-none-elf-4.8-2013.11_linux/bin/aarch64-none-elf-
+
 include $(buildsrc)/config.mk
 include $(buildtree)/include/autoconf.mk
 include $(buildtree)/.config
@@ -117,22 +119,6 @@ msg_start:
 	@echo "CURDIR: ${CURDIR}"
 	@echo "KBUILD_OUTPUT: ${KBUILD_OUTPUT}"
 	@echo "Building ${BOARDDIR}/acs.bin"
-
-# ENABLE_DDR_LOGGING is defined in fip/mk_script.sh:
-#  1: enable DDR tuning log; 0: disable DDR tuning log
-ifeq (${ENABLE_DDR_LOGGING},1)
-CFLAGS += -DCONFIG_DDR_LOGS_ENABLED=1
-else
-CFLAGS += -DCONFIG_DDR_LOGS_ENABLED=0
-endif
-
-# ENABLE_BFT_TIME_SAVING is defined in fip/mk_script.sh:
-#  1: enable BFT time saving; 0: disable BFT time saving
-ifeq (${ENABLE_BFT_TIME_SAVING},1)
-CFLAGS += -DCONFIG_BFT_TIME_SAVING_ENABLED=1
-else
-CFLAGS += -DCONFIG_BFT_TIME_SAVING_ENABLED=0
-endif
 
 #include plat/${PLAT}/platform.mk
 #ifdef BL2_SOURCES

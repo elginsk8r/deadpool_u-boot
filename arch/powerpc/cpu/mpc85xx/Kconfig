@@ -1590,4 +1590,3 @@ source "board/xes/xpedite550x/Kconfig"
 source "board/Arcturus/ucp1020/Kconfig"
 
 endmenu
-

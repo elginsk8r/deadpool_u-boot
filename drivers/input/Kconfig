@@ -77,4 +77,3 @@ config TWL4030_INPUT
 	bool "Enable TWL4030 Input controller"
 	help
 	  Enable TWL4030 Input controller
-

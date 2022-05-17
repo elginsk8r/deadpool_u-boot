@@ -11,4 +11,3 @@ config PHY_SUN4I_USB
 
 	  This driver controls the entire USB PHY block, both the USB OTG
 	  parts, as well as the 2 regular USB 2 host PHYs.
-

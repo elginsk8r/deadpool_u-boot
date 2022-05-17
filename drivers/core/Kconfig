@@ -253,4 +253,3 @@ config DM_DEV_READ_INLINE
 	default y if !OF_LIVE
 
 endmenu
-

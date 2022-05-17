@@ -1,14 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * \file        optimus_fat.c
- * \brief       fopen/fread/fclose for fat32
- *
- * \version     1.0.0
- * \date        2018/11/08
- * \author      Sam.Wu <yihui.wu@amlgic.com>
- *
- * Copyright (c) 2018 Amlogic. All Rights Reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
+
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * fat.c
@@ -156,15 +150,15 @@ static void get_name(dir_entry *dirent, char *s_name)
         *s_name = DELETED_FLAG;
 }
 
-static int flush_dirty_fat_buffer(fsdata *mydata);
-#if !defined(CONFIG_FAT_WRITE)
+//static int flush_dirty_fat_buffer(fsdata *mydata);
+//#if !defined(CONFIG_FAT_WRITE)
 /* Stub for read only operation */
 static int flush_dirty_fat_buffer(fsdata *mydata)
 {
     (void)(mydata);
     return 0;
 }
-#endif
+//#endif
 
 /*
  * Get the entry at index 'entry' in a FAT (12/16/32) table.

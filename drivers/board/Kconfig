@@ -20,4 +20,3 @@ config BOARD_SANDBOX
 	  Support querying device information for the Sandbox boards.
 
 endif
-

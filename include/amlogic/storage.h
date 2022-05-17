@@ -1,11 +1,6 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Header file of storage interface module
- *
- * Copyright (C) 2018 Amlogic Corporation
- *
- * Licensed under the GPL-2 or later.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef __STORAGE_H__
@@ -19,11 +14,14 @@
 #include <asm/byteorder.h>
 #include <jffs2/jffs2.h>
 
+#define RSV_UNVAIL	140	/* rsv unvail error */
+
 #define DISPROTECT_KEY			BIT(0)
 #define DISPROTECT_SECURE		BIT(1)
 #define DISPROTECT_FBBT			BIT(2)
 #define DISPROTECT_HYNIX		BIT(3)
 
+#define PART_PROTECT_FLAG		BIT(4)
 enum boot_type_e {
 	BOOT_EMMC = 1,
 	BOOT_SD = 1 << 1,
@@ -38,9 +36,87 @@ enum boot_type_e {
 #define RSV_ENV "env"
 #define RSV_DTB "dtb"
 #define RSV_BBT "bbt"
+#define RSV_DDR_PARA "ddr_para"
 
 #define DISCRETE_BOOTLOADER 1
 #define COMPACT_BOOTLOADER 0
+
+struct nand_startup_parameter {
+	int page_size;
+	int block_size;
+	int layout_reserve_size;
+	int pages_per_block;
+	int setup_data;
+	/* */
+	int page0_disable;
+};
+
+#define BL2E_STORAGE_PARAM_SIZE		(0x80)
+//#define BOOT_FIRST_BLOB_SIZE        (166*1024)
+#define BOOT_FILLER_SIZE            (4*1024)
+#define BOOT_RESERVED_SIZE          (4*1024)
+#define BOOT_RANDOM_NONCE           (16)
+#define BOOT_BL2E_SIZE              (66672) //74864-8K
+#define BOOT_EBL2E_SIZE             (BOOT_FILLER_SIZE + BOOT_RESERVED_SIZE + BOOT_BL2E_SIZE)
+#define BOOT_BL2X_SIZE              (66672)
+#define MAX_BOOT_AREA_ENTRIES		(8)
+/* bl2 core address base */
+#define BL2_CORE_BASE_OFFSET_EMMC	(0x200)
+/* boot area entry index */
+#define BOOT_AREA_BB1ST             (0)
+/* filler and reserved are considered part of the bl2E in storage view */
+#define BOOT_AREA_BL2E              (1)
+#define BOOT_AREA_BL2X              (2)
+#define BOOT_AREA_DDRFIP            (3)
+#define BOOT_AREA_DEVFIP            (4)
+#define BOOT_AREA_INVALID           (MAX_BOOT_AREA_ENTRIES)
+
+typedef struct boot_area_entry {
+    /* name */
+    char name[11];
+    /* index */
+    uint8_t idx;
+    uint64_t offset;
+    uint64_t size;
+} boot_area_entry_t;
+
+struct boot_layout {
+    boot_area_entry_t *boot_entry;
+};
+
+struct emmc_startup_parameter {
+	//sd_emmc_setup_t setup;
+};
+
+struct spi_nand_startup_parameter {
+	uint32_t pagesize;
+	uint32_t pages_per_eraseblock;
+	uint32_t eraseblocks_per_lun;
+	uint32_t planes_per_lun;
+	uint32_t luns_per_target;
+	uint32_t ntargets;
+	int layout_reserve_size;
+};
+
+struct storage_boot_entry {
+	uint32_t offset;
+	uint32_t size;
+};
+
+union storage_independent_parameter {
+	struct nand_startup_parameter nsp;
+	struct emmc_startup_parameter esp;
+	struct spi_nand_startup_parameter snasp;
+};
+
+struct storage_startup_parameter {
+	uint8_t boot_device;
+	uint8_t	boot_seq;
+	uint8_t	boot_bakups;
+	uint8_t reserved;
+	struct storage_boot_entry boot_entry[MAX_BOOT_AREA_ENTRIES];
+	union storage_independent_parameter sip;
+};
 
 struct storage_info_t {
 	u8 name[32];
@@ -57,6 +133,8 @@ struct storage_t {
 	struct storage_info_t info;
 	u32 init_flag;
 	struct list_head list;
+	int (*get_part_count)(void);
+	int (*list_part_name)(int idx, char *part_name);
 	/* when part_name is null, default to ops in whole chip */
 	/* int (*block_is_bad)(const char *part_name, loff_t off); */
 	u64 (*get_part_size)(const char *part_name);
@@ -75,7 +153,9 @@ struct storage_t {
 	int (*boot_write)(const char *part_name,
 			  u8 cpy, size_t size, void *source);
 	int (*boot_erase)(const char *part_name, u8 cpy);
-
+	int (*gpt_read)(void *dest);
+	int (*gpt_write)(void *source);
+	int (*gpt_erase)(void);
 	u32 (*get_rsv_size)(const char *rsv_name);
 	int (*read_rsv)(const char *rsv_name, size_t size, void *buf);
 	int (*write_rsv)(const char *rsv_name, size_t size, void *buf);
@@ -245,6 +325,27 @@ u64 store_part_size(const char *name);
 u8 store_boot_copy_num(const char *name);
 
 /**
+ * @usage: get the 1st boot copy nubmer of current device.
+ * for eMMC: 0 -> user partition; 1 -> boot0; 2 -> boot1
+ */
+u8 store_boot_copy_start(void);
+
+/**
+ * @usage: get the bootup index of [name]
+ *
+ * @name: do not care discrete mode or compact mode
+ * 		"bl2" "spl" could be used as the one romboot loaded
+ * 		"fip" "devfip" "tpl" or "bootloader" would be the main u-boot.
+ * @return: the copy number of the "bootloader" or "tpl"
+ */
+u8 store_bootup_bootidx(const char *name);
+
+/**
+ * @usage: restore the bootidx/bootdev etc.
+ */
+void store_restore_bootidx(void);
+
+/**
  * @usage: get the copy size of [name]
  *
  * @name: name: only can be "bl2" or "tpl"/"fip" in discrete mode
@@ -382,4 +483,21 @@ int store_rsv_erase(const char *name);
  *          other = fail
  */
 int store_rsv_protect(const char *name, bool ops);
+
+/**
+ * @usage: get bootloader mode for current storage
+ *
+ * @return: result of the operation
+ *          0 = COMPACT_BOOTLOADER
+ *          1 = DISCRETE_BOOTLOADER
+ */
+int store_get_device_bootloader_mode(void);
+
+int sheader_need(void);
+void sheader_load(void *addr);
+
+int store_gpt_read(void *buf);
+int store_gpt_write(void *buf);
+int store_gpt_erase(void);
+
 #endif/* __STORAGE_H__ */

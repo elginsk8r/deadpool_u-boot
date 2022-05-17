@@ -9,4 +9,3 @@ config CLK_ARMADA_3720
 	depends on CLK_MVEBU && ARM64
 	help
 	  Enable this to support the clocks on Marvell Armada 3720 SoC.
-

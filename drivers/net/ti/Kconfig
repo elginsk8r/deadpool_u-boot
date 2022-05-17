@@ -18,4 +18,3 @@ config DRIVER_TI_KEYSTONE_NET
 	bool "TI Keystone 2 Ethernet"
 	help
 	   This driver supports the TI Keystone 2 Ethernet subsystem
-

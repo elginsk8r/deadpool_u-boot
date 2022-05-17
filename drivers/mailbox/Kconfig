@@ -35,4 +35,3 @@ config K3_SEC_PROXY
 	  block.
 
 endmenu
-

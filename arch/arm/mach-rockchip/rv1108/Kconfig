@@ -32,4 +32,3 @@ source board/rockchip/evb_rv1108/Kconfig
 source board/elgin/elgin_rv1108/Kconfig
 
 endif
-

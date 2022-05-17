@@ -23,4 +23,3 @@ config CMD_GSC
 	     gsc wd - enables / disables the watchdog
 
 endif
-

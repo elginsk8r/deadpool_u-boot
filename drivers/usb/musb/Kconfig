@@ -18,4 +18,3 @@ config USB_OMAP3
 config USB_AM35X
 	bool"Legacy MUSB AM35x"
 	depends on ARCH_OMAP2PLUS && !USB_OMAP3
-

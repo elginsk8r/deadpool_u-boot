@@ -36,4 +36,3 @@ config SYS_CONFIG_NAME
 	default "vexpress_ca9x4"
 
 endif
-

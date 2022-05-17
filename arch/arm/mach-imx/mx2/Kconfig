@@ -28,4 +28,3 @@ source "board/freescale/mx25pdk/Kconfig"
 source "board/syteco/zmx25/Kconfig"
 
 endif
-

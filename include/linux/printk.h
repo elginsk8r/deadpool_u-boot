@@ -1,5 +1,5 @@
-#ifndef __KERNEL_PRINTK__
-#define __KERNEL_PRINTK__
+#ifndef __LINUX_PRINTK__
+#define __LINUX_PRINTK__
 
 #include <stdio.h>
 #include <linux/compiler.h>

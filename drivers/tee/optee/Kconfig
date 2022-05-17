@@ -25,4 +25,3 @@ config OPTEE_TA_AVB
 endmenu
 
 endif
-

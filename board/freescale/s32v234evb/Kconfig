@@ -21,4 +21,3 @@ config SYS_CONFIG_NAME
 	default "s32v234evb"
 
 endif
-

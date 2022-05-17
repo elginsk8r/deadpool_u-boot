@@ -1,10 +1,6 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Driver for Amlogic Meson SPI communication controller (SPICC)
- *
- * Copyright (C) BayLibre, SAS
- * Author: Neil Armstrong <narmstrong@baylibre.com>
- *
- * SPDX-License-Identifier: GPL-2.0+
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include <common.h>
@@ -21,7 +17,13 @@
 #include <dm/root.h>
 #include <dm/lists.h>
 #include <dm/util.h>
+#ifdef CONFIG_SECURE_POWER_CONTROL
+#include <asm/arch/pwr_ctrl.h>
+#endif
 
+#ifdef CONFIG_CLK_MESON_A1
+#define CONFIG_CLK_IF
+#endif
 
 /* Register Map */
 #define SPICC_RXDATA	0x00
@@ -178,22 +180,17 @@ struct meson_spicc_data {
 	bool				has_enhance_clk_div;
 	bool				has_cs_pre_delay;
 	bool				has_enhance_io_delay;
-	bool				has_comp_clk;
-	bool				is_div_parent_comp_clk;
+	bool				has_async_clk;
+	bool				is_div_parent_async_clk;
 	bool				has_enhance_tt_ti_delay;
 };
 
 struct meson_spicc_device {
 	void __iomem			*base;
-#ifdef CONFIG_CLK
-	struct clk			core;
-	struct clk			comp;
-	struct clk			clk;
-#else
+	u32				pm_id;
 	u32				parent_clk_rate;
 	u32				speed_hz;
 	u32				real_speed_hz;
-#endif
 	int				num_chipselect;
 	struct gpio_desc 		cs_gpios[CS_GPIO_MAX];
 	const struct meson_spicc_data	*data;
@@ -240,11 +237,8 @@ static void meson_spicc_auto_io_delay(struct meson_spicc_device *spicc)
 
 	mi_delay = SPICC_MI_NO_DELAY;
 	cap_delay = SPICC_CAP_AHEAD_2_CYCLE;
-#ifdef CONFIG_CLK
-	hz = clk_get_rate(&spicc->clk);
-#else
+
 	hz = spicc->real_speed_hz;
-#endif
 	if (hz >= 100000000)
 		cap_delay = SPICC_CAP_DELAY_1_CYCLE;
 	else if (hz >= 80000000)
@@ -420,10 +414,6 @@ static int spicc_release_bus(struct udevice *bus)
 static int spicc_set_speed(struct udevice *bus, uint hz)
 {
 	struct meson_spicc_device *spicc = dev_get_priv(bus);
-
-#ifdef CONFIG_CLK
-	clk_set_rate(&spicc->clk, hz);
-#else
 	u32 sys_clk_rate, div, mid, real_hz;
 	u32 regv;
 
@@ -433,10 +423,9 @@ static int spicc_set_speed(struct udevice *bus, uint hz)
 	sys_clk_rate = spicc->parent_clk_rate;
 	if (spicc->data->has_enhance_clk_div) {
 		/* speed = sys_clk_rate / 2 / (div+1) */
-		div = sys_clk_rate/hz;
-		if (div < 2)
-			div = 2;
-		div = (div >> 1) - 1;
+		div = DIV_ROUND_UP(sys_clk_rate, hz << 1);
+		if (div)
+			div--;
 		if (div > 0xff)
 			div = 0xff;
 		regv = readl_relaxed(spicc->base + SPICC_ENH_CTL0);
@@ -463,7 +452,6 @@ static int spicc_set_speed(struct udevice *bus, uint hz)
 	spicc->speed_hz = hz;
 	spicc->real_speed_hz = real_hz;
 	spicc_dbg("set speed %dHz (real %dHz)\n", hz, real_hz);
-#endif
 
 	meson_spicc_auto_io_delay(spicc);
 
@@ -506,7 +494,7 @@ static int spicc_set_mode(struct udevice *bus, uint mode)
 	writel_relaxed(conf, spicc->base + SPICC_TESTREG);
 
 	spicc->mode = mode;
-	spicc_dbg("set mode %d\n", mode);
+	spicc_dbg("set mode 0x%x\n", mode);
 
 	return 0;
 }
@@ -581,62 +569,29 @@ static int spicc_xfer(
 static int spicc_clk_init(struct udevice *bus)
 {
 	struct meson_spicc_device *spicc = dev_get_priv(bus);
-#ifdef CONFIG_CLK
-	int ret;
+	struct clk clk;
 
-	/* Get core clk */
-	ret = clk_get_by_name(bus, "core", &spicc->core);
-	if (ret) {
-		spicc_err("get clk_core failed(%d)\n", ret);
-		return ret;
-	}
-	ret = clk_enable(&spicc->core);
-	if (ret) {
-		spicc_err("enable clk_core failed(%d)\n", ret);
-		return ret;
+	spicc->parent_clk_rate = 0;
+	if (!clk_get_by_name(bus, "core", &clk)) {
+		if (!spicc->data->is_div_parent_async_clk)
+			spicc->parent_clk_rate = clk_get_rate(&clk);
 	}
 
-	/* Get composite clk */
-	if (spicc->data->has_comp_clk) {
-		ret = clk_get_by_name(bus, "comp", &spicc->comp);
-		if (ret) {
-			spicc_err("get clk_comp failed(%d)\n", ret);
-			return ret;
+	if (!clk_get_by_name(bus, "core-gate", &clk))
+		clk_enable(&clk);
+
+	if (spicc->data->has_async_clk) {
+		if (!clk_get_by_name(bus, "async", &clk)) {
+			if (spicc->data->is_div_parent_async_clk)
+				spicc->parent_clk_rate = clk_get_rate(&clk);
 		}
-		ret = clk_enable(&spicc->comp);
-		if (ret) {
-			spicc_err("enable clk_comp failed(%d)\n", ret);
-			return ret;
-		}
-		clk_set_parent(&spicc->clk, &spicc->comp);
+
+		if (!clk_get_by_name(bus, "async-gate", &clk))
+			clk_enable(&clk);
 	}
-	else
-		clk_set_parent(&spicc->clk, &spicc->core);
-#else
-	u32 regv;
-	u8 mux=3, div = 0;
-	unsigned long comp_rate[] = {
-		24000000,	/* XTAL */
-		166666666,	/* CLK81 */
-		500000000,	/* FCLK_DIV4 */
-		666666666,	/* FCLK_DIV3 */
-		1000000000,	/* FCLK_DIV2 */
-		400000000,	/* FCLK_DIV5 */
-		285700000,	/* FCLK_DIV7 */
-	};
 
-	regv = readl(P_HHI_SPICC_CLK_CNTL);
-	/* mux[25:23], gate[22], div[21:16] */
-	regv &= ~((0x7 << 23) | (1 << 22) | (0x3f << 16));
-	regv |= (mux << 23) | (1 << 22) | (div << 16);
-	writel(regv, P_HHI_SPICC_CLK_CNTL);
-	spicc->parent_clk_rate = comp_rate[mux];
-
-	regv = readl(P_HHI_GCLK_MPEG0);
-	regv |= 1 << 14;
-	writel(regv, P_HHI_GCLK_MPEG0);
-#endif
-	return 0;
+	spicc_info("parent clk rate %d\n", spicc->parent_clk_rate);
+	return spicc->parent_clk_rate ? 0 : -ENODEV;
 }
 
 static int spicc_cs_init(struct udevice *bus)
@@ -670,6 +625,12 @@ static int spicc_probe(struct udevice *bus)
 	spicc->data = (struct meson_spicc_data *)dev_get_driver_data(bus);
 	spicc->base = (void __iomem *)dev_read_addr(bus);
 
+#ifdef CONFIG_SECURE_POWER_CONTROL
+	if (!dev_read_u32(bus, "pm-id", &spicc->pm_id)) {
+		pwr_ctrl_psci_smc(spicc->pm_id, true);
+		spicc_info("power on %d\n", spicc->pm_id);
+	}
+#endif
 	spicc_info("0x%p\n", spicc->base);
 	if (spicc_clk_init(bus))
 		return -ENODEV;
@@ -696,6 +657,9 @@ static int spicc_probe(struct udevice *bus)
 	return 0;
 }
 
+/* g9tv/gxbb */
+
+/* gxtvbb/gxl/gxm/ (LD_CNTL) */
 static const struct meson_spicc_data meson_spicc_gx_data = {
 	.min_speed_hz		= 325000,
 	.max_speed_hz		= 4166667,
@@ -703,6 +667,7 @@ static const struct meson_spicc_data meson_spicc_gx_data = {
 	.fifo_size		= 16,
 };
 
+/* txl/gxlx/txlx (ENHANCE_CNTL) */
 static const struct meson_spicc_data meson_spicc_txlx_data = {
 	.min_speed_hz		= 325000,
 	.max_speed_hz		= 83333333,
@@ -713,6 +678,7 @@ static const struct meson_spicc_data meson_spicc_txlx_data = {
 	.has_cs_pre_delay	= true,
 };
 
+/* axg (ENHANCE_CNTL1, async-clk is only used for delay ctrl) */
 static const struct meson_spicc_data meson_spicc_axg_data = {
 	.min_speed_hz		= 325000,
 	.max_speed_hz		= 83333333,
@@ -721,9 +687,11 @@ static const struct meson_spicc_data meson_spicc_axg_data = {
 	.has_enhance_clk_div	= true,
 	.has_cs_pre_delay	= true,
 	.has_enhance_io_delay	= true,
-	.has_comp_clk		= true,
+	.has_async_clk		= true,
 };
 
+/* g12a (ENHANCE_CNTL2, async-clk can be used for spi-io-clk)
+   txhd hasn't ENHANCE_CNTL2 */
 static const struct meson_spicc_data meson_spicc_g12a_data = {
 	.min_speed_hz		= 50000,
 	.max_speed_hz		= 166666667,
@@ -732,8 +700,8 @@ static const struct meson_spicc_data meson_spicc_g12a_data = {
 	.has_enhance_clk_div	= true,
 	.has_cs_pre_delay	= true,
 	.has_enhance_io_delay	= true,
-	.has_comp_clk		= true,
-	.is_div_parent_comp_clk	= true,
+	.has_async_clk		= true,
+	.is_div_parent_async_clk = true,
 	.has_enhance_tt_ti_delay = true,
 };
 

@@ -25,4 +25,3 @@ config SYS_MALLOC_F_LEN
 	default 0x600
 
 endif
-

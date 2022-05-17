@@ -12,4 +12,3 @@ config SYS_CONFIG_NAME
 	  should be included from include/config.h.
 
 endmenu
-

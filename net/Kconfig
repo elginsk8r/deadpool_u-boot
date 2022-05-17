@@ -24,4 +24,3 @@ config NETCONSOLE
 	  See README.NetConsole for details.
 
 endif   # if NET
-

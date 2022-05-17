@@ -142,4 +142,3 @@ config SYS_CONFIG_NAME
 	default "rpi"
 
 endmenu
-

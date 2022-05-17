@@ -52,4 +52,3 @@ config OPT_TRI_CHOICE1
 	tristate "choice 1"
 
 endchoice
-

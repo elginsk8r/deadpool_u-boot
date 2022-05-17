@@ -22,4 +22,3 @@ config FS_FAT_MAX_CLUSTSIZE
 	  is the smallest amount of disk space that can be used to hold a
 	  file. Unless you have an extremely tight memory memory constraints,
 	  leave the default.
-

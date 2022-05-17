@@ -1,23 +1,7 @@
-
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/amlogic/media/common/vpu/vpu_ctrl.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #ifndef __VPU_CTRL_H__
 #define __VPU_CTRL_H__
@@ -36,6 +20,10 @@
 #define CLK_LEVEL_DFT_G12A     7
 #define CLK_LEVEL_MAX_G12A     8
 
+/* T5D */
+/* freq max=400M, default=250M */
+#define CLK_LEVEL_DFT_T5D     3
+#define CLK_LEVEL_MAX_T5D     6
 
 /* vpu clk setting */
 enum vpu_mux_e {
@@ -118,46 +106,28 @@ static struct vpu_ctrl_s vpu_mem_pd_tm2[] = {
 };
 
 /* ******************************************************* */
-/*              VPU_HDMI ISO pre: before reset               */
+/*              VPU_HDMI POWER               */
 /* ******************************************************* */
-static struct vpu_ctrl_s vpu_hdmi_iso_pre_gxb[] = {
+static struct vpu_ctrl_s vpu_pwr_gxb[] = {
 	/* reg,                val, bit, len */
-	{AO_RTI_GEN_PWR_SLEEP0,  1,   8,   1},
+	{AO_RTI_GEN_PWR_SLEEP0,  0,   8,   1},
 	{VPU_REG_END,            0,   0,   0},
 };
 
 /* ******************************************************* */
 /*              VPU_HDMI ISO                */
 /* ******************************************************* */
-static struct vpu_ctrl_s vpu_hdmi_iso_gxb[] = {
+static struct vpu_ctrl_s vpu_iso_gxb[] = {
 	/* reg,                val, bit, len */
-	{AO_RTI_GEN_PWR_SLEEP0,  1,   9,   1},
+	{AO_RTI_GEN_PWR_SLEEP0,  0,   9,   1},
 	{VPU_REG_END,            0,   0,   0},
 };
 
-static struct vpu_ctrl_s vpu_hdmi_iso_sm1[] = {
+static struct vpu_ctrl_s vpu_iso_sm1[] = {
 	/* reg,                val, bit, len */
-	{AO_RTI_GEN_PWR_ISO0,    1,   8,   1},
+	{AO_RTI_GEN_PWR_ISO0,    0,   8,   1},
 	{VPU_REG_END,            0,   0,   0},
 };
-
-/* ******************************************************* */
-/*                 VPU module init table                 */
-/* ******************************************************* */
-#if 0
-static struct vpu_ctrl_s vpu_module_init_txlx[] = {
-	/* reg,                     val, bit, len */
-	{DOLBY_TV_CLKGATE_CTRL,     1,   10,  2},
-	{DOLBY_TV_CLKGATE_CTRL,     1,   2,   2},
-	{DOLBY_TV_CLKGATE_CTRL,     1,   4,   2},
-	{DOLBY_CORE2A_CLKGATE_CTRL, 1,   10,  2},
-	{DOLBY_CORE2A_CLKGATE_CTRL, 1,   2,   2},
-	{DOLBY_CORE2A_CLKGATE_CTRL, 1,   4,   2},
-	{DOLBY_CORE3_CLKGATE_CTRL,  0,   1,   1},
-	{DOLBY_CORE3_CLKGATE_CTRL,  1,   2,   2},
-	{VPU_REG_END,               0,   0,   0},
-};
-#endif
 
 /* ******************************************************* */
 /*                 VPU reset table                    */
@@ -181,4 +151,37 @@ static struct vpu_reset_s vpu_reset_tl1[] = {
 	{RESET7_LEVEL, (1<<7)},
 	{VPU_REG_END,  0},
 };
+
+/* ******************************************************* */
+/*                 VPU pwrctrl id table                 */
+/* ******************************************************* */
+static unsigned int vpu_pwrctrl_id_table[] = {
+	PM_VPU_HDMI,
+	VPU_PWR_ID_END
+};
+
+static unsigned int vpu_pwrctrl_id_table_t7[] = {
+	PM_VPU_HDMI,
+	PM_VI_CLK1,
+	PM_VI_CLK2,
+	VPU_PWR_ID_END
+};
+
+/* ******************************************************* */
+/*                 VPU module init table                 */
+/* ******************************************************* */
+#if 0
+static struct vpu_ctrl_s vpu_module_init_txlx[] = {
+	/* reg,                     val, bit, len */
+	{DOLBY_TV_CLKGATE_CTRL,     1,   10,  2},
+	{DOLBY_TV_CLKGATE_CTRL,     1,   2,   2},
+	{DOLBY_TV_CLKGATE_CTRL,     1,   4,   2},
+	{DOLBY_CORE2A_CLKGATE_CTRL, 1,   10,  2},
+	{DOLBY_CORE2A_CLKGATE_CTRL, 1,   2,   2},
+	{DOLBY_CORE2A_CLKGATE_CTRL, 1,   4,   2},
+	{DOLBY_CORE3_CLKGATE_CTRL,  0,   1,   1},
+	{DOLBY_CORE3_CLKGATE_CTRL,  1,   2,   2},
+	{VPU_REG_END,               0,   0,   0},
+};
+#endif
 #endif

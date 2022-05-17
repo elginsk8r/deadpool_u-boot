@@ -26,4 +26,3 @@ config SPL_LDSCRIPT
 	default "arch/microblaze/cpu/u-boot-spl.lds"
 
 endmenu
-

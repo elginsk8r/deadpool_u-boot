@@ -115,4 +115,3 @@ source "board/ve8313/Kconfig"
 source "board/gdsys/mpc8308/Kconfig"
 
 endmenu
-

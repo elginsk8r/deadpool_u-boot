@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #include <common.h>
 #include <lcd.h>
 #include <command.h>
@@ -6,6 +11,7 @@
 #include <splash.h>
 #include <video_fb.h>
 #include <video.h>
+#include <amlogic/fb.h>
 
 int osd_enabled = 0;
 /* Graphic Device */
@@ -17,6 +23,7 @@ extern void osd_test(void);
 extern void osd_enable_hw(u32 index, u32 enable);
 extern void osd_set_free_scale_enable_hw(u32 index, u32 enable);
 extern int osd_rma_test(u32 osd_index);
+extern int get_osd_layer(void);
 static int do_osd_open(cmd_tbl_t *cmdtp, int flag, int argc,
 		       char *const argv[])
 {
@@ -32,10 +39,11 @@ static int do_osd_open(cmd_tbl_t *cmdtp, int flag, int argc,
 static int do_osd_enable(cmd_tbl_t *cmdtp, int flag, int argc,
 			char *const argv[])
 {
-	ulong index = 0;
+	int index = 0;
 
-	index = simple_strtoul(env_get("display_layer"), NULL, 0);
-	osd_enable_hw(index, 1);
+	index = get_osd_layer();
+	if (index >= 0)
+		osd_enable_hw(index, 1);
 
 	return 0;
 }
@@ -43,38 +51,59 @@ static int do_osd_enable(cmd_tbl_t *cmdtp, int flag, int argc,
 static int do_osd_close(cmd_tbl_t *cmdtp, int flag, int argc,
 			char *const argv[])
 {
+
+	uint index = 0;
+
+	index = get_osd_layer();
+
 	if (gdev == NULL)
 		return 1;
 
 	gdev = NULL;
-	osd_enable_hw(0, 0);
-	osd_enable_hw(1, 0);
-	osd_set_free_scale_enable_hw(0, 0);
-	osd_set_free_scale_enable_hw(1, 0);
+	if (index >= VIU2_OSD1) {
+		osd_enable_hw(VIU2_OSD1, 0);
+	} else {
+		osd_enable_hw(OSD1, 0);
+		osd_enable_hw(OSD2, 0);
+		osd_set_free_scale_enable_hw(OSD1, 0);
+		osd_set_free_scale_enable_hw(OSD2, 0);
+	}
+
 	osd_enabled = 0;
+
 	return 0;
 }
 
 static int do_osd_clear(cmd_tbl_t *cmdtp, int flag, int argc,
 			char *const argv[])
 {
+#ifdef OSD_SCALE_ENABLE
+	uint index = 0;
+	ulong fb_addr;
+	ulong fb_len;
+#endif
 	if (gdev == NULL) {
 		printf("Please enable osd device first!\n");
 		return 1;
 	}
 
 #ifdef OSD_SCALE_ENABLE
-	memset((void *)(long long)(gdev->frameAdrs), 0,
-	       (gdev->fb_width * gdev->fb_height)*gdev->gdfBytesPP);
-
-	flush_cache(gdev->frameAdrs,
-		    ((gdev->fb_width * gdev->fb_height)*gdev->gdfBytesPP));
+	index = get_osd_layer();
+	if (index < VIU2_OSD1) {
+		fb_addr = (ulong)gdev->frameAdrs;
+		fb_len = CANVAS_ALIGNED(gdev->fb_width * gdev->gdfBytesPP) * gdev->fb_height;
+	} else {
+		fb_addr = (ulong)(gdev->frameAdrs +
+			CANVAS_ALIGNED(gdev->fb_width * gdev->gdfBytesPP) * gdev->fb_height);
+		fb_len = CANVAS_ALIGNED(gdev->winSizeX * gdev->gdfBytesPP) * gdev->winSizeY;
+	}
+	memset((void *)fb_addr, 0, fb_len);
+	flush_cache(fb_addr, fb_len);
 #else
-	memset((void *)(long long)(gdev->frameAdrs), 0,
-	       (gdev->winSizeX * gdev->winSizeY)*gdev->gdfBytesPP);
+	fb_len = CANVAS_ALIGNED(gdev->winSizeX * gdev->gdfBytesPP) * gdev->winSizeY;
+	memset((void *)(long long)(gdev->frameAdrs), 0, fb_len);
 
-	flush_cache(gdev->frameAdrs,
-		    ((gdev->winSizeX * gdev->winSizeY)*gdev->gdfBytesPP));
+	flush_cache(gdev->frameAdrs, fb_len);
 #endif
 	return 0;
 }
@@ -151,77 +180,6 @@ static int do_osd_display(cmd_tbl_t *cmdtp, int flag, int argc,
 	return ret;
 }
 
-static int do_osd_setcolor(cmd_tbl_t *cmdtp, int flag, int argc,
-			  char *const argv[])
-{
-	ulong addr = 0;
-	int h = 0, w = 0;
-	int size = 0;
-	int i = 0, j = 0;
-	int display_bpp_value = 16; //default 16bpp
-	ulong val = 0;
-	unsigned int *ptr = NULL;
-	uchar *fb, low_value = 0, high_value = 0;
-
-	char *str = env_get("fb_addr");
-	if (str == NULL) {
-		printf("failed to get fb_addr");
-		return 1;
-	} else {
-		addr = simple_strtoul(str, NULL, 16);
-		pr_info("osd fb addr: 0x%lx\n", addr);
-	}
-	fb   = (uchar *)(addr);
-	str = env_get("fb_height");
-	if (str == NULL) {
-		printf("failed to get fb_heigh");
-		return 1;
-	} else {
-		h = simple_strtoul(str, NULL, 10);
-	}
-	pr_info("osd fb_height: %d\n", h);
-
-	str = env_get("fb_width");
-	if (str == NULL) {
-		printf("failed to get fb_width");
-		return 1;
-	} else {
-		w = simple_strtoul(str, NULL, 10);
-	}
-	pr_info("osd fb_width: %d\n", w);
-
-	str = env_get("display_bpp");
-	if (str == NULL) {
-		printf("failed to get display_bpp");
-		return 1;
-	} else {
-		display_bpp_value = simple_strtoul(str, NULL, 10);
-	}
-	pr_info("display_bpp_value: %d\n", display_bpp_value);
-
-	if (gdev == NULL) {
-		printf("do_osd_display, enable osd device first!\n");
-		return 1;
-	}
-	size = ((w * h));
-
-	val = simple_strtoul(argv[1], NULL, 16);
-	if (display_bpp_value == 16)
-	{
-		low_value = (val & 0xff);
-		high_value = ((val & 0xff00) >> 8);
-
-		for (j = 0; j < h; j++) {
-			for (i = 0; i < w; i++ ) {
-				*(fb++) = low_value;
-				*(fb++) = high_value;
-			}
-		}
-		flush_cache((unsigned long)addr, w * h * 16);
-	}
-	return 0;
-}
-
 static int do_osd_set(cmd_tbl_t *cmdtp, int flag, int argc,
 			  char *const argv[])
 {
@@ -275,7 +233,6 @@ static cmd_tbl_t cmd_osd_sub[] = {
 	U_BOOT_CMD_MKENT(debug, 2, 0, do_osd_debug, "", ""),
 	U_BOOT_CMD_MKENT(test, 2, 0, do_osd_test, "", ""),
 	U_BOOT_CMD_MKENT(display, 5, 0, do_osd_display, "", ""),
-	U_BOOT_CMD_MKENT(setcolor, 2, 0, do_osd_setcolor, "", ""),
 	U_BOOT_CMD_MKENT(set, 7, 0, do_osd_set, "", ""),
 	U_BOOT_CMD_MKENT(get, 2, 0, do_osd_get, "", ""),
 };
@@ -297,7 +254,7 @@ static int do_osd(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 }
 
 U_BOOT_CMD(
-	osd,	10,	1,	do_osd,
+	osd,	7,	1,	do_osd,
 	"osd sub-system",
 	"open                         - open osd device\n"
 	"osd enable                       - enable osd device\n"
@@ -306,7 +263,6 @@ U_BOOT_CMD(
 	"osd debug                        - debug osd device\n"
 	"osd test [osdID]                 - test osd device\n"
 	"osd display <imageAddr> [x y]    - display image\n"
-	"osd setcolor <color-rgb-value>   - display color bg\n"
 	"osd set <osdID> <a> <b> <c> <d>  - set Hist GoldenData in env\n"
 	"                                        a for hist_max_min\n"
 	"                                        b for hist_spl_val\n"

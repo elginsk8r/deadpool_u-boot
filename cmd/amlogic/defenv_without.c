@@ -1,15 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * \file        cmd_defenv_without.c
- * \brief       use this cmd but not 'env default',
- *               to reserve some envs after defaulting envs
- *
- * \version     1.0.0
- * \date        15/09/29
- * \author      Sam.Wu <yihui.wu@amlgic.com>
- *
- * Copyright (c) 2015 Amlogic. All Rights Reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
+
 #include <config.h>
 #include <common.h>
 #include <command.h>
@@ -80,7 +73,7 @@ static int _reserve_env_list_after_defenv(const int reservNum, const char* const
                 }
         }
 
-        set_default_env("## defenv_reserve\n", 0);
+        set_default_env("## defenv_reserve ##", 0);
 
         if (sumOfEnvVal)
         {

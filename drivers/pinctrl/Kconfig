@@ -321,4 +321,3 @@ source "drivers/pinctrl/mvebu/Kconfig"
 source "drivers/pinctrl/broadcom/Kconfig"
 
 endmenu
-

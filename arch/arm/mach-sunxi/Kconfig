@@ -990,4 +990,3 @@ config PINE64_DT_SELECTION
 	  utilizes the DRAM size will be enabled.
 
 endif
-

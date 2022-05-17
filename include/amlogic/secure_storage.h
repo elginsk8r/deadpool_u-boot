@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #ifndef __SECURE_STORAGE_H__
 #define __SECURE_STORAGE_H__
 
@@ -10,8 +15,6 @@
 #define RET_EUND	-1
 #define SMC_UNK		0xffffffff
 
-/* Attribute*/
-#define OBJ_ATTR_SECURE	(1<<0)
 
 #ifdef CONFIG_SECURE_STORAGE
 /* funtion name: secure_storage_write

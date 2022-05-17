@@ -23,4 +23,3 @@ config SYS_CONFIG_NAME
 	default "woodburn_sd"
 
 endif
-

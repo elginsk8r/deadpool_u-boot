@@ -14,4 +14,3 @@ source "board/st/stm32f429-evaluation/Kconfig"
 source "board/st/stm32f469-discovery/Kconfig"
 
 endif
-

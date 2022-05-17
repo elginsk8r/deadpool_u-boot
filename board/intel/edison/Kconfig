@@ -30,4 +30,3 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	select MD5
 
 endif
-

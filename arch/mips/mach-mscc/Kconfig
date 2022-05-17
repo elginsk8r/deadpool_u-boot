@@ -84,4 +84,3 @@ source "board/mscc/ocelot/Kconfig"
 source "board/mscc/luton/Kconfig"
 
 endmenu
-

@@ -13,4 +13,3 @@ config PINCTRL_BCM6838
 	help
 	   Support pin multiplexing and pin configuration control on
 	   Broadcom's 6838 family of SoCs.
-

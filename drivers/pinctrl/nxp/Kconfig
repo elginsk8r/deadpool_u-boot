@@ -88,4 +88,3 @@ config PINCTRL_VYBRID
 	  configuration. This driver is different from the linux one,
 	  this is a simple implementation, only parses the 'fsl,pins'
 	  property and configure related registers.
-

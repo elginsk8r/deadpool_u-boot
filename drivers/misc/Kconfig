@@ -336,4 +336,3 @@ config IHS_FPGA
 	  devices, depending on the device tree entry.
 
 endmenu
-

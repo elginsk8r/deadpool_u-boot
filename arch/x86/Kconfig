@@ -783,4 +783,3 @@ config HIGH_TABLE_SIZE
 	  This is most likely due to a large ACPI DSDT table is used.
 
 endmenu
-

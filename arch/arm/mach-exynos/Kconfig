@@ -167,4 +167,3 @@ config SPL_LDSCRIPT
 	default "board/samsung/common/exynos-uboot-spl.lds" if ARCH_EXYNOS5 || ARCH_EXYNOS4
 
 endif
-

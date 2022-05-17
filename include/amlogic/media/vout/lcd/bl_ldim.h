@@ -1,21 +1,6 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * include/amlogic/media/vout/lcd/bl_ldim.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef INC_AML_BL_LDIM_H
@@ -35,12 +20,6 @@ enum ldim_dev_type_e {
 
 #define LDIM_INIT_ON_MAX     300
 #define LDIM_INIT_OFF_MAX    20
-
-struct ldim_pinmux_ctrl_s {
-	char *name;
-	unsigned int pinmux_set[LCD_PINMUX_NUM][2];
-	unsigned int pinmux_clr[LCD_PINMUX_NUM][2];
-};
 
 struct ldim_config_s {
 	unsigned char row;
@@ -71,11 +50,15 @@ struct ldim_dev_config_s {
 	unsigned int init_off_cnt;
 
 	unsigned char pinctrl_ver;
-	struct ldim_pinmux_ctrl_s *ldim_pinmux;
-	struct bl_pwm_config_s pwm_config;
-	char gpio_name[BL_GPIO_NUM_MAX][LCD_GPIO_NAME_MAX];
+	struct lcd_pinmux_ctrl_s *ldim_pinmux;
+	struct bl_pwm_config_s ldim_pwm_config;
+	struct bl_pwm_config_s analog_pwm_config;
+	void (*dim_range_update)(void);
+
+	char gpio_name[BL_GPIO_NUM_MAX][LCD_CPU_GPIO_NAME_MAX];
 
 	unsigned short bl_regnum;
+	unsigned int device_count;
 };
 
 #define LDIM_SPI_NAME_MAX    30
@@ -92,7 +75,7 @@ struct ldim_spi_dev_info_s {
 };
 
 /*******global API******/
-struct aml_ldim_driver_s {
+struct ldim_driver_s {
 	int valid_flag;
 	int dev_index;
 	struct ldim_config_s *ldim_conf;
@@ -112,7 +95,8 @@ struct aml_ldim_driver_s {
 
 extern struct ldim_dev_config_s ldim_config_dft;
 
-extern struct aml_ldim_driver_s *aml_ldim_get_driver(void);
-extern int aml_ldim_probe(char *dt_addr, int flag); /* flag: 0=dts, 1=bsp, 2=unifykey */
+struct ldim_driver_s *ldim_get_driver(void);
+/* flag: 0=dts, 1=bsp, 2=unifykey */
+int ldim_probe(char *dt_addr, int flag);
 
 #endif /* INC_AML_BL_LDIM_H */

@@ -14,4 +14,3 @@ config SYS_TEXT_BASE
 	default 0xffffffff9fc00000 if 64BIT
 
 endif
-

@@ -98,4 +98,3 @@ source "board/menlo/m53menlo/Kconfig"
 source "board/technologic/ts4800/Kconfig"
 
 endif
-

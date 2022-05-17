@@ -162,4 +162,3 @@ config SYS_BOOTCOUNT_MAGIC
 	  Set the magic value used for the boot counter.
 
 endif
-

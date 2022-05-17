@@ -135,4 +135,3 @@ config X86_TSC_TIMER_EARLY_FREQ
 	default 400
 
 endif
-

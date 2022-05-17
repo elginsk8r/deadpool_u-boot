@@ -36,4 +36,3 @@ config SYS_CONFIG_NAME
 	default "tuxx1"
 
 endif
-

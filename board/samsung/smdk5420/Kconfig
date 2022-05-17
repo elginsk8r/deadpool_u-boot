@@ -49,4 +49,3 @@ config SYS_CONFIG_NAME
 	default "smdk5420"
 
 endif
-

@@ -33,4 +33,3 @@ source "drivers/tee/optee/Kconfig"
 endmenu
 
 endif
-

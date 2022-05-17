@@ -1,13 +1,6 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * \file        v2_burning_i.h
- * \brief       internal include interfaces
- *
- * \version     1.0.0
- * \date        2013/11/4
- * \author      Sam.Wu <yihui.wu@amlgic.com>
- *
- * Copyright (c) 2013 Amlogic Inc.. All Rights Reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef __V2_BURNING_I_H__
@@ -22,6 +15,9 @@
 #include <malloc.h>
 #include <u-boot/sha1.h>
 #include <console.h>
+#include <asm/arch/secure_apb.h>
+#include <asm/arch/io.h>
+#include <asm/arch/bl31_apis.h>
 
 #include <amlogic/aml_v2_burning.h>
 //#include <asm/arch/reboot.h>
@@ -32,6 +28,7 @@
 #include "v2_common/optimus_download.h"
 #include "v2_common/amlImage_if.h"
 #include "v2_common/optimus_progress_ui.h"
+#include <amlogic/store_wrapper.h>
 
 extern int cli_simple_parse_line(char *line, char *argv[]);
 #ifndef getenv

@@ -33,4 +33,3 @@ config VIDEO_BRIDGE_ANALOGIX_ANX6345
 	help
 	 The Analogix ANX6345 is RGB-to-DP converter. It enables an eDP LCD
 	 panel to be connected to an parallel LCD interface.
-

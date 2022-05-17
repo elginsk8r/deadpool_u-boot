@@ -48,4 +48,3 @@ config DFU_SF
 
 endif
 endmenu
-

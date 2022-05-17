@@ -45,4 +45,3 @@ config SYS_FSL_SEC_COMPAT
 
 config SYS_FSL_SEC_LE
 	bool "Little-endian access to Freescale Secure Boot"
-

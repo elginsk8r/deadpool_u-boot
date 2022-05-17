@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Command d2pll & ddrtest support.
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include <common.h>
@@ -7,8 +8,8 @@
 #include <asm/arch/io.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/romboot.h>
-#include <asm/arch/watchdog.h>
-#include <asm/arch/cpu_id.h>
+#include <asm/arch/cpu_reset.h>
+#include <amlogic/cpu_id.h>
 
 int do_ddr2pll(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {

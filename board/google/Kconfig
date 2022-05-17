@@ -59,4 +59,3 @@ source "board/google/chromebox_panther/Kconfig"
 source "board/google/chromebook_samus/Kconfig"
 
 endif
-

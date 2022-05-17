@@ -118,4 +118,6 @@ endif
 
 obj-y += libavb/
 
+obj-$(CONFIG_CHROMECAST) += chromecast/
+
 subdir-ccflags-$(CONFIG_CC_OPTIMIZE_LIBS_FOR_SPEED) += -O2

@@ -13,4 +13,3 @@ config SYS_TEXT_BASE
 	default 0x80000000
 
 endif
-

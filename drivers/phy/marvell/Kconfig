@@ -7,4 +7,3 @@ config MVEBU_COMPHY_SUPPORT
 	  This driver passes over the lanes
 	  and initialize the lane depends on the
 	  type and speed.
-

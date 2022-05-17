@@ -167,4 +167,3 @@ source "board/ti/dra7xx/Kconfig"
 source "board/ti/am57xx/Kconfig"
 
 endif
-

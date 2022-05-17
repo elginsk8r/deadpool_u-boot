@@ -16,4 +16,3 @@ config SYS_CONFIG_NAME
 	default "display5"
 
 endif
-

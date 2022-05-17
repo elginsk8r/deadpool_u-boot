@@ -1,23 +1,7 @@
-
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/include/asm/arch-txl/bl31_apis.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 /*
  * Trustzone API
@@ -48,7 +32,6 @@
 #define GET_SHARE_STORAGE_BLOCK_SIZE		0x82000027
 #define SET_STORAGE_INFO		0x82000028
 #define SET_REBOOT_REASON		0x82000049
-#define GET_DVFS_TABLE_INDEX            0x82000088
 
 /* Set Reboot Reason then Reboot*/
 #define PSCI_SYS_REBOOT		0x84000009
@@ -95,6 +78,17 @@
 
 /*viu probe en*/
 #define VIU_PREOBE_EN		0x82000080
+
+/* KEYMASTER */
+#define SET_BOOT_PARAMS		0x82000072
+#define SHA256_DIGEST_SIZE  32
+typedef struct {
+	uint32_t device_locked;
+	uint32_t verified_boot_state;
+	uint8_t verified_boot_key[SHA256_DIGEST_SIZE];
+	uint8_t verified_boot_hash[SHA256_DIGEST_SIZE];
+} keymaster_boot_params;
+
 /* Secure HAL APIs */
 #define TRUSTZONE_HAL_API_SRAM                  0x400
 
@@ -117,6 +111,7 @@ struct sram_hal_api_arg {
 #define JTAG_A53_EE 3
 #define CLUSTER_BIT 2
 
+#define GET_AVBKEY_FROM_FIP              0x820000b0
 
 /////////////////////////////////////////////////////////////////////////////////
 #define AML_DATA_PROCESS                 (0x820000FF)
@@ -125,8 +120,6 @@ struct sram_hal_api_arg {
 	#define AML_D_P_W_EFUSE_CUSTOMER_ID  (0x12)
 	#define AML_D_P_W_EFUSE_AMLOGIC 	 (0x20)
 	#define AML_D_P_IMG_DECRYPT          (0x40)
-	#define AML_D_P_IMG_DECRYPT_V3       (0x41)
-	#define AML_D_P_EXT_IMG_DECRYPT_V3   (0x51)
 	#define AML_D_P_UPGRADE_CHECK        (0x80)
 	#define AML_D_Q_IMG_SIG_HDR_SIZE     (0x100)
 
@@ -142,7 +135,6 @@ struct sram_hal_api_arg {
 
 void aml_set_jtag_state(unsigned state, unsigned select);
 unsigned aml_get_reboot_reason(void);
-unsigned aml_get_dvfs_id(void);
 unsigned aml_reboot(uint64_t function_id, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 void aml_set_reboot_reason(uint64_t function_id, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 unsigned long aml_sec_boot_check(unsigned long ,unsigned long ,unsigned long,unsigned long );
@@ -153,4 +145,6 @@ void aml_system_off(void);
 void bl31_get_chipid(unsigned int *, unsigned int *,
 	unsigned int *, unsigned int *);
 void set_viu_probe_enable(void);
+int32_t set_boot_params(const keymaster_boot_params*);
+int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen);
 #endif

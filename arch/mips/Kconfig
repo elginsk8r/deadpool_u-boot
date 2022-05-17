@@ -479,4 +479,3 @@ config MIPS_BOOT_CONFIG_WORD1
 endif
 
 endmenu
-

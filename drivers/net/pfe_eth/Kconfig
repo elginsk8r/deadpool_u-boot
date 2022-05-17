@@ -10,4 +10,3 @@ config SYS_FSL_PFE_ADDR
 	default 0x04000000
 
 endif
-

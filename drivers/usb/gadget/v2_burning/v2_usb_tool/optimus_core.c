@@ -1,11 +1,17 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #include <common.h>
 #include <command.h>
 
-#include "platform.h"
+#include "../../platform.h"
 #include "usb_pcd.h"
 
 #include "usb_pcd.c"
-#include "platform.c"
+//#include "../../platform.c"
+
 #include "dwc_pcd.c"
 #include "dwc_pcd_irq.c"
 

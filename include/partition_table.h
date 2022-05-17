@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #ifndef _PARTITION_TABLE_H
 #define _PARTITION_TABLE_H
 // #ifdef CONFIG_STORE_COMPATIBLE
@@ -54,6 +59,9 @@ extern int info_disprotect;
 
 extern int has_boot_slot;
 extern int has_system_slot;
+extern bool dynamic_partition;
+extern bool vendor_boot_partition;
+extern bool gpt_partition;
 
 extern int get_partition_from_dts(unsigned char * buffer);
 

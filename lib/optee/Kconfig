@@ -37,4 +37,3 @@ config BOOTM_OPTEE
 	  Select this command to enable chain-loading of a Linux kernel
 	  via an OPTEE firmware.
 	  The bootflow is BootROM -> u-boot -> OPTEE -> Linux in this case.
-

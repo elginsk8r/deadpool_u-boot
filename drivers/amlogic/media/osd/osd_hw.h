@@ -1,19 +1,7 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/amlogic/media/osd/osd_hw.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
-*/
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #ifndef _OSD_HW_H_
 #define _OSD_HW_H_
@@ -22,7 +10,8 @@
 
 #define REG_OFFSET (0x20)
 #define OSD_RELATIVE_BITS 0x33370
-
+extern void osd_init_hw_viu2(void);
+extern int osd_get_chip_type(void);
 extern void osd_init_hw(void);
 extern void osd_set_color_key_hw(u32 index, u32 bpp, u32 colorkey);
 extern void osd_srckey_enable_hw(u32  index, u8 enable);

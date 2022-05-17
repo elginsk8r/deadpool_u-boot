@@ -6,4 +6,3 @@ config AML_NAND
 config SECURE_NAND
 	bool "secure nand"
 	depends on AML_NAND
-

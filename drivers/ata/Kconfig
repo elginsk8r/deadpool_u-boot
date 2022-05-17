@@ -111,4 +111,3 @@ config AHCI_MVEBU
 
 	  If unsure, say N.
 endmenu
-

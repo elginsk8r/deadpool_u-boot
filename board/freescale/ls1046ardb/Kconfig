@@ -29,4 +29,3 @@ endif
 
 source "board/freescale/common/Kconfig"
 endif
-

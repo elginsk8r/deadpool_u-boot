@@ -1,20 +1,7 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/amlogic/media/osd/vpp.h
- *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
-*/
-
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
 
 #ifndef _VPP_H_
 #define _VPP_H_
@@ -31,5 +18,9 @@
 #define VPP_PRE_FG_OSD2             (1 << 5)
 #define VPP_PREBLEND_EN             (1 << 6)
 #define VPP_POST_FG_OSD2            (1 << 4)
+
+#define VPP_WATER_MARK_10BIT        (1 << 10)
+
+void set_vpp_matrix(int m_select, int *s, int on);
 
 #endif

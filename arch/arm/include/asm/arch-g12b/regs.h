@@ -1,10 +1,8 @@
-// ----------------------------------------------------------------------
-// regs.h header
-//
-// bus base define, update manually
-//
-// ----------------------------------------------------------------------
-//
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #ifndef _BASE_REGISTER
 #define _BASE_REGISTER
 #define REG_BASE_AOBUS                  (0xFF800000L)
@@ -13318,8 +13316,8 @@
 #define P_WATCHDOG_CNTL1                           (volatile unsigned int *)((0x3c35  << 2) + 0xffd00000)
 #define   WATCHDOG_TCNT                            (0x3c36)
 #define P_WATCHDOG_TCNT                            (volatile unsigned int *)((0x3c36  << 2) + 0xffd00000)
-#define   WATCHDOG_RESET                           (0x3c37)
-#define P_WATCHDOG_RESET                           (volatile unsigned int *)((0x3c37  << 2) + 0xffd00000)
+#define   WATCHDOG_RST                             (0x3c37)
+#define P_WATCHDOG_RST                             (volatile unsigned int *)((0x3c37  << 2) + 0xffd00000)
 // -----------------------------------------------------------
 #define   AHB_ARBITER_REG                          (0x3c42)
 #define P_AHB_ARBITER_REG                          (volatile unsigned int *)((0x3c42  << 2) + 0xffd00000)
@@ -32583,7 +32581,6 @@
 //===========================================================================
 // -----------------------------------------------
 // CBUS_BASE:  DSI_CBUS_BASE = 0x1c
-#define MIPI_DSI_REGISTER
 // -----------------------------------------------
 //------------------------------------------------------------------------------
 // DWC IP registers: Synopsys IP, please refer to MIPI DSI HOST Databook
@@ -32780,3 +32777,185 @@
 // synopsys translate_on
 //
 // Closing file:  dsi_regs.h
+#define VD1_HDR2_CTRL                      0x3800
+#define VD1_HDR2_CLK_GATE                  0x3801
+#define VD1_HDR2_MATRIXI_COEF00_01         0x3802
+#define VD1_HDR2_MATRIXI_COEF02_10         0x3803
+#define VD1_HDR2_MATRIXI_COEF11_12         0x3804
+#define VD1_HDR2_MATRIXI_COEF20_21         0x3805
+#define VD1_HDR2_MATRIXI_COEF22            0x3806
+#define VD1_HDR2_MATRIXI_COEF30_31         0x3807
+#define VD1_HDR2_MATRIXI_COEF32_40         0x3808
+#define VD1_HDR2_MATRIXI_COEF41_42         0x3809
+#define VD1_HDR2_MATRIXI_OFFSET0_1         0x380a
+#define VD1_HDR2_MATRIXI_OFFSET2           0x380b
+#define VD1_HDR2_MATRIXI_PRE_OFFSET0_1     0x380c
+#define VD1_HDR2_MATRIXI_PRE_OFFSET2       0x380d
+#define VD1_HDR2_MATRIXO_COEF00_01         0x380e
+#define VD1_HDR2_MATRIXO_COEF02_10         0x380f
+#define VD1_HDR2_MATRIXO_COEF11_12         0x3810
+#define VD1_HDR2_MATRIXO_COEF20_21         0x3811
+#define VD1_HDR2_MATRIXO_COEF22            0x3812
+#define VD1_HDR2_MATRIXO_COEF30_31         0x3813
+#define VD1_HDR2_MATRIXO_COEF32_40         0x3814
+#define VD1_HDR2_MATRIXO_COEF41_42         0x3815
+#define VD1_HDR2_MATRIXO_OFFSET0_1         0x3816
+#define VD1_HDR2_MATRIXO_OFFSET2           0x3817
+#define VD1_HDR2_MATRIXO_PRE_OFFSET0_1     0x3818
+#define VD1_HDR2_MATRIXO_PRE_OFFSET2       0x3819
+#define VD1_HDR2_MATRIXI_CLIP              0x381a
+#define VD1_HDR2_MATRIXO_CLIP              0x381b
+#define VD1_HDR2_CGAIN_OFFT                0x381c
+#define VD1_EOTF_LUT_ADDR_PORT             0x381e
+#define VD1_EOTF_LUT_DATA_PORT             0x381f
+#define VD1_OETF_LUT_ADDR_PORT             0x3820
+#define VD1_OETF_LUT_DATA_PORT             0x3821
+#define VD1_CGAIN_LUT_ADDR_PORT            0x3822
+#define VD1_CGAIN_LUT_DATA_PORT            0x3823
+#define VD1_HDR2_CGAIN_COEF0               0x3824
+#define VD1_HDR2_CGAIN_COEF1               0x3825
+#define VD1_OGAIN_LUT_ADDR_PORT            0x3826
+#define VD1_OGAIN_LUT_DATA_PORT            0x3827
+#define VD1_HDR2_ADPS_CTRL                 0x3828
+#define VD1_HDR2_ADPS_ALPHA0               0x3829
+#define VD1_HDR2_ADPS_ALPHA1               0x382a
+#define VD1_HDR2_ADPS_BETA0                0x382b
+#define VD1_HDR2_ADPS_BETA1                0x382c
+#define VD1_HDR2_ADPS_BETA2                0x382d
+#define VD1_HDR2_ADPS_COEF0                0x382e
+#define VD1_HDR2_ADPS_COEF1                0x382f
+#define VD1_HDR2_GMUT_CTRL                 0x3830
+#define VD1_HDR2_GMUT_COEF0                0x3831
+#define VD1_HDR2_GMUT_COEF1                0x3832
+#define VD1_HDR2_GMUT_COEF2                0x3833
+#define VD1_HDR2_GMUT_COEF3                0x3834
+#define VD1_HDR2_GMUT_COEF4                0x3835
+#define VD1_HDR2_PIPE_CTRL1                0x3836
+#define VD1_HDR2_PIPE_CTRL2                0x3837
+#define VD1_HDR2_PIPE_CTRL3                0x3838
+#define VD1_HDR2_PROC_WIN1                 0x3839
+#define VD1_HDR2_PROC_WIN2                 0x383a
+#define VD1_HDR2_MATRIXI_EN_CTRL           0x383b
+#define VD1_HDR2_MATRIXO_EN_CTRL           0x383c
+
+#define VD2_HDR2_CTRL                      0x3850
+#define VD2_HDR2_CLK_GATE                  0x3851
+#define VD2_HDR2_MATRIXI_COEF00_01         0x3852
+#define VD2_HDR2_MATRIXI_COEF02_10         0x3853
+#define VD2_HDR2_MATRIXI_COEF11_12         0x3854
+#define VD2_HDR2_MATRIXI_COEF20_21         0x3855
+#define VD2_HDR2_MATRIXI_COEF22            0x3856
+#define VD2_HDR2_MATRIXI_COEF30_31         0x3857
+#define VD2_HDR2_MATRIXI_COEF32_40         0x3858
+#define VD2_HDR2_MATRIXI_COEF41_42         0x3859
+#define VD2_HDR2_MATRIXI_OFFSET0_1         0x385a
+#define VD2_HDR2_MATRIXI_OFFSET2           0x385b
+#define VD2_HDR2_MATRIXI_PRE_OFFSET0_1     0x385c
+#define VD2_HDR2_MATRIXI_PRE_OFFSET2       0x385d
+#define VD2_HDR2_MATRIXO_COEF00_01         0x385e
+#define VD2_HDR2_MATRIXO_COEF02_10         0x385f
+#define VD2_HDR2_MATRIXO_COEF11_12         0x3860
+#define VD2_HDR2_MATRIXO_COEF20_21         0x3861
+#define VD2_HDR2_MATRIXO_COEF22            0x3862
+#define VD2_HDR2_MATRIXO_COEF30_31         0x3863
+#define VD2_HDR2_MATRIXO_COEF32_40         0x3864
+#define VD2_HDR2_MATRIXO_COEF41_42         0x3865
+#define VD2_HDR2_MATRIXO_OFFSET0_1         0x3866
+#define VD2_HDR2_MATRIXO_OFFSET2           0x3867
+#define VD2_HDR2_MATRIXO_PRE_OFFSET0_1     0x3868
+#define VD2_HDR2_MATRIXO_PRE_OFFSET2       0x3869
+#define VD2_HDR2_MATRIXI_CLIP              0x386a
+#define VD2_HDR2_MATRIXO_CLIP              0x386b
+#define VD2_HDR2_CGAIN_OFFT                0x386c
+#define VD2_EOTF_LUT_ADDR_PORT             0x386e
+#define VD2_EOTF_LUT_DATA_PORT             0x386f
+#define VD2_OETF_LUT_ADDR_PORT             0x3870
+#define VD2_OETF_LUT_DATA_PORT             0x3871
+#define VD2_CGAIN_LUT_ADDR_PORT            0x3872
+#define VD2_CGAIN_LUT_DATA_PORT            0x3873
+#define VD2_HDR2_CGAIN_COEF0               0x3874
+#define VD2_HDR2_CGAIN_COEF1               0x3875
+#define VD2_OGAIN_LUT_ADDR_PORT            0x3876
+#define VD2_OGAIN_LUT_DATA_PORT            0x3877
+#define VD2_HDR2_ADPS_CTRL                 0x3878
+#define VD2_HDR2_ADPS_ALPHA0               0x3879
+#define VD2_HDR2_ADPS_ALPHA1               0x387a
+#define VD2_HDR2_ADPS_BETA0                0x387b
+#define VD2_HDR2_ADPS_BETA1                0x387c
+#define VD2_HDR2_ADPS_BETA2                0x387d
+#define VD2_HDR2_ADPS_COEF0                0x387e
+#define VD2_HDR2_ADPS_COEF1                0x387f
+#define VD2_HDR2_GMUT_CTRL                 0x3880
+#define VD2_HDR2_GMUT_COEF0                0x3881
+#define VD2_HDR2_GMUT_COEF1                0x3882
+#define VD2_HDR2_GMUT_COEF2                0x3883
+#define VD2_HDR2_GMUT_COEF3                0x3884
+#define VD2_HDR2_GMUT_COEF4                0x3885
+#define VD2_HDR2_PIPE_CTRL1                0x3886
+#define VD2_HDR2_PIPE_CTRL2                0x3887
+#define VD2_HDR2_PIPE_CTRL3                0x3888
+#define VD2_HDR2_PROC_WIN1                 0x3889
+#define VD2_HDR2_PROC_WIN2                 0x388a
+#define VD2_HDR2_MATRIXI_EN_CTRL           0x388b
+#define VD2_HDR2_MATRIXO_EN_CTRL           0x388c
+
+#define OSD1_HDR2_CTRL                      0x38a0
+#define OSD1_HDR2_CLK_GATE                  0x38a1
+#define OSD1_HDR2_MATRIXI_COEF00_01         0x38a2
+#define OSD1_HDR2_MATRIXI_COEF02_10         0x38a3
+#define OSD1_HDR2_MATRIXI_COEF11_12         0x38a4
+#define OSD1_HDR2_MATRIXI_COEF20_21         0x38a5
+#define OSD1_HDR2_MATRIXI_COEF22            0x38a6
+#define OSD1_HDR2_MATRIXI_COEF30_31         0x38a7
+#define OSD1_HDR2_MATRIXI_COEF32_40         0x38a8
+#define OSD1_HDR2_MATRIXI_COEF41_42         0x38a9
+#define OSD1_HDR2_MATRIXI_OFFSET0_1         0x38aa
+#define OSD1_HDR2_MATRIXI_OFFSET2           0x38ab
+#define OSD1_HDR2_MATRIXI_PRE_OFFSET0_1     0x38ac
+#define OSD1_HDR2_MATRIXI_PRE_OFFSET2       0x38ad
+#define OSD1_HDR2_MATRIXO_COEF00_01         0x38ae
+#define OSD1_HDR2_MATRIXO_COEF02_10         0x38af
+#define OSD1_HDR2_MATRIXO_COEF11_12         0x38b0
+#define OSD1_HDR2_MATRIXO_COEF20_21         0x38b1
+#define OSD1_HDR2_MATRIXO_COEF22            0x38b2
+#define OSD1_HDR2_MATRIXO_COEF30_31         0x38b3
+#define OSD1_HDR2_MATRIXO_COEF32_40         0x38b4
+#define OSD1_HDR2_MATRIXO_COEF41_42         0x38b5
+#define OSD1_HDR2_MATRIXO_OFFSET0_1         0x38b6
+#define OSD1_HDR2_MATRIXO_OFFSET2           0x38b7
+#define OSD1_HDR2_MATRIXO_PRE_OFFSET0_1     0x38b8
+#define OSD1_HDR2_MATRIXO_PRE_OFFSET2       0x38b9
+#define OSD1_HDR2_MATRIXI_CLIP              0x38ba
+#define OSD1_HDR2_MATRIXO_CLIP              0x38bb
+#define OSD1_HDR2_CGAIN_OFFT                0x38bc
+#define OSD1_EOTF_LUT_ADDR_PORT             0x38be
+#define OSD1_EOTF_LUT_DATA_PORT             0x38bf
+#define OSD1_OETF_LUT_ADDR_PORT             0x38c0
+#define OSD1_OETF_LUT_DATA_PORT             0x38c1
+#define OSD1_CGAIN_LUT_ADDR_PORT            0x38c2
+#define OSD1_CGAIN_LUT_DATA_PORT            0x38c3
+#define OSD1_HDR2_CGAIN_COEF0               0x38c4
+#define OSD1_HDR2_CGAIN_COEF1               0x38c5
+#define OSD1_OGAIN_LUT_ADDR_PORT            0x38c6
+#define OSD1_OGAIN_LUT_DATA_PORT            0x38c7
+#define OSD1_HDR2_ADPS_CTRL                 0x38c8
+#define OSD1_HDR2_ADPS_ALPHA0               0x38c9
+#define OSD1_HDR2_ADPS_ALPHA1               0x38ca
+#define OSD1_HDR2_ADPS_BETA0                0x38cb
+#define OSD1_HDR2_ADPS_BETA1                0x38cc
+#define OSD1_HDR2_ADPS_BETA2                0x38cd
+#define OSD1_HDR2_ADPS_COEF0                0x38ce
+#define OSD1_HDR2_ADPS_COEF1                0x38cf
+#define OSD1_HDR2_GMUT_CTRL                 0x38d0
+#define OSD1_HDR2_GMUT_COEF0                0x38d1
+#define OSD1_HDR2_GMUT_COEF1                0x38d2
+#define OSD1_HDR2_GMUT_COEF2                0x38d3
+#define OSD1_HDR2_GMUT_COEF3                0x38d4
+#define OSD1_HDR2_GMUT_COEF4                0x38d5
+#define OSD1_HDR2_PIPE_CTRL1                0x38d6
+#define OSD1_HDR2_PIPE_CTRL2                0x38d7
+#define OSD1_HDR2_PIPE_CTRL3                0x38d8
+#define OSD1_HDR2_PROC_WIN1                 0x38d9
+#define OSD1_HDR2_PROC_WIN2                 0x38da
+#define OSD1_HDR2_MATRIXI_EN_CTRL           0x38db
+#define OSD1_HDR2_MATRIXO_EN_CTRL           0x38dc

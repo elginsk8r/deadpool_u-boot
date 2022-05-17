@@ -130,4 +130,3 @@ config CLK_MPC83XX
 	  Support for the clock driver of the MPC83xx series of SoCs.
 
 endmenu
-

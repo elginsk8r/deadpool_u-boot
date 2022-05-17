@@ -24,4 +24,3 @@ config TDX_CFG_BLOCK_2ND_ETHADDR
 source "board/toradex/common/Kconfig"
 
 endif
-

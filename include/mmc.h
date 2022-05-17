@@ -72,7 +72,6 @@
 #define MMC_MODE_1BIT		BIT(28)
 #define MMC_MODE_SPI		BIT(27)
 
-
 #define SD_DATA_4BIT	0x00040000
 
 #define IS_SD(x)	((x)->version & SD_VERSION_SD)
@@ -112,10 +111,10 @@
 #define MMC_CMD_SPI_READ_OCR		58
 #define MMC_CMD_SPI_CRC_ON_OFF		59
 #define MMC_CMD_RES_MAN			62
+#define MMC_SD_HS_TUNING		70
 
 #define MMC_CMD62_ARG1			0xefac62ec
 #define MMC_CMD62_ARG2			0xcbaea7
-
 
 #define SD_CMD_SEND_RELATIVE_ADDR	3
 #define SD_CMD_SWITCH_FUNC		6
@@ -128,6 +127,9 @@
 #define SD_CMD_ERASE_WR_BLK_END		33
 #define SD_CMD_APP_SEND_OP_COND		41
 #define SD_CMD_APP_SEND_SCR		51
+
+#define MMC_KEY_SIZE            (256*1024)
+#define EMMC_KEY_DEV            (1)
 
 static inline bool mmc_is_tuning_cmd(uint cmdidx)
 {
@@ -370,9 +372,6 @@ enum mmc_voltage {
  */
 #define MMC_NUM_BOOT_PARTITION	2
 #define MMC_PART_RPMB           3       /* RPMB partition number */
-#define MMC_PART_BOOT1          2
-#define MMC_PART_BOOT0          1
-#define MMC_PART_USER           0
 
 /* Driver model support */
 
@@ -505,7 +504,7 @@ int dm_mmc_get_cd(struct udevice *dev);
 int dm_mmc_get_wp(struct udevice *dev);
 int dm_mmc_execute_tuning(struct udevice *dev, uint opcode);
 int dm_mmc_wait_dat0(struct udevice *dev, int state, int timeout);
-
+int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt);
 /* Transition functions for compatibility */
 int mmc_set_ios(struct mmc *mmc);
 void mmc_send_init_stream(struct mmc *mmc);
@@ -621,6 +620,7 @@ struct mmc {
 	uint scr[2];
 	uint csd[4];
 	uint cid[4];
+	char key_stamp;
 	ushort rca;
 	u8 part_support;
 	u8 part_attr;
@@ -674,6 +674,7 @@ struct mmc {
 				  * accessing the boot partitions
 				  */
 	u32 quirks;
+	bool is_gpt;
 };
 
 struct mmc_hwpart_conf {
@@ -695,6 +696,12 @@ enum mmc_hwpart_conf_mode {
 	MMC_HWPART_CONF_CHECK,
 	MMC_HWPART_CONF_SET,
 	MMC_HWPART_CONF_COMPLETE,
+};
+
+struct aml_key_info {
+	u64 checksum;
+	u32 stamp;
+	u32 magic;
 };
 
 struct mmc *mmc_create(const struct mmc_config *cfg, void *priv);

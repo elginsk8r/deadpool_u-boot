@@ -7,7 +7,6 @@
 #ifndef __CLI_H
 #define __CLI_H
 
-#ifdef CONFIG_CLI_ENABLED
 /**
  * Go into the command loop
  *
@@ -15,7 +14,6 @@
  * CONFIG_BOOT_RETRY_TIME.
  */
 void cli_simple_loop(void);
-#endif /* CONFIG_CLI_ENABLED */
 
 /**
  * cli_simple_run_command() - Execute a command with the simple CLI

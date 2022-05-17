@@ -10,4 +10,3 @@ config CLK_S900
         depends on CLK_OWL && ARM64
         help
           Enable support for the clocks in Actions Semi S900 SoC.
-

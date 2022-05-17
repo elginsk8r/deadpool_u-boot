@@ -40,4 +40,3 @@ config SMM_TSEG_SIZE
 	default 0x800000
 
 endif
-

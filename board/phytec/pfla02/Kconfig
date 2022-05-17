@@ -16,4 +16,3 @@ config SPL_DRAM_1_BANK
 	  of RAM
 
 endif
-

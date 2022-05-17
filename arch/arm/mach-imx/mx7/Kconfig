@@ -72,4 +72,3 @@ source "board/toradex/colibri_imx7/Kconfig"
 source "board/warp7/Kconfig"
 
 endif
-

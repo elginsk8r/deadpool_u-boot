@@ -22,4 +22,3 @@ config MSM_SMEM
       processors in a Qualcomm platform.
 
 endif # menu "SMEM Support"
-

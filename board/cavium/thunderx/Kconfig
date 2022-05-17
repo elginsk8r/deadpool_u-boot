@@ -25,4 +25,3 @@ config CMD_ATF
 	  and node count.
 
 endif
-

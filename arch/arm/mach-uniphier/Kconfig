@@ -120,4 +120,3 @@ config CMD_DDRMPHY_DUMP
 config SYS_SOC
 	default "uniphier-v7" if ARCH_UNIPHIER_LD4_SLD8 || ARCH_UNIPHIER_V7_MULTI
 endif
-

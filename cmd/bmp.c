@@ -63,7 +63,7 @@ bmp_image_t *gunzip_bmp(unsigned long addr, unsigned long *lenp,
 	bmp = dst;
 
 	/* align to 32-bit-aligned-address + 2 */
-	bmp = (bmp_image_t *)((((unsigned int)dst + 1) & ~3) + 2);
+	bmp = (bmp_image_t *)((((ulong)dst + 1) & ~3) + 2);
 
 	if (gunzip(bmp, CONFIG_SYS_VIDEO_LOGO_MAX_SIZE, (uchar *)addr, &len) != 0) {
 		free(dst);
@@ -289,6 +289,21 @@ int bmp_display(ulong addr, int x, int y)
 	if (!bmp) {
 		printf("There is no valid bmp file at the given address\n");
 		return 1;
+	}
+	/*Logo only supports compression of header files as BI_BITFIELDS && RGB565 BMP format*/
+	u32 bit_count = le32_to_cpu(bmp->header.bit_count);
+	if (bit_count == 16) {
+		u32 compression = le32_to_cpu(bmp->header.compression);
+		if (compression != BI_BITFIELDS) {
+			printf("Error: logo only supports BI_BITFIELDS\n");
+			return 1;
+		} else {
+			u32* colortable = (u32*)(&bmp->color_table);
+			if (colortable[0] != 0xf800 && colortable[1] != 0x7e0 &&  colortable[2] != 0x1f) {
+				printf("Error: logo only supports RGB565 forma\n");
+				return 1;
+			}
+		}
 	}
 
 #if defined(CONFIG_LCD)

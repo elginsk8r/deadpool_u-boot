@@ -45,6 +45,7 @@ struct i2c_regs {
 struct meson_i2c_data {
 	u8 delay_ajust;
 	u8 div_factor;
+	u32 clkin_rate;
 };
 
 struct meson_i2c {
@@ -217,8 +218,6 @@ static int meson_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 	struct meson_i2c *i2c = dev_get_priv(bus);
 	int i, ret = 0;
 
-	//i2c bus need 300us to ready
-	udelay(300);
 	for (i = 0; i < nmsgs; i++) {
 		ret = meson_i2c_xfer_msg(i2c, msg + i, i == nmsgs - 1);
 		if (ret)
@@ -231,7 +230,7 @@ static int meson_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 static int meson_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
 {
 	struct meson_i2c *i2c = dev_get_priv(bus);
-	unsigned int clk_rate = MESON_I2C_CLK_RATE;
+	unsigned int clk_rate = i2c->data->clkin_rate;
 	unsigned int div;
 
 	div = DIV_ROUND_UP(clk_rate, speed * i2c->data->div_factor);
@@ -248,7 +247,7 @@ static int meson_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
 	clrsetbits_le32(&i2c->regs->ctrl, REG_CTRL_CLKDIVEXT_MASK,
 			(div >> 10) << REG_CTRL_CLKDIVEXT_SHIFT);
 
-	debug("meson i2c: set clk %u, src %lu, div %u\n", speed, clk_rate, div);
+	debug("meson i2c: set clk %u, src %u, div %u\n", speed, clk_rate, div);
 
 	return 0;
 }
@@ -259,8 +258,6 @@ static int meson_i2c_probe(struct udevice *bus)
 
 	i2c->data = (struct meson_i2c_data *)dev_get_driver_data(bus);
 
-	clk_enable(&i2c->clk);
-
 	clrbits_le32(&i2c->regs->ctrl, REG_CTRL_START);
 
 	return 0;
@@ -269,16 +266,8 @@ static int meson_i2c_probe(struct udevice *bus)
 static int meson_i2c_ofdata_to_platdata(struct udevice *dev)
 {
 	struct meson_i2c *i2c = dev_get_priv(dev);
-	int ret;
 
 	i2c->regs = dev_read_addr_ptr(dev);
-
-	ret = clk_get_by_name(dev, "clk_i2c", &i2c->clk);
-	if (ret < 0) {
-		debug("%s: Can't get clock for %s: %d\n", __func__, dev->name,
-		      ret);
-		return ret;
-	}
 
 	return 0;
 }
@@ -286,16 +275,25 @@ static int meson_i2c_ofdata_to_platdata(struct udevice *dev)
 static const struct meson_i2c_data i2c_meson_meson6_data = {
 	.div_factor = 4,
 	.delay_ajust = 15,
+	.clkin_rate = MESON_I2C_CLK_RATE,
 };
 
 static const struct meson_i2c_data i2c_meson_gx_data = {
 	.div_factor = 4,
 	.delay_ajust = 15,
+	.clkin_rate = MESON_I2C_CLK_RATE,
 };
 
 static const struct meson_i2c_data i2c_meson_data = {
 	.div_factor = 3,
 	.delay_ajust = 15,
+	.clkin_rate = MESON_I2C_CLK_RATE,
+};
+
+static const struct meson_i2c_data i2c_meson_a1_data = {
+	.div_factor = 3,
+	.delay_ajust = 15,
+	.clkin_rate = 64000000,
 };
 
 static const struct dm_i2c_ops meson_i2c_ops = {
@@ -308,6 +306,7 @@ static const struct udevice_id meson_i2c_ids[] = {
 	{ .compatible = "amlogic,meson-gx-i2c", .data = (long)&i2c_meson_gx_data },
 	{ .compatible = "amlogic,meson-gxbb-i2c", .data = (long)&i2c_meson_gx_data },
 	{ .compatible = "amlogic,meson-i2c", .data = (long)&i2c_meson_data },
+	{ .compatible = "amlogic,meson-a1-i2c", .data = (long)&i2c_meson_a1_data },
 	{ }
 };
 

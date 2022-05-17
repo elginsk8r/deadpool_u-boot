@@ -55,4 +55,3 @@ source "board/qca/ap143/Kconfig"
 source "board/tplink/wdr4300/Kconfig"
 
 endmenu
-

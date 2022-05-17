@@ -18,6 +18,12 @@ config MMC_WRITE
 	help
 	  Enable write access to MMC and SD Cards
 
+config MMC_FBOOT
+	bool "support for MMC fast boot"
+	default n
+	help
+	  Enable MMC fast boot
+
 config MMC_BROKEN_CD
 	bool "Poll for broken card detection case"
 	help
@@ -619,21 +625,6 @@ config MMC_MTK
 	  This is needed if support for any SD/SDIO/MMC devices is required.
 	  If unsure, say N.
 
-config AML_REMOVE_BOOTLOADER_PARTITION
-	bool "aml remove bootloader partition macro"
-	default n
-	help
-	  aml remove bootloader partition macro.
-
-config AML_GPT_SYNC_ENTIRE_ENTRY
-	bool "aml restore the entire backup GPT entry data macro"
-	default n
-	help
-	  Disable this macro, GPT entry's type_guid&uuid uses the mapping table in u-boot,
-	  and the attribute byte maybe is different.
-	  Enable this macro, When restoring a damaged GPT, restore all bytes from the
-	  backup GPT entry.
-
 endif
 
 config TEGRA124_MMC_DISABLE_EXT_LOOPBACK
@@ -666,4 +657,3 @@ config SYS_FSL_ERRATUM_ESDHC135
 
 config SYS_FSL_ERRATUM_ESDHC_A001
 	bool
-

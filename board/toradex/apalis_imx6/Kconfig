@@ -53,4 +53,3 @@ config TDX_APALIS_IMX6_V1_0
 source "board/toradex/common/Kconfig"
 
 endif
-

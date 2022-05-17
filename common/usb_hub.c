@@ -271,7 +271,7 @@ int usb_hub_port_reset(struct usb_device *dev, int port,
 	int err, tries;
 	ALLOC_CACHE_ALIGN_BUFFER(struct usb_port_status, portsts, 1);
 	unsigned short portstatus, portchange;
-	int delay = HUB_SHORT_RESET_TIME; /* start with short reset delay */
+	int delay = HUB_LONG_RESET_TIME; /* start with short reset delay */
 
 #if CONFIG_IS_ENABLED(DM_USB)
 	debug("%s: resetting '%s' port %d...\n", __func__, dev->dev->name,
@@ -397,10 +397,12 @@ int usb_hub_port_connect_change(struct usb_device *dev, int port)
 	}
 
 #ifdef CONFIG_USB_DEVICE_V2
+#if CONFIG_IS_ENABLED(DM_USB)
 	if (usb_hub_is_root_hub(dev->dev)) {
 		usb_tuning_port(dev, port);
 		mdelay(10);
 	}
+#endif
 #endif
 
 #if CONFIG_IS_ENABLED(DM_USB)

@@ -16,4 +16,3 @@ config CMD_ZYNQMP
 	  BOOT.BIN using Xilinx bootgen tool.
 
 endif
-

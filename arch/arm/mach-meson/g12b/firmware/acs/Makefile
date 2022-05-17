@@ -200,10 +200,6 @@ OD			:=	${CROSS_COMPILE}objdump
 NM			:=	${CROSS_COMPILE}nm
 PP			:=	${CROSS_COMPILE}gcc -E ${CFLAGS}
 
-ifeq ($(BL33_DEBUG), 1)
-	CFLAGS += -DBL33_DEBUG_PRINT
-endif
-
 # Variables for use with Firmware Image Package
 FIPTOOLPATH		?=	tools/fip_create
 FIPTOOL			?=	${FIPTOOLPATH}/fip_create

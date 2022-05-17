@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Unify interfaces for read/write nandkey/emmckey/efuse key
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
+
 #include "key_manage_i.h"
 #include <amlogic/keyunify.h>
 #include <linux/ctype.h>
@@ -55,12 +57,34 @@ static KmDevKeyOps _efuseKeyOps = {
 };
 #endif//#if defined(CONFIG_EFUSE)
 
+#if defined(CONFIG_KEYMAN_PROVISION_KEY)
+static KmDevKeyOps _provisionKeyOps = {
+        .pInitFunc           = keymanage_provision_init             ,
+        .pUninitFunc         = keymanage_provision_exit             ,
+        .pWriteFunc          = keymanage_provision_write            ,
+        .pGetSize            = keymanage_provision_size             ,
+        .pKeyExist           = keymanage_provision_exist            ,
+        .pKeyCanRead         = keymanage_provision_query_can_read   ,
+        .pReadFunc           = keymanage_provision_read             ,
+
+        .can_overwrite       = 1                                    ,
+};
+#endif//#if defined(CONFIG_KEYMAN_PROVISION_KEY)
+
 #define _KM_DEV_INDEX_SECUREKEY         0
+#define _KM_DEV_INDEX_PROVISION         1
+#if defined(CONFIG_KEYMAN_PROVISION_KEY)
+#define _KM_DEV_INDEX_EFUSE             2
+#else
 #define _KM_DEV_INDEX_EFUSE             1
+#endif//#if defined(CONFIG_KEYMAN_PROVISION_KEY)
 
 static KmDevKeyOps* _km_devKeyOpsArr[] = {
             [_KM_DEV_INDEX_SECUREKEY]      = &_SecukeyOps,
-#if 1
+#if defined(CONFIG_KEYMAN_PROVISION_KEY)
+            [_KM_DEV_INDEX_PROVISION]	   = &_provisionKeyOps,
+#endif//#if defined(CONFIG_KEYMAN_PROVISION_KEY)
+#if defined(CONFIG_EFUSE)
             [_KM_DEV_INDEX_EFUSE]          = &_efuseKeyOps,
 #endif//#if defined(CONFIG_EFUSE)
 };
@@ -173,6 +197,12 @@ int key_unify_init(const char* seedStr, const char* dtbLoadaddr)
         KM_ERR("Seed is 0 err\n");
         return __LINE__;
     }
+
+    if (amlkey_if_init(dtbLoadaddr)) {
+        KM_ERR("amlkey interface init fail\n");
+        return __LINE__;
+    }
+
     for (i=0; i < _KM_DEVCNT; i++)
     {
         KmDevKeyOps* theDevOps = _km_devKeyOpsArr[i];
@@ -228,6 +258,10 @@ static const KmDevKeyOps* _get_km_ops_by_name(const char* keyname)
             {
                 theDevOps = _km_devKeyOpsArr[_KM_DEV_INDEX_SECUREKEY];
             }
+            break;
+
+        case KEY_M_PROVISION_KEY:
+            theDevOps = _km_devKeyOpsArr[_KM_DEV_INDEX_PROVISION];
             break;
 
         case KEY_M_UNKNOW_DEV:
@@ -325,7 +359,6 @@ int key_unify_read(const char *keyname, void* keydata, const unsigned bufLen)
 
 int key_unify_query_size(const char* keyname, ssize_t* keysize)
 {
-    int ret = 0;
     const KmDevKeyOps* theDevOps  = NULL;
 
     theDevOps = _get_km_ops_by_name(keyname);
@@ -334,11 +367,13 @@ int key_unify_query_size(const char* keyname, ssize_t* keysize)
         return __LINE__;
     }
 
-    ret = theDevOps->pKeyCanRead(keyname);
+#if 0
+    int ret = theDevOps->pKeyCanRead(keyname);
     if (!ret) {
         KM_ERR("key[%s] can't read as it's secure\n", keyname);
         return __LINE__;
     }
+#endif
 
     *keysize = theDevOps->pGetSize(keyname);
 

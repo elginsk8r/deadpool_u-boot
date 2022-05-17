@@ -56,4 +56,3 @@ source "board/nvidia/ventana/Kconfig"
 source "board/toradex/colibri_t20/Kconfig"
 
 endif
-

@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ */
+
 #include <common.h>
 #include <asm/io.h>
 #include <command.h>
@@ -46,7 +51,7 @@ int r1p1_temp_read(int type)
 				udelay(50);
 				value_ts = readl(TS_PLL_STAT0) & 0xffff;
 			}
-			for (i = 0; i <= T_AVG_NUM; i ++) {
+			for (i = 0; i < T_READ_NUM; i ++) {
 				udelay(T_DLY_TIME);
 				value_ts = readl(TS_PLL_STAT0) & 0xffff;
 				if ((value_ts >= T_VALUE_MIN) &&
@@ -55,7 +60,12 @@ int r1p1_temp_read(int type)
 					cnt ++;
 				}
 			}
-			value_ts =  value_all_ts / cnt;
+			if (cnt) {
+				value_ts =  value_all_ts / cnt;
+			} else {
+				value_ts = 0;
+				printf("tsensor read temp cnt is zero");
+			}
 			printf("pll tsensor avg: 0x%x, u_efuse: 0x%x\n", value_ts, u_efuse);
 			if (value_ts == 0) {
 				printf("tsensor read temp is zero\n");
@@ -81,7 +91,7 @@ int r1p1_temp_read(int type)
 				udelay(50);
 				value_ts = readl(TS_DDR_STAT0) & 0xffff;
 			}
-			for (i = 0; i <= T_AVG_NUM; i ++) {
+			for (i = 0; i < T_READ_NUM; i ++) {
 				udelay(T_DLY_TIME);
 				value_ts = readl(TS_DDR_STAT0) & 0xffff;
 				if ((value_ts >= T_VALUE_MIN) &&
@@ -90,7 +100,12 @@ int r1p1_temp_read(int type)
 					cnt ++;
 				}
 			}
-			value_ts =  value_all_ts / cnt;
+			if (cnt) {
+				value_ts =  value_all_ts / cnt;
+			} else {
+				value_ts = 0;
+				printf("tsensor read temp cnt is zero");
+			}
 			printf("ddr tsensor avg: 0x%x, u_efuse: 0x%x\n", value_ts, u_efuse);
 			if (value_ts == 0) {
 				printf("tsensor read temp is zero\n");

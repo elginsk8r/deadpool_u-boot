@@ -30,4 +30,3 @@ config USB_ULPI
 	  PHY Transreceiver for USB controllers.
 
 	  This driver uses ULPI viewports that are specific for each SoC.
-

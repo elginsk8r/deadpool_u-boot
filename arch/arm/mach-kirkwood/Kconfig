@@ -91,4 +91,3 @@ source "board/alliedtelesis/SBx81LIFKW/Kconfig"
 source "board/alliedtelesis/SBx81LIFXCAT/Kconfig"
 
 endif
-

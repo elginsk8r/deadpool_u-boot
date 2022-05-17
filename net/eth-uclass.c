@@ -13,7 +13,10 @@
 #include <dm/uclass-internal.h>
 #include "eth_internal.h"
 #include <amlogic/keyunify.h>
-#include <asm/arch/cpu_id.h>
+#include <amlogic/cpu_id.h>
+#if defined MAC_ADDR_NEW
+#include <asm/arch/register.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -459,7 +462,6 @@ static int eth_pre_unbind(struct udevice *dev)
 
 static int eth_get_efuse_mac(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev->platdata;
 #ifndef CONFIG_UNIFY_KEY_MANAGE
 	debug("\nWarning: %s MAC addresses is not from dtb\n",
 				dev->name);
@@ -471,6 +473,7 @@ static int eth_get_efuse_mac(struct udevice *dev)
 	ssize_t keysize = 0;
 	const char* seedNum = "0x1234";
 	unsigned char buf[MAC_MAX_LEN+1] = {0};
+	struct eth_pdata *pdata = dev->platdata;
 
 	err = key_unify_init(seedNum, NULL);
 	if (err)
@@ -500,6 +503,8 @@ static int eth_get_efuse_mac(struct udevice *dev)
 	return key_unify_uninit();
 #endif
 }
+
+static char env_str[32];
 static int eth_post_probe(struct udevice *dev)
 {
 	struct eth_device_priv *priv = dev->uclass_priv;
@@ -545,14 +550,22 @@ static int eth_post_probe(struct udevice *dev)
 		eth_env_set_enetaddr_by_index("eth", ARP_HLEN,
 					      pdata->enetaddr);
 	} else {
+#if defined MAC_ADDR_NEW
+		unsigned int reg18;
+		reg18 = *(unsigned int *)SYSCTRL_SEC_STATUS_REG18;
+		sprintf((char *)env_str,"02:ad:%02x:01:%02x:%02x", ((reg18 >> 24) & 0xff),
+				((reg18 >> 8) & 0xff), (reg18 & 0xff));
+		printf("MACADDR:%s(from sec_reg)\n", env_str);
+		env_set("ethaddr", (const char *)env_str);
+#else
 		uint8_t buff[16];
 		if (get_chip_id(&buff[0], sizeof(buff)) == 0) {
-			sprintf((char *)env_enetaddr,"02:%02x:%02x:%02x:%02x:%02x",buff[8],
-				buff[7],buff[6],buff[5],buff[4]);
-			printf("MACADDR:%s(from chipid)\n",env_enetaddr);
-			env_set("ethaddr",(const char *)env_enetaddr);
+			sprintf((char *)env_str,"02:%02x:%02x:%02x:%02x:%02x", buff[8],
+				buff[7], buff[6], buff[5], buff[4]);
+			printf("MACADDR:%s(from chipid)\n", env_str);
+			env_set("ethaddr", (const char *)env_str);
 		}
-
+#endif
 		eth_env_get_enetaddr_by_index("eth", dev->seq, env_enetaddr);
 		if (!is_zero_ethaddr(env_enetaddr)) {
 			if (!is_zero_ethaddr(pdata->enetaddr) &&

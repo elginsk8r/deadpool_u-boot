@@ -21,4 +21,3 @@ config BAV_VERSION
 	  Overwrite this if you have an older Rev.A and want ethernet support.
 
 endif
-

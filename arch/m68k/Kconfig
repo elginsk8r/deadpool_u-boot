@@ -225,4 +225,3 @@ source "board/sysam/amcore/Kconfig"
 source "board/sysam/stmark2/Kconfig"
 
 endmenu
-

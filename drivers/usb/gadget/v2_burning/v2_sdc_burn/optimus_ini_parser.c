@@ -1,14 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * \file        optimus_ini_parser.c
- * \brief       ini parsing utilities for sdc burnning
- *
- * \version     1.0.0
- * \date        2013-7-11
- * \author      Sam.Wu <yihui.wu@amlgic.com>
- *
- * Copyright (c) 2013 Amlogic. All Rights Reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
+
 #include "optimus_sdc_burn_i.h"
 
 #define dbg(fmt ...)  //printf("[INI]"fmt)
@@ -229,6 +223,28 @@ int parse_ini_file_2_valid_lines(const char* filePath, char* iniBuf, const unsig
 
     return lineNum;
 }
+
+int parse_ini_buf_2_valid_lines(char* iniBuf, const unsigned bufSz, char* lines[])
+{
+    const int MaxLines = 1024;//
+    int ret = 0;
+    unsigned lineNum = 0;
+
+    iniBuf[bufSz] = 0;
+
+    //step1:first loop to seprate buffer to lines
+    ret = _optimus_parse_buf_2_lines(iniBuf, bufSz, (const char**)lines, &lineNum, MaxLines);
+    if (ret) {
+            err("Fail to parse buf to lines.ret=%d\n", ret);
+            return 0;
+    }
+
+    //step 2: abandon comment or space lines
+    ret = _optimus_abandon_ini_comment_lines(lines, lineNum);
+
+    return lineNum;
+}
+
 
 int optimus_ini_trans_lines_2_usr_params(const char* const lines[], const unsigned lineNum,
                         int (*pCheckSetUseFul)(const char* setName),

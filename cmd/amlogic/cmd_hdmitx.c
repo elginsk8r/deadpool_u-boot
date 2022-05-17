@@ -1,23 +1,6 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * (C) Copyright 2018
- * Amlogic. Inc.
- *
- * This file is used to prefetch/varify/compare HDCP keys
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include <common.h>
@@ -25,40 +8,129 @@
 #include <environment.h>
 #include <malloc.h>
 #include <asm/byteorder.h>
-#include <amlogic/media/vout/hdmitx.h>
+#include <amlogic/media/vout/hdmitx/hdmitx.h>
+#include <amlogic/media/dv/dolby_vision.h>
 #ifdef CONFIG_AML_LCD
 #include <amlogic/media/vout/lcd/aml_lcd.h>
+#endif
+
+#ifdef CONFIG_AML_LCD
+static unsigned int hdmitx_parse_vout_name(char *name)
+{
+	char *p, *frac_str;
+	unsigned int frac = 0;
+
+	p = strchr(name, ',');
+	if (!p) {
+		frac = 0;
+	} else {
+		frac_str = p + 1;
+		*p = '\0';
+		if (strcmp(frac_str, "frac") == 0)
+			frac = 1;
+	}
+
+	return frac;
+}
 #endif
 
 static int do_hpd_detect(cmd_tbl_t *cmdtp, int flag, int argc,
 	char *const argv[])
 {
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
 #ifdef CONFIG_AML_LCD
 	struct aml_lcd_drv_s *lcd_drv = NULL;
 	char *mode;
+	unsigned int frac;
 #endif
-	int st;
+	char* st;
+	char* hdmimode;
+	char* cvbsmode;
+	char* colorattribute;
+	int hpd_st = 0;
+
+	st = env_get("hdmitx_hpd_bypass");
+	if (st && (strcmp((const char *)(uintptr_t)st[0], "1") == 0)) {
+		printf("hdmitx_hpd_bypass detect\n");
+		return 0;
+	}
 
 #ifdef CONFIG_AML_LCD
 	lcd_drv = aml_lcd_get_driver();
 	if (lcd_drv) {
 		if (lcd_drv->lcd_outputmode_check) {
-			mode = env_get("outputmode");
-			if (lcd_drv->lcd_outputmode_check(mode) == 0)
-				return 0;
+			mode = (char *)malloc(64 * sizeof(char));
+			if (!mode) {
+				printf("cmd_hpd: mode malloc falied\n");
+				if (lcd_drv->lcd_outputmode_check(mode, 0) == 0)
+					return 0;
+			} else {
+				memset(mode, 0, sizeof(mode));
+				sprintf(mode, "%s", env_get("outputmode"));
+				frac = hdmitx_parse_vout_name(mode);
+				if (lcd_drv->lcd_outputmode_check(mode, frac) == 0) {
+					free(mode);
+					return 0;
+				}
+				free(mode);
+			}
 		}
 	}
 #endif
 
-	st = hdmitx_device.HWOp.get_hpd_state();
-	printf("hpd_state=%c\n", st ? '1' : '0');
+	hpd_st = hdev->hwop.get_hpd_state();
+	if (!hpd_st) {
+		/* For some TV, they cost extra time to pullup HPD after 5V */
+		ulong hdmitx_hpd_wait_ms = env_get_ulong("hdmitx_hpd_wait_ms", 10, 1000);
+		ulong delay_ms = 0;
 
-	if (st) {
-		env_set("outputmode", env_get("hdmimode"));
-	} else {
-		env_set("outputmode", env_get("cvbsmode"));
+		while (delay_ms < hdmitx_hpd_wait_ms) {
+			if (hdmitx_hpd_wait_ms - delay_ms > 100) {
+				mdelay(100);
+				delay_ms += 100;
+			} else {
+				mdelay(hdmitx_hpd_wait_ms - delay_ms);
+				delay_ms = hdmitx_hpd_wait_ms;
+			}
+			hpd_st = hdev->hwop.get_hpd_state();
+			if (hpd_st) {
+				printf("hpd delay %lu ms\n", delay_ms);
+				break;
+			}
+		}
 	}
-	return st;
+	printf("hpd_state=%d\n", hpd_st);
+
+	/*get hdmi mode and colorattribute from env */
+	hdmimode = env_get("hdmimode");
+	if (hdmimode)
+		printf("do_hpd_detect: hdmimode=%s\n", hdmimode);
+
+
+	colorattribute = env_get("colorattribute");
+	if (colorattribute)
+		printf("do_hpd_detect: colorattribute=%s\n", colorattribute);
+
+	if (hdmimode) {
+		if (strstr(hdmimode, "null")) {
+			env_set("hdmimode", "1080p60hz");
+			//run_command("saveenv", 0);
+		}
+	} else {
+		env_set("hdmimode", "1080p60hz");
+		//run_command("saveenv", 0);
+	}
+	hdmimode = env_get("hdmimode");
+	if (hpd_st) {
+		env_set("outputmode", hdmimode);
+	} else {
+		cvbsmode = env_get("cvbsmode");
+		if (cvbsmode)
+			env_set("outputmode", cvbsmode);
+		env_set("hdmichecksum", "0x00000000");
+		//run_command("saveenv", 0);
+	}
+	return hpd_st;
 }
 
 static unsigned char edid_raw_buf[256] = {0};
@@ -90,6 +162,7 @@ static int do_edid(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 	unsigned int tmp_addr = 0;
 	unsigned char edid_addr = 0;
 	unsigned char st = 0;
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
 
 	memset(edid_raw_buf, 0, ARRAY_SIZE(edid_raw_buf));
 	if (argc < 2)
@@ -101,7 +174,7 @@ static int do_edid(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		edid_addr = tmp_addr;
 		/* read edid raw data */
 		/* current only support read 1 byte edid data */
-		st = hdmitx_device.HWOp.read_edid(
+		st = hdev->hwop.read_edid(
 			&edid_raw_buf[edid_addr & 0xf8], edid_addr & 0xf8, 8);
 		printf("edid[0x%02x]: 0x%02x\n", edid_addr,
 			edid_raw_buf[edid_addr]);
@@ -117,12 +190,13 @@ static int do_rx_det(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 {
 	unsigned char edid_addr = 0xf8;     // Fixed Address
 	unsigned char st = 0;
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
 
 	memset(edid_raw_buf, 0, ARRAY_SIZE(edid_raw_buf));
 
 	// read edid raw data
 	// current only support read 1 byte edid data
-	st = hdmitx_device.HWOp.read_edid(&edid_raw_buf[edid_addr & 0xf8], edid_addr & 0xf8, 8);
+	st = hdev->hwop.read_edid(&edid_raw_buf[edid_addr & 0xf8], edid_addr & 0xf8, 8);
 	if (1)      // Debug only
 		dump_edid_raw_8bytes(&edid_raw_buf[edid_addr & 0xf8]);
 	if (st) {
@@ -198,13 +272,35 @@ static int do_rx_det(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 	return st;
 }
 
+static void save_default_720p(void)
+{
+	env_set("hdmimode", "720p60hz");
+	env_set("outputmode", "720p60hz");
+	env_set("colorattribute", "rgb,8bit");
+}
+
+static void hdmitx_mask_rx_info(struct hdmitx_dev *hdev)
+{
+	if (!hdev || !hdev->para)
+		return;
+
+	if (env_get("colorattribute"))
+		hdmi_parse_attr(hdev->para, env_get("colorattribute"));
+
+	/* when current output color depth is 8bit, mask hdr capability */
+	/* refer to SWPL-44445 for more detail */
+	if (hdev->para->cd == HDMI_COLOR_DEPTH_24B)
+		memset(&hdev->RXCap.hdr_info, 0, sizeof(struct hdr_info));
+}
+
 static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
 	if (argc < 1)
 		return cmd_usage(cmdtp);
 
 	if (strcmp(argv[1], "list") == 0)
-		hdmitx_device.HWOp.list_support_modes();
+		hdev->hwop.list_support_modes();
 	else if (strcmp(argv[1], "bist") == 0) {
 		unsigned int mode = 0;
 		if (strcmp(argv[2], "off") == 0)
@@ -215,31 +311,49 @@ static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 			mode = 3;
 		else
 			mode = simple_strtoul(argv[2], NULL, 10);
-		hdmitx_device.HWOp.test_bist(mode);
+		hdev->hwop.test_bist(mode);
 	} else if (strcmp(argv[1], "prbs") == 0) {
-		hdmitx_device.para->cs = HDMI_COLOR_FORMAT_RGB;
-		hdmitx_device.para->cd = HDMI_COLOR_DEPTH_24B;
-		hdmitx_device.vic = HDMI_1920x1080p60_16x9;
-		hdmi_tx_set(&hdmitx_device);
-		hdmitx_device.HWOp.test_bist(10);
-	} else if (strcmp(argv[1], "div40") == 0) {
-		hdmitx_device.HWOp.test_bist(11);
+		hdev->para->cs = HDMI_COLOR_FORMAT_RGB;
+		hdev->para->cd = HDMI_COLOR_DEPTH_24B;
+		hdev->vic = HDMI_1920x1080p60_16x9;
+		hdmi_tx_set(hdev);
+		hdev->hwop.test_prbs();
+	} else if (strncmp(argv[1], "div40", 5) == 0) {
+		bool div40 = 0;
+
+		if (argv[1][5] == '1')
+			div40 = 1;
+		hdev->hwop.set_div40(div40);
 	} else { /* "output" */
-		hdmitx_device.vic = hdmi_get_fmt_vic(argv[1]);
-		hdmitx_device.para = hdmi_get_fmt_paras(hdmitx_device.vic);
-		if (hdmitx_device.vic == HDMI_unkown) {
+		if (!edid_parsing_ok(hdev)) {
+			/* SWPL-34712: if EDID parsing error case, not save env,
+			 * only forcely output default mode(480p,RGB,8bit).
+			 */
+			printf("edid parsing ng, forcely output 720p, rgb,8bit\n");
+			save_default_720p();
+			hdev->vic = HDMI_1280x720p60_16x9;
+			hdev->para =
+				hdmi_get_fmt_paras(hdev->vic);
+			hdev->para->cs = HDMI_COLOR_FORMAT_RGB;
+			hdev->para->cd = HDMI_COLOR_DEPTH_24B;
+			hdmi_tx_set(hdev);
+			return CMD_RET_SUCCESS;
+		}
+		hdev->vic = hdmi_get_fmt_vic(argv[1]);
+		hdev->para = hdmi_get_fmt_paras(hdev->vic);
+		if (hdev->vic == HDMI_unkown) {
 			/* Not find VIC */
 			printf("Not find '%s' mapped VIC\n", argv[1]);
 			return CMD_RET_FAILURE;
 		} else
-			printf("set hdmitx VIC = %d\n", hdmitx_device.vic);
-		if (strstr(argv[1], "hz420") != NULL)
-			hdmitx_device.para->cs = HDMI_COLOR_FORMAT_420;
+			printf("set hdmitx VIC = %d\n", hdev->vic);
 		if (env_get("colorattribute"))
-			hdmi_parse_attr(hdmitx_device.para, env_get("colorattribute"));
+			hdmi_parse_attr(hdev->para, env_get("colorattribute"));
+		if (strstr(argv[1], "hz420") != NULL)
+			hdev->para->cs = HDMI_COLOR_FORMAT_420;
 		/* For RGB444 or YCbCr444 under 6Gbps mode, no deepcolor */
 		/* Only 4k50/60 has 420 modes */
-		switch (hdmitx_device.vic) {
+		switch (hdev->vic) {
 		case HDMI_3840x2160p50_16x9:
 		case HDMI_3840x2160p60_16x9:
 		case HDMI_4096x2160p50_256x135:
@@ -252,61 +366,71 @@ static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		case HDMI_4096x2160p60_256x135_Y420:
 		case HDMI_3840x2160p50_64x27_Y420:
 		case HDMI_3840x2160p60_64x27_Y420:
-			if ((hdmitx_device.para->cs == HDMI_COLOR_FORMAT_RGB) ||
-			    (hdmitx_device.para->cs == HDMI_COLOR_FORMAT_444)) {
-				if (hdmitx_device.para->cd != HDMI_COLOR_DEPTH_24B) {
+			if ((hdev->para->cs == HDMI_COLOR_FORMAT_RGB) ||
+			    (hdev->para->cs == HDMI_COLOR_FORMAT_444)) {
+				if (hdev->para->cd != HDMI_COLOR_DEPTH_24B) {
 					printf("vic %d cs %d has no cd %d\n",
-						hdmitx_device.vic,
-						hdmitx_device.para->cs,
-						hdmitx_device.para->cd);
-					hdmitx_device.para->cd = HDMI_COLOR_DEPTH_24B;
+						hdev->vic,
+						hdev->para->cs,
+						hdev->para->cd);
+					hdev->para->cd = HDMI_COLOR_DEPTH_24B;
 					printf("set cd as %d\n", HDMI_COLOR_DEPTH_24B);
 				}
 			}
-			if (hdmitx_device.para->cs == HDMI_COLOR_FORMAT_420)
-				hdmitx_device.vic |= HDMITX_VIC420_OFFSET;
+			if (hdev->para->cs == HDMI_COLOR_FORMAT_420)
+				hdev->vic |= HDMITX_VIC420_OFFSET;
 			break;
 		default:
-			if (hdmitx_device.para->cs == HDMI_COLOR_FORMAT_420) {
-				printf("vic %d has no cs %d\n", hdmitx_device.vic,
-					hdmitx_device.para->cs);
-				hdmitx_device.para->cs = HDMI_COLOR_FORMAT_444;
+			if (hdev->para->cs == HDMI_COLOR_FORMAT_420) {
+				printf("vic %d has no cs %d\n", hdev->vic,
+					hdev->para->cs);
+				hdev->para->cs = HDMI_COLOR_FORMAT_444;
 				printf("set cs as %d\n", HDMI_COLOR_FORMAT_444);
 			}
+			/* For VESA modes, should be RGB format */
+			if (hdev->vic >= HDMITX_VESA_OFFSET) {
+				hdev->para->cs = HDMI_COLOR_FORMAT_RGB;
+				hdev->para->cd = HDMI_COLOR_DEPTH_24B;
+			}
 			break;
-		/* For VESA modes, should be RGB format */
-		if (hdmitx_device.vic >= HDMITX_VESA_OFFSET)
-			hdmitx_device.para->cs = HDMI_COLOR_FORMAT_RGB;
 		}
-		hdmi_tx_set(&hdmitx_device);
+		printf("set hdmitx VIC = %d CS = %d CD = %d\n",
+		       hdev->vic, hdev->para->cs, hdev->para->cd);
+		hdmi_tx_set(hdev);
 	}
 	return CMD_RET_SUCCESS;
 }
 
 static int do_blank(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
 	if (argc < 1)
 		return cmd_usage(cmdtp);
 
 	if (strcmp(argv[1], "1") == 0)
-		hdmitx_device.HWOp.output_blank(1);
+		hdev->hwop.output_blank(1);
 	if (strcmp(argv[1], "0") == 0)
-		hdmitx_device.HWOp.output_blank(0);
+		hdev->hwop.output_blank(0);
 
 	return CMD_RET_SUCCESS;
 }
 
 static int do_off(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 {
-	hdmitx_device.vic = HDMI_unkown;
-	hdmitx_device.HWOp.turn_off();
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
+	hdev->vic = HDMI_unkown;
+	hdev->hwop.turn_off();
 	printf("turn off hdmitx\n");
 	return 1;
 }
 
 static int do_dump(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 {
-	hdmitx_device.HWOp.dump_regs();
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
+	hdev->hwop.dump_regs();
 	return 1;
 }
 
@@ -336,7 +460,7 @@ static int do_reg(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 
 static int do_info(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 {
-	struct hdmitx_dev *hdev = &hdmitx_device;
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
 	struct hdmi_format_para *para = hdev->para;
 
 	printf("%s %d\n", para->ext_name, hdev->vic);
@@ -345,24 +469,33 @@ static int do_info(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 	return 1;
 }
 
-static int do_get_preferred_mode(cmd_tbl_t * cmdtp, int flag, int argc,
-	char * const argv[])
+static int xtochar(int num, char* checksum)
 {
-	struct hdmitx_dev *hdev = &hdmitx_device;
-	unsigned int byte_num = 0;
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
+	if (((hdev->rawedid[num]  >> 4 ) & 0xf) <= 9)
+		checksum[0] = ((hdev->rawedid[num]  >> 4 ) & 0xf) + '0';
+	else
+		checksum[0] = ((hdev->rawedid[num]  >> 4 ) & 0xf) -10 + 'a';
+
+	if ((hdev->rawedid[num] & 0xf) <= 9)
+		checksum[1] = (hdev->rawedid[num] & 0xf) + '0';
+	else
+		checksum[1] = (hdev->rawedid[num] & 0xf) -10 + 'a';
+
+	return 0;
+}
+
+static void get_parse_edid_data(struct hdmitx_dev *hdev)
+{
 	unsigned char *edid = hdev->rawedid;
+	unsigned int byte_num = 0;
 	unsigned char blk_no = 1;
-	struct hdmi_format_para *para;
-	char pref_mode[64];
-	char color_attr[64];
+	char *hdr_priority = env_get("hdr_priority");
 
-	memset(edid, 0, EDID_BLK_SIZE * EDID_BLK_NO);
-	memset(pref_mode, 0, sizeof(pref_mode));
-	memset(color_attr, 0, sizeof(color_attr));
-
-	/* Read complete EDID data sequentially */
+	/* get edid data */
 	while (byte_num < 128 * blk_no) {
-		hdmitx_device.HWOp.read_edid(&edid[byte_num], byte_num & 0x7f, byte_num / 128);
+		hdev->hwop.read_edid(&edid[byte_num], byte_num & 0x7f, byte_num / 128);
 		if (byte_num == 120) {
 			blk_no = edid[126] + 1;
 			if (blk_no > 4)
@@ -371,30 +504,264 @@ static int do_get_preferred_mode(cmd_tbl_t * cmdtp, int flag, int argc,
 		byte_num += 8;
 	}
 
-	if (hdmi_edid_parsing(hdev->rawedid, &hdev->RXCap) == 0) {
+	if (0)
 		dump_full_edid(hdev->rawedid);
+
+	/* parse edid data */
+	hdmi_edid_parsing(hdev->rawedid, &hdev->RXCap);
+
+	if (!hdr_priority)
+		return;
+	/* if hdr_priority is 2, then mark both dv_info and hdr_info */
+	if (strcmp(hdr_priority, "2") == 0) {
+		memset(&hdev->RXCap.dv_info, 0, sizeof(struct dv_info));
+		memset(&hdev->RXCap.hdr_info, 0, sizeof(struct hdr_info));
+		memset(&hdev->RXCap.hdr10plus_info, 0, sizeof(struct hdr10_plus_info));
+		pr_info("hdr_priority: %s and clear dv/hdr_info\n", hdr_priority);
+		return;
 	}
+	/* if hdr_priority is 1, then mark dv_info */
+	if (hdr_priority && (strcmp(hdr_priority, "1") == 0)) {
+		memset(&hdev->RXCap.dv_info, 0, sizeof(struct dv_info));
+		pr_info("hdr_priority: %s and clear dv_info\n", hdr_priority);
+	}
+}
+
+/* policy process: to find the output mode/attr/dv_type */
+void scene_process(struct hdmitx_dev *hdev,
+	scene_output_info_t *scene_output_info)
+{
+	hdmi_data_t hdmidata;
+
+	if (!hdev || !scene_output_info)
+		return;
+	/* 1.read dolby vision mode from prop(maybe need to env) */
+	memset(&hdmidata, 0, sizeof(hdmi_data_t));
+	get_hdmi_data(hdev, &hdmidata);
+
+	/* 2. dolby vision scene process */
+	/* only for tv support dv and box enable dv */
+	if (is_dv_preference(hdev)) {
+		dolbyvision_scene_process(&hdmidata, scene_output_info);
+	} else if (is_dolby_enabled()) {
+		/* for enable dolby vision core when
+		 * first boot connecting non dv tv
+		 * NOTE: let systemcontrol to enable DV core
+		 */
+		/* scene_output_info->final_dv_type = DOLBY_VISION_ENABLE; */
+	} else {
+		/* for UI disable dolby vision core and boot keep the status
+		 * NOTE: TBD if need to disable DV here
+		 */
+		/* scene_output_info->final_dv_type = DOLBY_VISION_DISABLE; */
+	}
+	/* 3.sdr scene process */
+	/* decide final display mode and deepcolor */
+	if (is_dv_preference(hdev)) {
+		/* do nothing
+		 * already done above, just sync with sysctrl
+		 */
+	} else if (is_hdr_preference(hdev)) {
+		hdr_scene_process(&hdmidata, scene_output_info);
+	} else {
+		sdr_scene_process(&hdmidata, scene_output_info);
+	}
+	/* not find outputmode and use default mode */
+	if (strlen(scene_output_info->final_displaymode) == 0)
+		strcpy(scene_output_info->final_displaymode, DEFAULT_HDMI_MODE);
+	/* not find color space and use default mode */
+	if (!strstr(scene_output_info->final_deepcolor, "bit"))
+		strcpy(scene_output_info->final_deepcolor, DEFAULT_COLOR_FORMAT);
+}
+
+static int do_get_parse_edid(cmd_tbl_t * cmdtp, int flag, int argc,
+	char * const argv[])
+{
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+	unsigned char *edid = hdev->rawedid;
+	unsigned char *store_checkvalue;
+	memset(edid, 0, EDID_BLK_SIZE * EDID_BLK_NO);
+	unsigned int i;
+	unsigned int checkvalue[4];
+	unsigned int checkvalue1;
+	unsigned int checkvalue2;
+	char checksum[11];
+	unsigned char def_cksum[] = {'0', 'x', '0', '0', '0', '0', '0', '0', '0', '0', '\0'};
+	char *hdmimode;
+	char *colorattribute;
+	char dv_type[2] = {0};
+	scene_output_info_t scene_output_info;
+	struct hdmi_format_para *para = NULL;
+	bool mode_support = false;
+
+	if (!hdev->hwop.get_hpd_state()) {
+		printf("HDMI HPD low, no need parse EDID\n");
+		return 1;
+	}
+	memset(&scene_output_info, 0, sizeof(scene_output_info_t));
+
+	get_parse_edid_data(hdev);
+
+	/* check if the tv has changed or anything wrong */
+	store_checkvalue = (unsigned char*)env_get("hdmichecksum");
+	colorattribute = env_get("colorattribute");
+	hdmimode = env_get("hdmimode");
+
+	if (!store_checkvalue)
+		store_checkvalue = def_cksum;
+
+	printf("read hdmichecksum: %s, hdmimode: %s, colorattribute: %s\n",
+	       store_checkvalue, hdmimode, colorattribute);
+
+	for (i = 0; i < 4; i++) {
+		if (('0' <= store_checkvalue[i * 2 + 2]) && (store_checkvalue[i * 2 + 2] <= '9'))
+			checkvalue1 = store_checkvalue[i * 2 + 2] -'0';
+		else
+			checkvalue1 = store_checkvalue[i * 2 + 2] -'W';
+		if (('0' <= store_checkvalue[i * 2 + 3]) && (store_checkvalue[i * 2 + 3] <= '9'))
+			checkvalue2 = store_checkvalue[i * 2 + 3] -'0';
+		else
+			checkvalue2 = store_checkvalue[i * 2 + 3] -'W';
+		checkvalue[i] = checkvalue1 * 16 + checkvalue2;
+	}
+
+	if ((checkvalue[0] != hdev->rawedid[0x7f])  ||
+	    (checkvalue[1] != hdev->rawedid[0xff])  ||
+	    (checkvalue[2] != hdev->rawedid[0x17f]) ||
+	    (checkvalue[3] != hdev->rawedid[0x1ff])) {
+		hdev->RXCap.edid_changed = 1;
+
+		checksum[0] = '0';
+		checksum[1] = 'x';
+		for (i = 0; i < 4; i++)
+			xtochar(0x80 * i + 0x7f, &checksum[2* i + 2]);
+		checksum[10] = '\0';
+		memcpy(hdev->RXCap.checksum, checksum, 10);
+		printf("TV has changed, now crc: %s\n", checksum);
+	} else {
+		memcpy(hdev->RXCap.checksum, store_checkvalue, 10);
+		printf("TV is the same, checksum: %s\n", hdev->RXCap.checksum);
+	}
+
+	/* check current mode+colorattr support or not */
+	para = hdmi_tst_fmt_name(hdmimode, colorattribute);
+	if (hdmitx_edid_check_valid_mode(hdev, para))
+		mode_support = true;
+	else
+		mode_support = false;
+
+	/* two cases need to go with uboot mode select policy:
+	 * 1.TV changed
+	 * 2.TV not changed, but current mode(set by sysctrl/hwc)
+	 * not supportted by uboot (probably means mode select policy or
+	 * edid parse between sysctrl and uboot have some gap)
+	 * then need to find proper output mode with uboot policy.
+	 */
+	if (hdev->RXCap.edid_changed || !mode_support) {
+		/* find proper mode if EDID changed */
+		scene_process(hdev, &scene_output_info);
+		env_set("hdmichecksum", hdev->RXCap.checksum);
+		if (edid_parsing_ok(hdev)) {
+			/* SWPL-34712: if EDID parsing error case, not save env,
+			 * only output default mode(480p,RGB,8bit). after
+			 * EDID read OK, systemcontrol will recover the hdmi
+			 * mode from env, to avoid keep the default hdmi output
+			 */
+			env_set("hdmimode", scene_output_info.final_displaymode);
+			env_set("outputmode",
+			       scene_output_info.final_displaymode);
+			env_set("colorattribute",
+			       scene_output_info.final_deepcolor);
+			/* if change from DV TV to HDR/SDR TV, don't change
+			 * DV status to disabled, as DV core need to be enabled.
+			 */
+			if ((scene_output_info.final_dv_type !=
+			    get_ubootenv_dv_type()) &&
+			    (scene_output_info.final_dv_type !=
+			     DOLBY_VISION_DISABLE)) {
+				sprintf(dv_type, "%d", scene_output_info.final_dv_type);
+				env_set("dolby_status", dv_type);
+				/* according to the policy of systemcontrol,
+				 * if current DV mode is not supported by TV
+				 * EDID, DV type maybe changed to one witch
+				 * TV support, and need VPP/DV module to
+				 * update new DV output mode.
+				 */
+				printf("update dv_type: %d\n",
+				       scene_output_info.final_dv_type);
+			}
+		} else {
+			save_default_720p();
+		}
+		printf("update outputmode: %s\n", env_get("outputmode"));
+		printf("update colorattribute: %s\n", env_get("colorattribute"));
+		printf("update hdmichecksum: %s\n", env_get("hdmichecksum"));
+	}
+	hdev->vic = hdmi_get_fmt_vic(env_get("outputmode"));
+	hdev->para = hdmi_get_fmt_paras(hdev->vic);
+	hdmitx_mask_rx_info(hdev);
+	return 0;
+}
+static int do_get_preferred_mode(cmd_tbl_t * cmdtp, int flag, int argc,
+	char * const argv[])
+{
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
+	unsigned char *edid = hdev->rawedid;
+
+	struct hdmi_format_para *para;
+	char pref_mode[64];
+	char color_attr[64];
+	char *hdmi_read_edid;
+
+	hdmi_read_edid = env_get("hdmi_read_edid");
+	if (hdmi_read_edid && (hdmi_read_edid[0] == '0'))
+		return 0;
+
+	memset(edid, 0, EDID_BLK_SIZE * EDID_BLK_NO);
+	memset(pref_mode, 0, sizeof(pref_mode));
+	memset(color_attr, 0, sizeof(color_attr));
+
+	/* If sink is not detected there is a still a good chance it supports proper modes */
+	/* 720p is chosen as a safe compromise: supported by most sinks and looks good enough */
+	if (!hdev->hwop.get_hpd_state()) {
+		para = hdmi_get_fmt_paras(HDMI_1280x720p60_16x9);
+		snprintf(pref_mode, sizeof(pref_mode), "%s", para->sname);
+		snprintf(color_attr, sizeof(color_attr), "%s", "rgb,8bit");
+		printk("no sink, fallback to %s[%d]\n", para->sname, HDMI_1280x720p60_16x9);
+		goto bypass_edid_read;
+	}
+
+	get_parse_edid_data(hdev);
+
 	para = hdmi_get_fmt_paras(hdev->RXCap.preferred_mode);
+
 	if (para) {
-		sprintf(pref_mode, "setenv hdmimode %s", para->sname);
+		sprintf(pref_mode, "preferred_mode %s", para->sname);
 		if (hdev->RXCap.pref_colorspace & (1 << 5))
 			sprintf(color_attr, "setenv colorattribute %s", "444,8bit");
 		else if (hdev->RXCap.pref_colorspace & (1 << 4))
 			sprintf(color_attr, "setenv colorattribute %s", "422,8bit");
 		else
 			sprintf(color_attr, "setenv colorattribute %s", "rgb,8bit");
-	} else { /* set default mode */
+	} else {
 		hdev->RXCap.preferred_mode = HDMI_720x480p60_16x9;
 		para = hdmi_get_fmt_paras(HDMI_720x480p60_16x9);
 		sprintf(pref_mode, "setenv hdmimode %s", para->sname);
 		sprintf(color_attr, "setenv colorattribute %s", "444,8bit");
 	}
-	printk("edid preferred_mode is %s[%d]\n", para->sname, hdev->RXCap.preferred_mode);
+	printk("sink preferred_mode is %s[%d]\n", para->sname, hdev->RXCap.preferred_mode);
 
+bypass_edid_read:
 	/* save to ENV */
+	/*
 	run_command(pref_mode, 0);
 	run_command(color_attr, 0);
 	run_command("saveenv", 0);
+	*/
+	printk("hdr mode is %d\n", hdev->RXCap.hdr_info.hdr_sup_eotf_smpte_st_2084);
+	printk("dv  mode is ver:%d  len: %x\n", hdev->RXCap.dv_info.ver, hdev->RXCap.dv_info.length);
+	printk("hdr10+ mode is %d\n", hdev->RXCap.hdr10plus_info.application_version);
 
 	return 0;
 }
@@ -410,6 +777,7 @@ static cmd_tbl_t cmd_hdmi_sub[] = {
 	U_BOOT_CMD_MKENT(info, 1, 1, do_info, "", ""),
 	U_BOOT_CMD_MKENT(get_preferred_mode, 1, 1, do_get_preferred_mode, "", ""),
 	U_BOOT_CMD_MKENT(reg, 3, 1, do_reg, "", ""),
+	U_BOOT_CMD_MKENT(get_parse_edid, 1, 1, do_get_parse_edid, "", ""),
 };
 
 static int do_hdmitx(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
@@ -432,7 +800,7 @@ static int do_hdmitx(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 
 U_BOOT_CMD(hdmitx, CONFIG_SYS_MAXARGS, 0, do_hdmitx,
 	   "HDMITX sub-system",
-	"hdmitx version:20181013\n"
+	"hdmitx version:20200618\n"
 	"hdmitx hpd\n"
 	"    Detect hdmi rx plug-in\n"
 	"hdmitx get_preferred_mode\n"
@@ -456,3 +824,10 @@ U_BOOT_CMD(hdmitx, CONFIG_SYS_MAXARGS, 0, do_hdmitx,
 	"hdmitx rx_det\n"
 	"    Auto detect if RX is FBC and set outputmode\n"
 );
+
+struct hdr_info *hdmitx_get_rx_hdr_info(void)
+{
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
+	return &hdev->RXCap.hdr_info;
+}

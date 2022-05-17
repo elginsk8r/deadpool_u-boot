@@ -20,4 +20,3 @@ source "board/AndesTech/adp-ag101p/Kconfig"
 source "board/AndesTech/adp-ae3xx/Kconfig"
 
 endmenu
-

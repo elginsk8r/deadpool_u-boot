@@ -7,4 +7,3 @@ config CMD_BOOTEFI_SELFTEST
 	  This adds an EFI test application to U-Boot that can be executed
 	  with the 'bootefi selftest' command. It provides extended tests of
 	  the EFI API implementation.
-

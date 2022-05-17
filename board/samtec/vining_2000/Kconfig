@@ -10,4 +10,3 @@ config SYS_CONFIG_NAME
 	default "vining_2000"
 
 endif
-

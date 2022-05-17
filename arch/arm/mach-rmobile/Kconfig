@@ -25,4 +25,3 @@ source "arch/arm/mach-rmobile/Kconfig.32"
 source "arch/arm/mach-rmobile/Kconfig.64"
 
 endif
-

@@ -278,4 +278,3 @@ source "board/sagem/f@st1704/Kconfig"
 source "board/sfr/nb4_ser/Kconfig"
 
 endmenu
-

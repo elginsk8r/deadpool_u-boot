@@ -32,4 +32,3 @@ config MX31_CLK32
 source "board/freescale/mx31pdk/Kconfig"
 
 endif
-

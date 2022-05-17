@@ -13,4 +13,3 @@ config PINCTRL_MT7629
 	select PINCTRL_MTK
 
 endif
-

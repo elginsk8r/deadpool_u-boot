@@ -157,4 +157,3 @@ config SPL_LDSCRIPT
 	default "board/$(BOARDDIR)/u-boot-spl-da850evm.lds"
 
 endif
-

@@ -67,4 +67,3 @@ config TDX_CFG_BLOCK_2ND_ETHADDR
 	  second Ethernet address as environment variable (eth1addr).
 
 endif
-

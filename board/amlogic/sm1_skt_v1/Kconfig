@@ -20,4 +20,3 @@ config SYS_CONFIG_NAME
 	default "sm1_skt_v1"
 
 endif
-

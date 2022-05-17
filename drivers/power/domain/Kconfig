@@ -59,4 +59,3 @@ config TI_SCI_POWER_DOMAIN
 	  Generic power domain implementation for TI devices implementing the
 	  TI SCI protocol.
 endmenu
-

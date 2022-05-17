@@ -12,4 +12,3 @@ config SYS_VPD_EEPROM_SIZE
 config SYS_VPD_EEPROM_I2C_ADDR_LEN
 	int "Number of bytes to use for VPD EEPROM address"
 	default 1
-

@@ -11,4 +11,3 @@ config EXT4_WRITE
 	help
 	  This provides support for creating and writing new files to an
 	  existing ext4 filesystem partition.
-

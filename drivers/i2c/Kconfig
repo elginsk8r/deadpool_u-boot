@@ -491,4 +491,3 @@ config SYS_I2C_IHS
 source "drivers/i2c/muxes/Kconfig"
 
 endmenu
-

@@ -165,4 +165,3 @@ config WDT_MESON
 	   found on some Amlogic Meson chips.
 
 endmenu
-

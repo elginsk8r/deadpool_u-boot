@@ -40,4 +40,3 @@ config SYS_CAR_SIZE
 	default 0x20000
 
 endif
-

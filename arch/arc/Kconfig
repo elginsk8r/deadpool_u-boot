@@ -171,4 +171,3 @@ source "board/synopsys/hsdk/Kconfig"
 source "board/synopsys/iot_devkit/Kconfig"
 
 endmenu
-

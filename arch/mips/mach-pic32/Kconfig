@@ -34,4 +34,3 @@ endchoice
 source "board/microchip/pic32mzda/Kconfig"
 
 endmenu
-

@@ -62,4 +62,3 @@ config USB_MUSB_PIO_ONLY
 	help
 	  All data is copied between memory and FIFO by the CPU.
 	  DMA controllers are ignored.
-

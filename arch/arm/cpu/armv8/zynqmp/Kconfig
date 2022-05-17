@@ -154,4 +154,3 @@ config SD1_LSHFT_MODE
 endchoice
 
 endif
-

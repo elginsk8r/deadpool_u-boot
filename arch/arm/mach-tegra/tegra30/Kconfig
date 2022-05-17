@@ -36,4 +36,3 @@ source "board/toradex/colibri_t30/Kconfig"
 source "board/avionic-design/tec-ng/Kconfig"
 
 endif
-

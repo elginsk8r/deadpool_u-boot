@@ -573,4 +573,3 @@ source "board/wandboard/Kconfig"
 source "board/warp/Kconfig"
 
 endif
-

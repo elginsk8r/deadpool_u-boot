@@ -26,4 +26,3 @@ source "board/efi/efi-x86_app/Kconfig"
 source "board/efi/efi-x86_payload/Kconfig"
 
 endif
-

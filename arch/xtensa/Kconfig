@@ -19,4 +19,3 @@ endchoice
 source "board/cadence/xtfpga/Kconfig"
 
 endmenu
-

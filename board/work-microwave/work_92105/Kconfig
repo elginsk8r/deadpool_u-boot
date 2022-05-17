@@ -22,4 +22,3 @@ config CMD_MAX6957
 	  This allows PMIC registers to be read and written.
 
 endif
-

@@ -12,8 +12,8 @@ obj-$(CONFIG_HASH) += hash.o
 obj-$(CONFIG_HUSH_PARSER) += cli_hush.o
 obj-$(CONFIG_AUTOBOOT) += autoboot.o
 
-obj-$(CONFIG_CMD_MMC) += partitions.o
-obj-$(CONFIG_CMD_MMC) += aml_dt.o
+obj-$(CONFIG_AML_STORAGE) += partitions.o
+obj-$(CONFIG_AML_STORAGE) += aml_dt.o
 
 # This option is not just y/n - it can have a numeric value
 ifdef CONFIG_BOOT_RETRY_TIME
@@ -111,7 +111,6 @@ endif
 
 obj-y += image.o
 obj-$(CONFIG_ANDROID_BOOT_IMAGE) += image-android.o
-obj-$(CONFIG_ZIRCON_BOOT_IMAGE) += image-zircon.o
 obj-$(CONFIG_$(SPL_TPL_)OF_LIBFDT) += image-fdt.o
 obj-$(CONFIG_$(SPL_TPL_)FIT) += image-fit.o
 obj-$(CONFIG_$(SPL_)MULTI_DTB_FIT) += boot_fit.o common_fit.o
@@ -126,10 +125,13 @@ ifdef CONFIG_CMD_EEPROM_LAYOUT
 obj-y += eeprom/eeprom_field.o eeprom/eeprom_layout.o
 endif
 
+obj-$(CONFIG_CMD_SHA2) += cmd_sha2.o
+
 obj-y += cli.o
 obj-$(CONFIG_FSL_DDR_INTERACTIVE) += cli_simple.o cli_readline.o
 obj-$(CONFIG_DFU_OVER_USB) += dfu.o
 obj-y += command.o
+obj-$(CONFIG_MESON_LEDS_STATE_CONTROL) += cmd_leds_state.o
 obj-$(CONFIG_$(SPL_TPL_)LOG) += log.o
 obj-$(CONFIG_$(SPL_TPL_)LOG_CONSOLE) += log_console.o
 obj-y += s_record.o
@@ -137,3 +139,6 @@ obj-$(CONFIG_CMD_LOADB) += xyzModem.o
 obj-$(CONFIG_$(SPL_TPL_)YMODEM_SUPPORT) += xyzModem.o
 
 obj-$(CONFIG_AVB_VERIFY) += avb_verify.o
+obj-$(CONFIG_MDUMP_COMPRESS) += ramdump.o
+
+obj-y += blxx2bl33_param.o

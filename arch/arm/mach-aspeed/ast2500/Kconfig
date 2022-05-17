@@ -14,4 +14,3 @@ config TARGET_EVB_AST2500
 source "board/aspeed/evb_ast2500/Kconfig"
 
 endif
-
