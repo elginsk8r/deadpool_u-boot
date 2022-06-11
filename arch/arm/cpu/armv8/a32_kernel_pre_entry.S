@@ -1,3 +1,23 @@
+/*
+* Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+* *
+This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+* *
+This program is distributed in the hope that it will be useful, but WITHOUT
+* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+* more details.
+* *
+You should have received a copy of the GNU General Public License along
+* with this program; if not, write to the Free Software Foundation, Inc.,
+* 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+* *
+Description:
+*/
+
 #include <asm-offsets.h>
 #include <config.h>
 #include <version.h>
@@ -33,13 +53,13 @@ ENTRY(jump_to_a32_kernel)
 	movk	x0, #0x00c5, lsl #16	// Clear EE and E0E on LE systems
 	msr	sctlr_el1, x0
 
-#if 0
 	/* Generic timers. */
 	mrs	x0, cnthctl_el2
 	orr	x0, x0, #3			// Enable EL1 physical timers
 	msr	cnthctl_el2, x0
 	msr	cntvoff_el2, xzr		// Clear virtual offset
 
+#if 0
 	/* Populate ID registers. */
 	mrs	x0, midr_el1
 	mrs	x1, mpidr_el1

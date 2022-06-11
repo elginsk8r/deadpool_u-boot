@@ -80,6 +80,10 @@
 
 #define RTL_TIMEOUT	100000
 
+#define ETH_FRAME_LEN		1514
+#define ETH_ALEN		6
+#define ETH_ZLEN		60
+
 /* PCI Tuning Parameters
    Threshold is bytes transferred to chip before transmission starts. */
 #define TX_FIFO_THRESH 256	/* In bytes, rounded down to 32 byte units. */
@@ -500,11 +504,11 @@ static int rtl_poll(struct eth_device *dev)
 		memcpy(rxdata, rx_ring + ring_offs + 4, semi_count);
 		memcpy(&(rxdata[semi_count]), rx_ring, rx_size-4-semi_count);
 
-		net_process_received_packet(rxdata, length);
+		NetReceive(rxdata, length);
 		debug_cond(DEBUG_RX, "rx packet %d+%d bytes",
 			semi_count, rx_size-4-semi_count);
 	} else {
-		net_process_received_packet(rx_ring + ring_offs + 4, length);
+		NetReceive(rx_ring + ring_offs + 4, length);
 		debug_cond(DEBUG_RX, "rx packet %d bytes", rx_size-4);
 	}
 	flush_cache((unsigned long)rx_ring, RX_BUF_LEN);

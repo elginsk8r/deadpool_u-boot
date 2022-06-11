@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_ini__aml_sdc_burn.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "optimus_sdc_burn_i.h"
@@ -34,8 +37,8 @@ ConfigPara_t g_sdcBurnPara = {
     },
 
     .custom         = {
-        .eraseBootloader    = 1,//default to erase bootloader! no effect for usb_upgrade
-        .eraseFlash         = 1,//default erase flash for all cases
+        .eraseBootloader    = 1,//default to erase bootloader!
+        .eraseFlash         = 0,//default no erase flash for usb disk upgrade
         .bitsMap.eraseBootloader    = 1,
         .bitsMap.eraseFlash         = 1,
     },
@@ -239,19 +242,6 @@ static int parse_set_custom_para(const char* key, const char* strVal)
 
     }
 
-    if (!strcmp(key, "erase_ddr_para"))
-    {
-        if (pCustome->bitsMap.eraseDdrPara) {
-            goto _key_dup;
-        }
-
-        if (strVal)
-        {
-            pCustome->eraseDdrPara = cfgVal;
-            pCustome->bitsMap.eraseDdrPara = 1;
-        }
-    }
-
     return 0;
 
 _key_dup:
@@ -321,7 +311,7 @@ static int parse_burn_parts(const char* key, const char* strVal)
 
         partName = (char*)pBurnParts->burnParts[burnIndex];
         if (!strVal) {
-            err("value of %s can't empty\n", key);
+            err("value of %s can't empty\n", strVal);
             return __LINE__;
         }
 
@@ -406,7 +396,7 @@ static int optimus_aml_sdc_burn_ini_parse_usr_cfg(const char* setName, const cha
         return ret;
 }
 
-static int _parse_ini_cfg_file(const char* filePath, HIMAGE hImg)
+int parse_ini_cfg_file(const char* filePath)
 {
     const int MaxFileSz = OPTIMUS_DOWNLOAD_SLOT_SZ;
     char* CfgFileLoadAddr = (char*)OPTIMUS_DOWNLOAD_TRANSFER_BUF_ADDR;
@@ -417,20 +407,7 @@ static int _parse_ini_cfg_file(const char* filePath, HIMAGE hImg)
 
     init_config_para(&g_sdcBurnPara);
 
-    if (hImg) {
-        DWN_MSG("try to fetch para from item aml_sdc_burn.ini\n");
-        int itemSz = MaxFileSz;
-        rcode =  optimus_img_item2buf(hImg, "ini", "aml_sdc_burn", CfgFileLoadAddr, &itemSz);
-        if (ITEM_NOT_EXIST == rcode) {
-            DWN_MSG("Item ini not existed, so use hard-coded para\n");
-            return ITEM_NOT_EXIST;
-        } else if(rcode) {
-            DWN_ERR("Err when get item ini, rcode %d\n", rcode);
-            return __LINE__;
-        } else
-            validLineNum = parse_ini_buf_2_valid_lines(CfgFileLoadAddr, itemSz, lines);
-    } else
-        validLineNum = parse_ini_file_2_valid_lines(filePath, CfgFileLoadAddr, MaxFileSz, lines);
+    validLineNum = parse_ini_file_2_valid_lines(filePath, CfgFileLoadAddr, MaxFileSz, lines);
     if (!validLineNum) {
         err("error in parse ini file\n");
         return __LINE__;
@@ -453,16 +430,6 @@ static int _parse_ini_cfg_file(const char* filePath, HIMAGE hImg)
     print_sdc_burn_para(&g_sdcBurnPara);
 
     return 0;
-}
-
-int parse_ini_cfg_file(const char* filePath)
-{
-    return _parse_ini_cfg_file(filePath, NULL);
-}
-
-int parse_ini_cfg_from_item(HIMAGE hImg)
-{
-    return _parse_ini_cfg_file(NULL, hImg);
 }
 
 #define MYDBG 0

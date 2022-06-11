@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12b/cpu_sdio.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __CPU_SDIO_H__
@@ -14,15 +17,24 @@
 #define SDIO_PORT_B 1
 #define SDIO_PORT_C 2
 
+#define	Cfg_div 	0
+#define Cfg_src		6
+#define Cfg_co_phase	8
+#define	Cfg_tx_phase	10
+#define	Cfg_rx_phase	12
+#define	Cfg_sram_pd		14
+#define	Cfg_tx_delay	16
+#define	Cfg_rx_delay	22
+#define	Cfg_always_on	28
+#define	Cfg_irq_sdio_sleep   29
+#define Cfg_irq_sdio_sleep_ds		30
 
-#if 0
 #define	SD_EMMC_RXD_ERROR				1
 #define	SD_EMMC_TXD_ERROR				1<<1
 #define	SD_EMMC_DESC_ERROR				1<<2
 #define	SD_EMMC_RESP_CRC_ERROR			1<<3
 #define	SD_EMMC_RESP_TIMEOUT_ERROR		1<<4
 #define	SD_EMMC_DESC_TIMEOUT_ERROR		1<<5
-#endif
 
 struct sd_emmc_global_regs {
     volatile uint32_t gclock;     // 0x00

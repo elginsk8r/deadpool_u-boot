@@ -1,17 +1,17 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_usb_tool/optimus_core.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <common.h>
-#include <command.h>
-
-#include "../../platform.h"
+#include "platform.h"
 #include "usb_pcd.h"
 
 #include "usb_pcd.c"
-//#include "../../platform.c"
-
+#include "platform.c"
 #include "dwc_pcd.c"
 #include "dwc_pcd_irq.c"
 
@@ -49,14 +49,12 @@ int do_v2_usbtool (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
     int rc = 0;
     unsigned timeout            = (2 <= argc) ? simple_strtoul(argv[1], NULL, 0) : 0;
-#if (defined AML_USB_BURN_TOOL)
     //if get burning tool identify command in pcToolWaitTime, then auto jump into burning mode
     unsigned pcToolWaitTime     = (3 <= argc) ? simple_strtoul(argv[2], NULL, 0) : 0;
+
     optimus_work_mode_set(OPTIMUS_WORK_MODE_USB_UPDATE);
     setenv(_ENV_TIME_OUT_TO_AUTO_BURN, pcToolWaitTime ? argv[2] : "");
-#else
-    /*#error "xxxx"*/
-#endif// #if (defined AML_USB_BURN_TOOL)
+
     rc = v2_usbburning(timeout);
     /*close_usb_phy_clock(0);*/
 

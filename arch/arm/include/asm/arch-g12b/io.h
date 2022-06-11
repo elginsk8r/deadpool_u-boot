@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12b/io.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __MACH_MESSON_REGS_IO_H
@@ -9,14 +12,12 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/io.h>
-#include <asm/arch/register.h>
-
-//#define IO_CBUS_BASE                    (0xFFD00000L)
-//#define IO_AXI_BUS_BASE                 (0xFFB00000L) /* gpv */
-//#define IO_AHB_BUS_BASE                 (0xFF500000L) /* usb0 */
-//#define IO_APB_BUS_BASE                 (0xFFFC0000L) /* AHB SRAM, sec/sys ahb? txlx_mem_map.xlsx */
-//#define IO_APB_HDMI_BUS_BASE            (0xFFE00000L) /*  */
-//#define IO_VPU_BUS_BASE                 (0xFF900000L) /* VPU */
+#define IO_CBUS_BASE                    (0xFFD00000L)
+#define IO_AXI_BUS_BASE                 (0xFFB00000L) /* gpv */
+#define IO_AHB_BUS_BASE                 (0xFF500000L) /* usb0 */
+#define IO_APB_BUS_BASE                 (0xFFFC0000L) /* AHB SRAM, sec/sys ahb? txlx_mem_map.xlsx */
+#define IO_APB_HDMI_BUS_BASE            (0xFFE00000L) /*  */
+#define IO_VPU_BUS_BASE                 (0xFF900000L) /* VPU */
 
 #define CBUS_REG_OFFSET(reg) ((reg) << 2)
 #define CBUS_REG_ADDR(reg)	 (IO_CBUS_BASE + CBUS_REG_OFFSET(reg))

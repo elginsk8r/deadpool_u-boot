@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12b/acs.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __ACS_H
@@ -43,9 +46,6 @@ typedef struct acs_setting{
 		unsigned char		rsv_set_version;
 		unsigned short		rsv_set_length;
 		unsigned long		rsv_set_addr;
-		char				board_id[12];
-		unsigned short		ddr_struct_size[12];
-		unsigned long		ddr_struct_org_size;
 }__attribute__ ((packed)) acs_set_t;
 
 #endif

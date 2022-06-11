@@ -1,6 +1,6 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-/*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+
+/** \file
+ * \brief defines _PMU_SMB_LPDDR4_2D data structure
  */
 
 /**  \brief LPDDR4_2D training firmware message block structure

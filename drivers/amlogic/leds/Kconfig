@@ -1,3 +1,0 @@
-config MESON_LEDS_STATE_CONTROL
-    bool "Amlogic device LEDS control"
-    default n

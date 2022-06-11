@@ -1,204 +1,239 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
- * Sunxi ehci glue
+ * Copyright (C) 2014 Roman Byshko
  *
- * Copyright (C) 2015 Hans de Goede <hdegoede@redhat.com>
- * Copyright (C) 2014 Roman Byshko <rbyshko@gmail.com>
+ * Roman Byshko <rbyshko@gmail.com>
  *
  * Based on code from
  * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <common.h>
 #include <asm/arch/clock.h>
+#include <asm/arch/cpu.h>
+#include <asm/gpio.h>
 #include <asm/io.h>
-#include <dm.h>
+#include <common.h>
 #include "ehci.h"
-#include <generic-phy.h>
 
-#ifdef CONFIG_SUNXI_GEN_SUN4I
-#define BASE_DIST		0x8000
-#define AHB_CLK_DIST		2
+#define SUNXI_USB_PMU_IRQ_ENABLE	0x800
+#define SUNXI_USB_CSR			0x404
+#define SUNXI_USB_PASSBY_EN		1
+
+#define SUNXI_EHCI_AHB_ICHR8_EN		(1 << 10)
+#define SUNXI_EHCI_AHB_INCR4_BURST_EN	(1 << 9)
+#define SUNXI_EHCI_AHB_INCRX_ALIGN_EN	(1 << 8)
+#define SUNXI_EHCI_ULPI_BYPASS_EN	(1 << 0)
+
+static struct sunxi_ehci_hcd {
+	struct usb_hcd *hcd;
+	int usb_rst_mask;
+	int ahb_clk_mask;
+	int gpio_vbus;
+	int irq;
+	int id;
+} sunxi_echi_hcd[] = {
+	{
+		.usb_rst_mask = CCM_USB_CTRL_PHY1_RST | CCM_USB_CTRL_PHY1_CLK,
+		.ahb_clk_mask = 1 << AHB_GATE_OFFSET_USB_EHCI0,
+#ifndef CONFIG_MACH_SUN6I
+		.irq = 39,
 #else
-#define BASE_DIST		0x1000
-#define AHB_CLK_DIST		1
+		.irq = 72,
 #endif
-
-#define SUN6I_AHB_RESET0_CFG_OFFSET 0x2c0
-#define SUN9I_AHB_RESET0_CFG_OFFSET 0x5a0
-
-struct ehci_sunxi_cfg {
-	bool has_reset;
-	u32 extra_ahb_gate_mask;
-	u32 reset0_cfg_offset;
+		.id = 1,
+	},
+#if (CONFIG_USB_MAX_CONTROLLER_COUNT > 1)
+	{
+		.usb_rst_mask = CCM_USB_CTRL_PHY2_RST | CCM_USB_CTRL_PHY2_CLK,
+		.ahb_clk_mask = 1 << AHB_GATE_OFFSET_USB_EHCI1,
+#ifndef CONFIG_MACH_SUN6I
+		.irq = 40,
+#else
+		.irq = 74,
+#endif
+		.id = 2,
+	}
+#endif
 };
 
-struct ehci_sunxi_priv {
-	struct ehci_ctrl ehci;
-	struct sunxi_ccm_reg *ccm;
-	u32 *reset0_cfg;
-	int ahb_gate_mask; /* Mask of ahb_gate0 clk gate bits for this hcd */
-	struct phy phy;
-	const struct ehci_sunxi_cfg *cfg;
-};
+static int enabled_hcd_count;
 
-static int ehci_usb_probe(struct udevice *dev)
+static void *get_io_base(int hcd_id)
 {
-	struct usb_platdata *plat = dev_get_platdata(dev);
-	struct ehci_sunxi_priv *priv = dev_get_priv(dev);
-	struct ehci_hccr *hccr = (struct ehci_hccr *)devfdt_get_addr(dev);
-	struct ehci_hcor *hcor;
-	int extra_ahb_gate_mask = 0;
-	u8 reg_mask = 0;
-	int phys, ret;
-
-	priv->cfg = (const struct ehci_sunxi_cfg *)dev_get_driver_data(dev);
-	priv->ccm = (struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-	if (IS_ERR(priv->ccm))
-		return PTR_ERR(priv->ccm);
-
-	priv->reset0_cfg = (void *)priv->ccm +
-				   priv->cfg->reset0_cfg_offset;
-
-	phys = dev_count_phandle_with_args(dev, "phys", "#phy-cells");
-	if (phys < 0) {
-		phys = 0;
-		goto no_phy;
+	switch (hcd_id) {
+	case 0:
+		return (void *)SUNXI_USB0_BASE;
+	case 1:
+		return (void *)SUNXI_USB1_BASE;
+	case 2:
+		return (void *)SUNXI_USB2_BASE;
+	default:
+		return NULL;
 	}
-
-	ret = generic_phy_get_by_name(dev, "usb", &priv->phy);
-	if (ret) {
-		pr_err("failed to get %s usb PHY\n", dev->name);
-		return ret;
-	}
-
-	ret = generic_phy_init(&priv->phy);
-	if (ret) {
-		pr_err("failed to init %s USB PHY\n", dev->name);
-		return ret;
-	}
-
-	ret = generic_phy_power_on(&priv->phy);
-	if (ret) {
-		pr_err("failed to power on %s USB PHY\n", dev->name);
-		return ret;
-	}
-
-no_phy:
-	/*
-	 * This should go away once we've moved to the driver model for
-	 * clocks resp. phys.
-	 */
-	reg_mask = ((uintptr_t)hccr - SUNXI_USB1_BASE) / BASE_DIST;
-	priv->ahb_gate_mask = 1 << AHB_GATE_OFFSET_USB_EHCI0;
-	extra_ahb_gate_mask = priv->cfg->extra_ahb_gate_mask;
-	priv->ahb_gate_mask <<= reg_mask * AHB_CLK_DIST;
-	extra_ahb_gate_mask <<= reg_mask * AHB_CLK_DIST;
-
-	setbits_le32(&priv->ccm->ahb_gate0,
-		     priv->ahb_gate_mask | extra_ahb_gate_mask);
-	if (priv->cfg->has_reset)
-		setbits_le32(priv->reset0_cfg,
-			     priv->ahb_gate_mask | extra_ahb_gate_mask);
-
-	hcor = (struct ehci_hcor *)((uintptr_t)hccr +
-				    HC_LENGTH(ehci_readl(&hccr->cr_capbase)));
-
-	return ehci_register(dev, hccr, hcor, NULL, 0, plat->init_type);
 }
 
-static int ehci_usb_remove(struct udevice *dev)
+static int get_vbus_gpio(int hcd_id)
 {
-	struct ehci_sunxi_priv *priv = dev_get_priv(dev);
-	int ret;
+	switch (hcd_id) {
+	case 1: return sunxi_name_to_gpio(CONFIG_USB1_VBUS_PIN);
+	case 2: return sunxi_name_to_gpio(CONFIG_USB2_VBUS_PIN);
+	}
+	return -1;
+}
 
-	if (generic_phy_valid(&priv->phy)) {
-		ret = generic_phy_exit(&priv->phy);
-		if (ret) {
-			pr_err("failed to exit %s USB PHY\n", dev->name);
-			return ret;
-		}
+static void usb_phy_write(struct sunxi_ehci_hcd *sunxi_ehci, int addr,
+			  int data, int len)
+{
+	int j = 0, usbc_bit = 0;
+	void *dest = get_io_base(0) + SUNXI_USB_CSR;
+
+	usbc_bit = 1 << (sunxi_ehci->id * 2);
+	for (j = 0; j < len; j++) {
+		/* set the bit address to be written */
+		clrbits_le32(dest, 0xff << 8);
+		setbits_le32(dest, (addr + j) << 8);
+
+		clrbits_le32(dest, usbc_bit);
+		/* set data bit */
+		if (data & 0x1)
+			setbits_le32(dest, 1 << 7);
+		else
+			clrbits_le32(dest, 1 << 7);
+
+		setbits_le32(dest, usbc_bit);
+
+		clrbits_le32(dest, usbc_bit);
+
+		data >>= 1;
+	}
+}
+
+static void sunxi_usb_phy_init(struct sunxi_ehci_hcd *sunxi_ehci)
+{
+	/* The following comments are machine
+	 * translated from Chinese, you have been warned!
+	 */
+
+	/* adjust PHY's magnitude and rate */
+	usb_phy_write(sunxi_ehci, 0x20, 0x14, 5);
+
+	/* threshold adjustment disconnect */
+#if defined CONFIG_MACH_SUN4I || defined CONFIG_MACH_SUN6I
+	usb_phy_write(sunxi_ehci, 0x2a, 3, 2);
+#else
+	usb_phy_write(sunxi_ehci, 0x2a, 2, 2);
+#endif
+
+	return;
+}
+
+static void sunxi_usb_passby(struct sunxi_ehci_hcd *sunxi_ehci, int enable)
+{
+	unsigned long bits = 0;
+	void *addr = get_io_base(sunxi_ehci->id) + SUNXI_USB_PMU_IRQ_ENABLE;
+
+	bits = SUNXI_EHCI_AHB_ICHR8_EN |
+		SUNXI_EHCI_AHB_INCR4_BURST_EN |
+		SUNXI_EHCI_AHB_INCRX_ALIGN_EN |
+		SUNXI_EHCI_ULPI_BYPASS_EN;
+
+	if (enable)
+		setbits_le32(addr, bits);
+	else
+		clrbits_le32(addr, bits);
+
+	return;
+}
+
+static void sunxi_ehci_enable(struct sunxi_ehci_hcd *sunxi_ehci)
+{
+	struct sunxi_ccm_reg *ccm = (struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+
+	setbits_le32(&ccm->usb_clk_cfg, sunxi_ehci->usb_rst_mask);
+	setbits_le32(&ccm->ahb_gate0, sunxi_ehci->ahb_clk_mask);
+#ifdef CONFIG_MACH_SUN6I
+	setbits_le32(&ccm->ahb_reset0_cfg, sunxi_ehci->ahb_clk_mask);
+#endif
+
+	sunxi_usb_phy_init(sunxi_ehci);
+
+	sunxi_usb_passby(sunxi_ehci, SUNXI_USB_PASSBY_EN);
+
+	if (sunxi_ehci->gpio_vbus != -1)
+		gpio_direction_output(sunxi_ehci->gpio_vbus, 1);
+}
+
+static void sunxi_ehci_disable(struct sunxi_ehci_hcd *sunxi_ehci)
+{
+	struct sunxi_ccm_reg *ccm = (struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+
+	if (sunxi_ehci->gpio_vbus != -1)
+		gpio_direction_output(sunxi_ehci->gpio_vbus, 0);
+
+	sunxi_usb_passby(sunxi_ehci, !SUNXI_USB_PASSBY_EN);
+
+#ifdef CONFIG_MACH_SUN6I
+	clrbits_le32(&ccm->ahb_reset0_cfg, sunxi_ehci->ahb_clk_mask);
+#endif
+	clrbits_le32(&ccm->ahb_gate0, sunxi_ehci->ahb_clk_mask);
+	clrbits_le32(&ccm->usb_clk_cfg, sunxi_ehci->usb_rst_mask);
+}
+
+int ehci_hcd_init(int index, enum usb_init_type init, struct ehci_hccr **hccr,
+		struct ehci_hcor **hcor)
+{
+	struct sunxi_ccm_reg *ccm = (struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+	struct sunxi_ehci_hcd *sunxi_ehci = &sunxi_echi_hcd[index];
+	int err;
+
+	sunxi_ehci->gpio_vbus = get_vbus_gpio(sunxi_ehci->id);
+
+	/* enable common PHY only once */
+	if (index == 0)
+		setbits_le32(&ccm->usb_clk_cfg, CCM_USB_CTRL_PHYGATE);
+
+	if (sunxi_ehci->gpio_vbus != -1) {
+		err = gpio_request(sunxi_ehci->gpio_vbus, "ehci_vbus");
+		if (err)
+			return err;
 	}
 
-	ret = ehci_deregister(dev);
-	if (ret)
-		return ret;
+	sunxi_ehci_enable(sunxi_ehci);
 
-	if (priv->cfg->has_reset)
-		clrbits_le32(priv->reset0_cfg, priv->ahb_gate_mask);
-	clrbits_le32(&priv->ccm->ahb_gate0, priv->ahb_gate_mask);
+	*hccr = get_io_base(sunxi_ehci->id);
+
+	*hcor = (struct ehci_hcor *)((uint32_t) *hccr
+				+ HC_LENGTH(ehci_readl(&(*hccr)->cr_capbase)));
+
+	debug("sunxi-ehci: init hccr %x and hcor %x hc_length %d\n",
+	      (uint32_t)*hccr, (uint32_t)*hcor,
+	      (uint32_t)HC_LENGTH(ehci_readl(&(*hccr)->cr_capbase)));
+
+	enabled_hcd_count++;
 
 	return 0;
 }
 
-static const struct ehci_sunxi_cfg sun4i_a10_cfg = {
-	.has_reset = false,
-};
+int ehci_hcd_stop(int index)
+{
+	struct sunxi_ccm_reg *ccm = (struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+	struct sunxi_ehci_hcd *sunxi_ehci = &sunxi_echi_hcd[index];
+	int err;
 
-static const struct ehci_sunxi_cfg sun6i_a31_cfg = {
-	.has_reset = true,
-	.reset0_cfg_offset = SUN6I_AHB_RESET0_CFG_OFFSET,
-};
+	sunxi_ehci_disable(sunxi_ehci);
 
-static const struct ehci_sunxi_cfg sun8i_h3_cfg = {
-	.has_reset = true,
-	.extra_ahb_gate_mask = 1 << AHB_GATE_OFFSET_USB_OHCI0,
-	.reset0_cfg_offset = SUN6I_AHB_RESET0_CFG_OFFSET,
-};
+	if (sunxi_ehci->gpio_vbus != -1) {
+		err = gpio_free(sunxi_ehci->gpio_vbus);
+		if (err)
+			return err;
+	}
 
-static const struct ehci_sunxi_cfg sun9i_a80_cfg = {
-	.has_reset = true,
-	.reset0_cfg_offset = SUN9I_AHB_RESET0_CFG_OFFSET,
-};
+	/* disable common PHY only once, for the last enabled hcd */
+	if (enabled_hcd_count == 1)
+		clrbits_le32(&ccm->usb_clk_cfg, CCM_USB_CTRL_PHYGATE);
 
-static const struct udevice_id ehci_usb_ids[] = {
-	{
-		.compatible = "allwinner,sun4i-a10-ehci",
-		.data = (ulong)&sun4i_a10_cfg,
-	},
-	{
-		.compatible = "allwinner,sun5i-a13-ehci",
-		.data = (ulong)&sun4i_a10_cfg,
-	},
-	{
-		.compatible = "allwinner,sun6i-a31-ehci",
-		.data = (ulong)&sun6i_a31_cfg,
-	},
-	{
-		.compatible = "allwinner,sun7i-a20-ehci",
-		.data = (ulong)&sun4i_a10_cfg,
-	},
-	{
-		.compatible = "allwinner,sun8i-a23-ehci",
-		.data = (ulong)&sun6i_a31_cfg,
-	},
-	{
-		.compatible = "allwinner,sun8i-a83t-ehci",
-		.data = (ulong)&sun6i_a31_cfg,
-	},
-	{
-		.compatible = "allwinner,sun8i-h3-ehci",
-		.data = (ulong)&sun8i_h3_cfg,
-	},
-	{
-		.compatible = "allwinner,sun9i-a80-ehci",
-		.data = (ulong)&sun9i_a80_cfg,
-	},
-	{
-		.compatible = "allwinner,sun50i-a64-ehci",
-		.data = (ulong)&sun8i_h3_cfg,
-	},
-	{ /* sentinel */ }
-};
+	enabled_hcd_count--;
 
-U_BOOT_DRIVER(ehci_sunxi) = {
-	.name	= "ehci_sunxi",
-	.id	= UCLASS_USB,
-	.of_match = ehci_usb_ids,
-	.probe = ehci_usb_probe,
-	.remove = ehci_usb_remove,
-	.ops	= &ehci_usb_ops,
-	.platdata_auto_alloc_size = sizeof(struct usb_platdata),
-	.priv_auto_alloc_size = sizeof(struct ehci_sunxi_priv),
-	.flags	= DM_FLAG_ALLOC_PRIV_DMA,
-};
+	return 0;
+}
