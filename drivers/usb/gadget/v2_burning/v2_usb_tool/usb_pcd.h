@@ -1,11 +1,12 @@
-/* usb pcd driver header */
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * (C) Copyright 2010 Amlogic, Inc
+ * drivers/usb/gadget/v2_burning/v2_usb_tool/usb_pcd.h
  *
- * Victor Wan, victor.wan@amlogic.com,
- * 2010-03-24 @ Shanghai
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
  *
  */
+
+/* usb pcd driver header */
 #ifndef __USB_PCD_H__
 #define __USB_PCD_H__
 #include <asm/types.h>

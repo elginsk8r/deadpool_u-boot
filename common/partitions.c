@@ -1,11 +1,21 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * common/partitions.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
+
 #include <common.h>
 #include <malloc.h>
 #include <linux/err.h>
 #include <partition_table.h>
-#include <linux/libfdt.h>
+#include <libfdt.h>
 #include <asm/arch/bl31_apis.h>
-#include <amlogic/aml_efuse.h>
+#include <asm/arch/secure_apb.h>
 
+extern int is_dtb_encrypt(unsigned char *buffer);
+extern int check_valid_dts(unsigned char *buffer);
 #ifdef CONFIG_MULTI_DTB
 	extern unsigned long get_multi_dt_entry(unsigned long fdt_addr);
 #endif
@@ -20,7 +30,7 @@ static int parts_total_num;
 int has_boot_slot = 0;
 int has_system_slot = 0;
 bool dynamic_partition = false;
-bool vendor_boot_partition = false;
+
 
 int get_partitions_table(struct partitions **table)
 {
@@ -49,45 +59,6 @@ void free_partitions(void)
 	part_table = NULL;
 }
 
-#ifndef IS_FEAT_BOOT_VERIFY
-#define IS_FEAT_BOOT_VERIFY() 0
-#endif// #ifndef IS_FEAT_BOOT_VERIFY
-
-/*
-  return 0 if dts is valid
-  other value are falure.
-*/
-int check_valid_dts(unsigned char *buffer)
-{
-	int ret = -__LINE__;
-	char *dt_addr;
-	/* fixme, a work around way */
-	unsigned char *sbuffer = (unsigned char *)env_get_hex("loadaddr", 0x1000000 + 0x100000);
-	/* g12a merge to trunk, use trunk code */
-	//unsigned char *sbuffer = (unsigned char *)0x1000000;
-
-	if (IS_FEAT_BOOT_VERIFY()) {
-		memcpy(sbuffer, buffer, AML_DTB_IMG_MAX_SZ);
-		flush_cache((unsigned long)sbuffer, AML_DTB_IMG_MAX_SZ);
-		ret = aml_sec_boot_check(AML_D_P_IMG_DECRYPT, (long unsigned)sbuffer, AML_DTB_IMG_MAX_SZ, 0);
-		if (ret) {
-			printf("\n %s() %d: Decrypt dtb: Sig Check %d\n", __func__, __LINE__, ret);
-			return -__LINE__;
-		}
-		memcpy(buffer, sbuffer, AML_DTB_IMG_MAX_SZ);
-	}
-#ifdef CONFIG_MULTI_DTB
-	dt_addr = (char *)get_multi_dt_entry((unsigned long)buffer);
-#else
-	dt_addr = (char *)buffer;
-#endif
-	pr_debug("start dts,buffer=%p,dt_addr=%p\n", buffer, dt_addr);
-	ret = fdt_check_header(dt_addr);
-	if ( ret < 0 )
-		printf("%s: %s\n",__func__,fdt_strerror(ret));
-	/* fixme, is it 0 when ok? */
-	return ret;
-}
 
 int get_partition_from_dts(unsigned char *buffer)
 {
@@ -106,7 +77,7 @@ int get_partition_from_dts(unsigned char *buffer)
 		goto _err;
 
 	ret = check_valid_dts(buffer);
-	pr_debug("%s() %d: ret %d\n",__func__, __LINE__, ret);
+	printf("%s() %d: ret %d\n",__func__, __LINE__, ret);
 	if ( ret < 0 )
 	{
 		printf("%s() %d: ret %d\n",__func__, __LINE__, ret);
@@ -125,7 +96,7 @@ int get_partition_from_dts(unsigned char *buffer)
 		goto _err;
 	}
 	parts_num = (int *)fdt_getprop(dt_addr, nodeoffset, "parts", NULL);
-	pr_debug("parts: %d\n",be32_to_cpup((u32*)parts_num));
+	printf("parts: %d\n",be32_to_cpup((u32*)parts_num));
 
 	if (parts_num > 0)
 	{
@@ -139,9 +110,6 @@ int get_partition_from_dts(unsigned char *buffer)
 		parts_total_num = be32_to_cpup((u32*)parts_num);
 	}
 	dynamic_partition = false;
-	env_set("partiton_mode","normal");
-	vendor_boot_partition = false;
-	env_set("vendor_boot_mode","false");
 	for (index = 0; index < be32_to_cpup((u32*)parts_num); index++)
 	{
 		sprintf(propname,"part-%d", index);
@@ -170,15 +138,15 @@ int get_partition_from_dts(unsigned char *buffer)
 			memcpy(part_table[index].name, uname, strlen(uname));
 		part_table[index].size = ((unsigned long)be32_to_cpup((u32*)usize) << 32) | (unsigned long)be32_to_cpup((((u32*)usize)+1));
 		part_table[index].mask_flags = be32_to_cpup((u32*)umask);
-		pr_debug("%02d:%10s\t%016llx %01x\n", index, uname, part_table[index].size, part_table[index].mask_flags);
+		printf("%02d:%10s\t%016llx %01x\n", index, uname, part_table[index].size, part_table[index].mask_flags);
 
 		if (strcmp(uname, "boot_a") == 0) {
 			has_boot_slot = 1;
-			pr_info("set has_boot_slot = 1\n");
+			printf("set has_boot_slot = 1\n");
 		}
 		else if (strcmp(uname, "boot") == 0) {
 			has_boot_slot = 0;
-			pr_info("set has_boot_slot = 0\n");
+			printf("set has_boot_slot = 0\n");
 		}
 		if (strcmp(uname, "system_a") == 0)
 			has_system_slot = 1;
@@ -187,14 +155,7 @@ int get_partition_from_dts(unsigned char *buffer)
 
 		if (strcmp(uname, "super") == 0) {
 			dynamic_partition = true;
-			env_set("partiton_mode","dynamic");
 			printf("enable dynamic_partition\n");
-		}
-
-		if (strncmp(uname, "vendor_boot", 11) == 0) {
-			vendor_boot_partition = true;
-			env_set("vendor_boot_mode","true");
-			printf("enable vendor_boot\n");
 		}
 	}
 	return 0;

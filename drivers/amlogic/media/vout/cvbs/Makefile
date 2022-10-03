@@ -1,1 +1,0 @@
-obj-$(CONFIG_AML_CVBS) += cvbs.o vdac.o

@@ -1,15 +1,11 @@
-/*****************************************************************
-**
-**  Copyright (C) 2012 Amlogic,Inc.  All rights reserved
-**
-**        Filename : id_table.c
-**        Revision : 1.001
-**        Author: Benjamin Zhao
-**        Description:
-**	all supported nand id table, provide nand flash basic information,
-**	mainly init nand phy driver.
-**
-*****************************************************************/
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * drivers/nand/phy/id_table.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
+
 #include "../include/phynand.h"
 
 

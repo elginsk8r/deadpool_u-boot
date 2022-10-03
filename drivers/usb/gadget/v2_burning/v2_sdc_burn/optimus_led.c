@@ -1,14 +1,11 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * \file        optimus_led.c
- * \brief       use led to indicate burning states
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_led.c
  *
- * \version     1.0.0
- * \date        2013/11/9
- * \author      Sam.Wu <yihui.wu@amlgic.com>
- *
- * Copyright (c) 2013 Amlogic Inc.. All Rights Reserved.
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
  *
  */
+
 #include "../v2_burning_i.h"
 #include "optimus_led.h"
 

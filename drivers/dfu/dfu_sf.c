@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2014, NVIDIA CORPORATION. All rights reserved.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <common.h>
@@ -11,24 +12,15 @@
 #include <spi.h>
 #include <spi_flash.h>
 
-static int dfu_get_medium_size_sf(struct dfu_entity *dfu, u64 *size)
+static long dfu_get_medium_size_sf(struct dfu_entity *dfu)
 {
-	*size = dfu->data.sf.size;
-
-	return 0;
+	return dfu->data.sf.size;
 }
 
 static int dfu_read_medium_sf(struct dfu_entity *dfu, u64 offset, void *buf,
 		long *len)
 {
-	return spi_flash_read(dfu->data.sf.dev, dfu->data.sf.start + offset,
-		*len, buf);
-}
-
-static u64 find_sector(struct dfu_entity *dfu, u64 start, u64 offset)
-{
-	return (lldiv((start + offset), dfu->data.sf.dev->sector_size)) *
-		dfu->data.sf.dev->sector_size;
+	return spi_flash_read(dfu->data.sf.dev, offset, *len, buf);
 }
 
 static int dfu_write_medium_sf(struct dfu_entity *dfu,
@@ -36,14 +28,11 @@ static int dfu_write_medium_sf(struct dfu_entity *dfu,
 {
 	int ret;
 
-	ret = spi_flash_erase(dfu->data.sf.dev,
-			      find_sector(dfu, dfu->data.sf.start, offset),
-			      dfu->data.sf.dev->sector_size);
+	ret = spi_flash_erase(dfu->data.sf.dev, offset, *len);
 	if (ret)
 		return ret;
 
-	ret = spi_flash_write(dfu->data.sf.dev, dfu->data.sf.start + offset,
-			      *len, buf);
+	ret = spi_flash_write(dfu->data.sf.dev, offset, *len, buf);
 	if (ret)
 		return ret;
 
@@ -117,10 +106,8 @@ static struct spi_flash *parse_dev(char *devstr)
 int dfu_fill_entity_sf(struct dfu_entity *dfu, char *devstr, char *s)
 {
 	char *st;
-	char *devstr_bkup = strdup(devstr);
 
-	dfu->data.sf.dev = parse_dev(devstr_bkup);
-	free(devstr_bkup);
+	dfu->data.sf.dev = parse_dev(devstr);
 	if (!dfu->data.sf.dev)
 		return -ENODEV;
 

@@ -1,23 +1,10 @@
-
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/include/asm/arch-txl/ddr_define.h
+ * arch/arm/include/asm/arch-g12b/ddr_define.h
  *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
+ */
 
 #define CONFIG_BOARD_ID_MASK				0xFF
 #define CONFIG_DDR_TYPE_DDR3				0
@@ -208,10 +195,10 @@
 
 
 /* print ddr training window */
-//#ifndef CONFIG_DDR_FULL_TEST
-//#define CONFIG_DDR_FULL_TEST				0
-//#endif
-//#define DDR_FULL_TEST						(CONFIG_DDR_FULL_TEST<<10)
+#ifndef CONFIG_DDR_FULL_TEST
+#define CONFIG_DDR_FULL_TEST				0
+#endif
+#define DDR_FULL_TEST						(CONFIG_DDR_FULL_TEST<<10)
 
 /* non-sec region scramble function */
 #ifndef CONFIG_DDR_NONSEC_SCRAMBLE
@@ -259,8 +246,6 @@
 #define DDR_FUNC_LPDDR3_SOC_ODT_ONLY_UP						(0<<25)
 #endif
 #define DDR_FUNC_FAST_BOOT_CHECK_CHIP_ID					(1<<30)
-#define DDR_FUNC_CONFIG_DFE_FUNCTION						(1<<29)
-#define DDR_FUNC_CONFIG_DDR_DVFS_FUNCTION					(1<<28)
 #define DDR_FUNC							(DDR_FUNC_D2PLL					| \
 											DDR_FUNC_LP						| \
 											DDR_FUNC_ZQ_PD					| \
@@ -277,7 +262,7 @@
 											DDR_FUNC_LPDDR3_CA_TRAINING_CA1_BIT0| \
 											DDR_FUNC_LPDDR3_CA_TRAINING_CA1_BIT1| \
 											DDR_FUNC_LPDDR3_SOC_ODT_ONLY_UP	| \
-											(0x80000000) 						\
+											(1 << 31) 						\
 											)
 
 

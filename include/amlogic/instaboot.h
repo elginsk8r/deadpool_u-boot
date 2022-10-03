@@ -1,3 +1,11 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * include/amlogic/instaboot.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
+
 #ifndef __INSTABOOT_H_
 #define __INSTABOOT_H_
 

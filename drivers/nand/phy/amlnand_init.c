@@ -1,22 +1,17 @@
-/*****************************************************************
-**
-**  Copyright (C) 2012 Amlogic,Inc.  All rights reserved
-**
-**        Filename : driver_uboot.c
-**        Revision : 1.001
-**        Author: Benjamin Zhao
-**        Description:
-**			amlnand_init,  mainly init nand phy driver.
-**
-**
-*****************************************************************/
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * drivers/nand/phy/amlnand_init.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
+
 
 #include "../include/phynand.h"
 #include <amlogic/secure_storage.h>
 #include <asm/arch/secure_apb.h>
 
 struct amlnand_chip *aml_nand_chip = NULL;
-
 extern int boot_dev_init(struct amlnand_chip *aml_chip);
 
 static void show_nand_driver_version(void)
@@ -276,23 +271,6 @@ void amlnand_clear_pinmux(struct amlnand_chip *aml_chip)
 	return;
 }
 
-#if 0
-void secure_storage_set_info(uint32_t info)
-{
-        register uint64_t x0 asm("x0")= SET_STORAGE_INFO;
-        register uint64_t x1 asm("x1") = info;
-        asm volatile(
-                __asmeq("%0", "x0")
-                __asmeq("%1", "x1")
-                "smc    #0\n"
-                : :"r" (x0), "r"(x1));
-
-}
-#endif
-
-extern int get_flash_type(struct amlnand_chip *aml_chip);
-
-
 int amlnf_phy_init(u8 flag, struct platform_device *pdev)
 {
 	struct amlnand_chip *aml_chip = NULL;
@@ -306,14 +284,13 @@ int amlnf_phy_init(u8 flag, struct platform_device *pdev)
 		aml_nand_msg("malloc failed for aml_chip:%x",
 			(uint32_t)sizeof(struct amlnand_chip));
 		ret = -NAND_MALLOC_FAILURE;
-		goto exit_error0;
+		goto exit_error1;
 	}
 	memset(aml_chip , 0, sizeof(struct amlnand_chip));
 	memset(aml_chip->reserved_blk, 0xff, RESERVED_BLOCK_CNT);
 	aml_chip->init_flag = flag;
 	aml_chip->nand_status = NAND_STATUS_NORMAL;
 	aml_nand_chip = aml_chip;
-
 	PHY_NAND_LINE
 	ret = amlnf_phy_resource(aml_chip, pdev);
 	if (ret)
@@ -328,32 +305,32 @@ int amlnf_phy_init(u8 flag, struct platform_device *pdev)
 		goto exit_error1;
 	}
 	PHY_NAND_LINE
-	/* Step 2: init aml_chip and store interface operation */
+	/* Step 2: init aml_chip operation */
 	ret = amlnand_init_operation(aml_chip);
 	if (ret < 0) {
 		aml_nand_msg("chip detect failed and ret:%x", ret);
 		ret = -NAND_FAILED;
 		goto exit_error1;
 	}
-
 	PHY_NAND_LINE
 	/* Step 3: get nand id and get hw flash information */
 	ret = amlnand_chip_init(aml_chip);
 	if (ret < 0) {
 		aml_nand_msg("chip detect failed and ret:%x", ret);
+		device_boot_flag = EMMC_BOOT_FLAG;
 		amlnand_clear_pinmux(aml_chip);
 		ret = -NAND_FAILED;
 		goto exit_error1;
 	}
 	PHY_NAND_LINE
+	/* update device_boot_flag for outsides */
+	device_boot_flag = NAND_BOOT_FLAG;
 	/* write 2 gp2*/
-	#if 0
 	secure_storage_set_info(STORAGE_DEV_NAND);
-	#endif
 
 	PHY_NAND_LINE
 	if (aml_chip->init_flag == NAND_SCAN_ID_INIT)
-		goto exit_error0;
+		goto exit_error1;
 	PHY_NAND_LINE
 
 	//fixme, debug code
@@ -397,9 +374,9 @@ int amlnf_phy_init(u8 flag, struct platform_device *pdev)
 		aml_nand_free(controller->oob_buf);
 
 		//nand_buf_free(aml_chip);
-		/*exit with NAND_SUCCESS while we are erasing.*/
-		ret = NAND_SUCCESS;
-		goto exit_error0;
+		/*exit with error code in porpoises, while we are erasing.*/
+		ret = -1;
+		goto exit_error1;
 	}else{
 
 		//Step 5: register nand device, and config device information
@@ -411,13 +388,13 @@ int amlnf_phy_init(u8 flag, struct platform_device *pdev)
 			ret = -NAND_READ_FAILED;
 			goto exit_error0;
 		}
-}
+	}
 	return ret;
 
 exit_error1:
-	if (aml_chip)
-		aml_nand_free(aml_chip);
+	aml_nand_free(aml_chip);
 exit_error0:
+
 
 	return ret;
 }

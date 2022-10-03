@@ -1,29 +1,15 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
-* Copyright (C) 2017 Amlogic, Inc. All rights reserved.
-* *
-This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
-* *
-This program is distributed in the hope that it will be useful, but WITHOUT
-* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-* more details.
-* *
-You should have received a copy of the GNU General Public License along
-* with this program; if not, write to the Free Software Foundation, Inc.,
-* 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-* *
-Description:
-*/
+ * drivers/usb/gadget/v2_burning/v2_common/optimus_progress_ui.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
 
 #include "../v2_burning_i.h"
 #include <bmp_layout.h>
 #include <lcd.h>
 #include <video_font.h>
-
-typedef struct bmp_header bmp_header_t;
 
 #ifdef CONFIG_VIDEO_AMLLCD
 extern int lcd_drawchars (ushort x, ushort y, uchar *str, int count);
@@ -33,14 +19,12 @@ extern int lcd_drawchars (ushort x, ushort y, uchar *str, int count);
 #endif// #ifdef CONFIG_VIDEO_AMLLCD
 
 #ifdef CONFIG_AML_VOUT
-#ifdef OSD_SCALE_ENABLE
 #define _VIDEO_DEV_OPEN "hdmitx hpd;osd open;osd clear;vout output ${outputmode};bmp scale;"
-#else
-#define _VIDEO_DEV_OPEN "hdmitx hpd;osd open;osd clear;vout output ${outputmode};"
-#endif//#ifdef OSD_SCALE_ENABLE
 #else
 #define _VIDEO_DEV_OPEN "video dev bl_on;"
 #endif// #ifdef CONFIG_VIDEO_AMLTVOUT
+
+#if CONFIG_SD_BURNING_SUPPORT_UI
 
 const char* const UpgradeLogoAddr = (const char*)(OPTIMUS_DOWNLOAD_DISPLAY_BUF + OPTIMUS_DOWNLOAD_SLOT_SZ);
 
@@ -141,7 +125,7 @@ static int _show_burn_logo(const char* bmpOffsetName) //Display logo to report b
 {
     int ret = 0;
     char bmpCmd[64] = "bmp display %s";
-    char* bmpAddrEnv = getenv((char*)bmpOffsetName);
+    ulong bmpAddrEnv = getenv_hex(bmpOffsetName, 0);
 
     if (!bmpAddrEnv) {
         DWN_MSG("Reload bmps env.\n");
@@ -150,15 +134,18 @@ static int _show_burn_logo(const char* bmpOffsetName) //Display logo to report b
             DWN_ERR("Fail in re-unpack res img\n");
             return __LINE__;
         }
-        bmpAddrEnv = getenv((char*)bmpOffsetName);
+        bmpAddrEnv = getenv_hex(bmpOffsetName, 0);
     }
-    sprintf(bmpCmd, "bmp display %s ", bmpAddrEnv);
+    snprintf(bmpCmd, sizeof bmpCmd, "bmp display 0x%lx ", bmpAddrEnv);
 
     ret = run_command(bmpCmd, 0);
     if (ret) {
         DWN_ERR("Fail in run[%s], bmpOffsetName=%s\n", bmpCmd, bmpOffsetName);
         return __LINE__;
     }
+#ifdef CONFIG_OSD_SCALE_ENABLE
+    /*run_command("bmp scale", 0);*/
+#endif// #ifdef CONFIG_OSD_SCALE_ENABLE
 
     return 0;
 }
@@ -329,6 +316,10 @@ int optimus_progress_ui_set_unfocus_bkg(__hdle hUiProgress, unsigned long unfocu
         progressBarX += bkgWidth;
     }
 
+#ifdef CONFIG_OSD_SCALE_ENABLE
+    //run_command("bmp scale", 0);
+#endif// #ifdef CONFIG_OSD_SCALE_ENABLE
+
     return 0;
 }
 
@@ -400,6 +391,9 @@ int optimus_progress_ui_direct_update_progress(__hdle hUiProgress, const int per
 
         pUiProgress->nextProgressBarX += pUiProgress->progressBarWidth_f;
     }
+#ifdef CONFIG_OSD_SCALE_ENABLE
+    //run_command("bmp scale", 0);
+#endif// #ifdef CONFIG_OSD_SCALE_ENABLE
 
     pUiProgress->curPercent                 = percents;
 
@@ -452,41 +446,37 @@ int optimus_progress_ui_release(__hdle hUiPrgress)
 __hdle optimus_progress_ui_request_for_sdc_burn(void)
 {
     __hdle hUiProgress = NULL;
-    unsigned barAddr = simple_strtoul(getenv("upgrade_bar_offset"), NULL, 0);
-    unsigned display_width = simple_strtoul(getenv("fb_width"), NULL, 0);
-    unsigned display_height = simple_strtoul(getenv("fb_height"), NULL, 0);
-    bmp_header_t* upgrading  = (bmp_header_t*)simple_strtoul(getenv("upgrade_upgrading_offset"), NULL, 0);
-    const unsigned loadingHeight = upgrading->height;
-    const unsigned barYCor       =
-        (3* display_height + loadingHeight)/4;//display_height - (display_height/2 - loadingHeight/2)/2;
-    unsigned unfocusBmpAddr = simple_strtoul(getenv("upgrade_unfocus_offset"), NULL, 0);
+    unsigned barAddr = getenv_hex("upgrade_bar_offset", 0);
+    unsigned display_width = getenv_ulong("fb_width", 0, 0);
+    unsigned display_height = getenv_ulong("fb_height", 0, 0);
+    bmp_header_t* upgrading  = (bmp_header_t*)getenv_hex("upgrade_upgrading_offset", 0);
+    unsigned unfocusBmpAddr = getenv_hex("upgrade_unfocus_offset", 0);
 
     if (!barAddr) {
-        DWN_ERR("Fail to getenv[%s=%s]\n",
-                "upgrade_bar_offset", getenv("upgrade_bar_offset"));
+        DWN_ERR("Fail to getenv upgrade_bar_offset\n");
         show_logo_report_burn_ui_error();
         return NULL;
     }
     if (!display_width) {
-        DWN_ERR("Fail to getenv[%s=%s]\n",
-                "fb_width", getenv("fb_width"));
+        DWN_ERR("Fail to getenv fb_width\n");
         show_logo_report_burn_ui_error(); return NULL;
     }
     if (!display_height) {
-        DWN_ERR("Fail to getenv[%s=%s]\n",
-                "fb_height", getenv("fb_height")); return NULL;
+        DWN_ERR("Fail to getenv fb_height\n");
     }
     if (!upgrading) {
-        DWN_ERR("Fail to getenv[%s=%s]\n",
-                "upgrade_upgrading_offset", getenv("upgrade_upgrading_offset"));
+        DWN_ERR("Fail to getenv upgrade_upgrading_offset\n");
         show_logo_report_burn_ui_error(); return NULL;
     }
     if (!unfocusBmpAddr) {
-        DWN_ERR("Fail to getenv[%s=%s]\n",
-                "upgrade_unfocus_offset", getenv("upgrade_unfocus_offset"));
+        DWN_ERR("Fail to getenv upgrade_unfocus_offset\n");
         show_logo_report_burn_ui_error(); return NULL;
     }
     DWN_DBG("upgrade_unfocus_offset=%s\n", getenv("upgrade_unfocus_offset"));
+
+    const unsigned loadingHeight = upgrading->height;
+    const unsigned barYCor       =
+        (3* display_height + loadingHeight)/4;//display_height - (display_height/2 - loadingHeight/2)/2;
 
     DWN_MSG("dw,dh[%u, %u]\n", display_width, display_height);
     hUiProgress = optimus_progress_ui_request(100, 0,barAddr, display_width, barYCor);
@@ -497,6 +487,7 @@ __hdle optimus_progress_ui_request_for_sdc_burn(void)
 
     if (optimus_progress_ui_set_unfocus_bkg(hUiProgress, unfocusBmpAddr)) {
         DWN_ERR("Fail to set bkg\n");
+        optimus_progress_ui_release(hUiProgress);
         return NULL;;
     }
 
@@ -577,10 +568,10 @@ static int do_progress_bar_test(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 
     if (!hProgressBar)
     {
-        unsigned barAddr = simple_strtoul(getenv("upgrade_bar_offset"), NULL, 0);
-        unsigned display_width = simple_strtoul(getenv("fb_width"), NULL, 0);
-        unsigned display_height = simple_strtoul(getenv("fb_height"), NULL, 0);
-        bmp_header_t* upgrading  = (bmp_header_t*)simple_strtoul(getenv("upgrade_upgrading_offset"), NULL, 0);
+        unsigned barAddr = getenv_hex("upgrade_bar_offset", 0);
+        unsigned display_width  = getenv_ulong("fb_width", 0, );
+        unsigned display_height = getenv_ulong("fb_height", 0, 0);
+        bmp_header_t* upgrading  = (bmp_header_t*)getenv_ulong("upgrade_upgrading_offset", 0, 0);
         const unsigned loadingHeight = upgrading->height;
         const unsigned barYCor       =
             (3* display_height + loadingHeight)/4;//display_height - (display_height/2 - loadingHeight/2)/2;
@@ -595,16 +586,13 @@ static int do_progress_bar_test(cmd_tbl_t *cmdtp, int flag, int argc, char * con
                    "fb_width", getenv("fb_width")); return __LINE__;
         }
         if (!display_height) {
-            DWN_ERR("Fail to getenv[%s=%s]\n",
-                    "fb_height", getenv("fb_height")); return __LINE__;
+            DWN_ERR("Fail to getenv %s\n", "fb_height"); return __LINE__;
         }
         if (!upgrading) {
-            DWN_ERR("Fail to getenv[%s=%s]\n",
-                    "upgrade_upgrading_offset", getenv("upgrade_upgrading_offset")); return __LINE__;
+            DWN_ERR("Fail to getenv %s\n", "upgrade_upgrading_offset"); return __LINE__;
         }
         if (!unfocusBmpAddr) {
-            DWN_ERR("Fail to getenv[%s=%s]\n",
-                    "upgrade_unfocus_offset", getenv("upgrade_unfocus_offset")); return __LINE__;
+            DWN_ERR("Fail to getenv %s\n", "upgrade_unfocus_offset"); return __LINE__;
         }
 
         hProgressBar = optimus_progress_ui_request(100, 0, barAddr, display_width, barYCor);
@@ -655,4 +643,6 @@ U_BOOT_CMD(
    "argv: nb [bytes]: smart mode, show percents with bytes\n"//usage
 );
 #endif//#if PROGRESS_BAR_TEST
+
+#endif//#if CONFIG_SD_BURNING_SUPPORT_UI
 

@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * g_dnl.c -- USB Downloader Gadget
  *
  * Copyright (C) 2012 Samsung Electronics
  * Lukasz Majewski  <l.majewski@samsung.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -11,24 +12,22 @@
 
 #include <mmc.h>
 #include <part.h>
-#include <usb.h>
 
 #include <g_dnl.h>
 #include <usb_mass_storage.h>
 #include <dfu.h>
 #include <thor.h>
 
-#include <env_callback.h>
-
 #include "gadget_chips.h"
 #include "composite.c"
+#include <amlogic/amlkey_if.h>
 
 /*
  * One needs to define the following:
- * CONFIG_USB_GADGET_VENDOR_NUM
- * CONFIG_USB_GADGET_PRODUCT_NUM
- * CONFIG_USB_GADGET_MANUFACTURER
- * at e.g. ./configs/<board>_defconfig
+ * CONFIG_G_DNL_VENDOR_NUM
+ * CONFIG_G_DNL_PRODUCT_NUM
+ * CONFIG_G_DNL_MANUFACTURER
+ * at e.g. ./include/configs/<board>.h
  */
 
 #define STRING_MANUFACTURER 25
@@ -37,20 +36,47 @@
 #define STRING_USBDOWN 2
 /* Index of String serial */
 #define STRING_SERIAL  3
-#define MAX_STRING_SERIAL	256
+#define MAX_STRING_SERIAL	32
 /* Number of supported configurations */
 #define CONFIGURATION_NUMBER 1
 
 #define DRIVER_VERSION		"usb_dnl 2.0"
 
+#ifdef CONFIG_PRODUCT_NAME
+static const char product[] = CONFIG_PRODUCT_NAME;
+#else
 static const char product[] = "USB download gadget";
-static char g_dnl_serial[MAX_STRING_SERIAL];
-static const char manufacturer[] = "Amlogic";
+#endif
+
+static char g_dnl_serial[MAX_STRING_SERIAL] = "1234567890";
+
+#ifdef CONFIG_VENDOR_NAME
+const static char manufacturer[] = CONFIG_VENDOR_NAME;
+#else
+static const char manufacturer[] = "amlogic";
+#endif
+
+char usid_string[MAX_STRING_SERIAL];
 
 void g_dnl_set_serialnumber(char *s)
 {
 	memset(g_dnl_serial, 0, MAX_STRING_SERIAL);
-	strncpy(g_dnl_serial, s, MAX_STRING_SERIAL - 1);
+	if (strlen(s) < MAX_STRING_SERIAL)
+		strncpy(g_dnl_serial, s, strlen(s));
+}
+
+char * get_usid_string(void)
+{
+	int ret;
+	ret = amlkey_isexsit((const uint8_t *)USID_KEY);
+	if (ret) {
+		ret = amlkey_size((const uint8_t *)USID_KEY);
+		if (ret && ret < MAX_STRING_SERIAL) {
+			amlkey_read((const uint8_t *)USID_KEY, (uint8_t *)usid_string, ret);
+			return usid_string;
+		}
+	}
+	return NULL;
 }
 
 static struct usb_device_descriptor device_desc = {
@@ -58,13 +84,13 @@ static struct usb_device_descriptor device_desc = {
 	.bDescriptorType = USB_DT_DEVICE,
 
 	.bcdUSB = __constant_cpu_to_le16(0x0200),
-	.bDeviceClass = USB_CLASS_PER_INTERFACE,
-	.bDeviceSubClass = 0, /*0x02:CDC-modem , 0x00:CDC-serial*/
+	.bDeviceClass = USB_CLASS_COMM,
+	.bDeviceSubClass = 0x02, /*0x02:CDC-modem , 0x00:CDC-serial*/
 
 	.idVendor = 0x18d1,
-	.idProduct = 0x0d02,
-	/* .iProduct = DYNAMIC */
-	/* .iSerialNumber = DYNAMIC */
+	.idProduct = 0x4ee0,
+	.iProduct = STRING_PRODUCT,
+	.iSerialNumber = STRING_SERIAL,
 	.bNumConfigurations = 1,
 };
 
@@ -93,6 +119,8 @@ static int g_dnl_unbind(struct usb_composite_dev *cdev)
 {
 	struct usb_gadget *gadget = cdev->gadget;
 
+	free(cdev->config);
+	cdev->config = NULL;
 	debug("%s: calling usb_gadget_disconnect for "
 			"controller '%s'\n", __func__, gadget->name);
 	usb_gadget_disconnect(gadget);
@@ -147,18 +175,6 @@ static int g_dnl_config_register(struct usb_composite_dev *cdev)
 }
 
 __weak
-int board_usb_init(int index, enum usb_init_type init)
-{
-	return 0;
-}
-
-__weak
-int board_usb_cleanup(int index, enum usb_init_type init)
-{
-	return 0;
-}
-
-__weak
 int g_dnl_bind_fixup(struct usb_device_descriptor *dev, const char *name)
 {
 	return 0;
@@ -203,24 +219,12 @@ static int g_dnl_get_bcd_device_number(struct usb_composite_dev *cdev)
 	return g_dnl_get_board_bcd_device_number(gcnum);
 }
 
-/**
- * Update internal serial number variable when the "serial#" env var changes.
- *
- * Handle all cases, even when flags == H_PROGRAMMATIC or op == env_op_delete.
- */
-static int on_serialno(const char *name, const char *value, enum env_op op,
-		int flags)
-{
-	g_dnl_set_serialnumber((char *)value);
-	return 0;
-}
-U_BOOT_ENV_CALLBACK(serialno, on_serialno);
-
 static int g_dnl_bind(struct usb_composite_dev *cdev)
 {
 	struct usb_gadget *gadget = cdev->gadget;
 	int id, ret;
 	int gcnum;
+	char *s=NULL;
 
 	debug("%s: gadget: 0x%p cdev: 0x%p\n", __func__, gadget, cdev);
 
@@ -238,17 +242,18 @@ static int g_dnl_bind(struct usb_composite_dev *cdev)
 	g_dnl_string_defs[1].id = id;
 	device_desc.iProduct = id;
 
+	id = usb_string_id(cdev);
+	if (id < 0)
+		return id;
+
+	g_dnl_string_defs[2].id = id;
+	device_desc.iSerialNumber = id;
+
+	s = get_usid_string();
+	if (s)
+		g_dnl_set_serialnumber(s);
+
 	g_dnl_bind_fixup(&device_desc, cdev->driver->name);
-
-	if (strlen(g_dnl_serial)) {
-		id = usb_string_id(cdev);
-		if (id < 0)
-			return id;
-
-		g_dnl_string_defs[2].id = id;
-		device_desc.iSerialNumber = id;
-	}
-
 	ret = g_dnl_config_register(cdev);
 	if (ret)
 		goto error;
@@ -290,8 +295,9 @@ static struct usb_composite_driver g_dnl_driver = {
 int g_dnl_register(const char *name)
 {
 	int ret;
+	char *s;
 
-	debug("%s: g_dnl_driver.name = %s\n", __func__, name);
+	printf("%s: g_dnl_driver.name = %s\n", __func__, name);
 	g_dnl_driver.name = name;
 
 	ret = usb_composite_register(&g_dnl_driver);
@@ -299,6 +305,12 @@ int g_dnl_register(const char *name)
 		printf("%s: failed!, error: %d\n", __func__, ret);
 		return ret;
 	}
+
+	s = getenv("serial");
+	if (s) {
+		g_dnl_set_serialnumber(s);
+	}
+
 	return 0;
 }
 

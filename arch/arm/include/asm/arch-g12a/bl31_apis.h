@@ -1,32 +1,11 @@
-
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/include/asm/arch-txl/bl31_apis.h
+ * arch/arm/include/asm/arch-g12a/bl31_apis.h
  *
- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
-
-/*
- * Trustzone API
- *
- * Copyright (C) 2012 Amlogic, Inc.
- *
- * Author: Platform-SH@amlogic.com
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
  *
  */
+
 
 #ifndef __GXBB_BL31_APIS_H
 #define __GXBB_BL31_APIS_H
@@ -127,7 +106,6 @@ struct sram_hal_api_arg {
 #define JTAG_A53_EE 3
 #define CLUSTER_BIT 2
 
-#define GET_AVBKEY_FROM_FIP              0x820000b0
 
 /////////////////////////////////////////////////////////////////////////////////
 #define AML_DATA_PROCESS                 (0x820000FF)
@@ -162,5 +140,4 @@ void bl31_get_chipid(unsigned int *, unsigned int *,
 	unsigned int *, unsigned int *);
 void set_viu_probe_enable(void);
 int32_t set_boot_params(const keymaster_boot_params*);
-int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen);
 #endif

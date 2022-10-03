@@ -1,21 +1,22 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2014 Google, Inc
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <fdtdec.h>
 #include <malloc.h>
 #include <spi.h>
 #include <dm/device-internal.h>
 #include <dm/uclass-internal.h>
+#include <dm/root.h>
 #include <dm/lists.h>
 #include <dm/util.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-#define SPI_DEFAULT_SPEED_HZ 100000
 
 static int spi_set_speed_mode(struct udevice *bus, int speed, int mode)
 {
@@ -44,13 +45,14 @@ static int spi_set_speed_mode(struct udevice *bus, int speed, int mode)
 	return 0;
 }
 
-int dm_spi_claim_bus(struct udevice *dev)
+int spi_claim_bus(struct spi_slave *slave)
 {
+	struct udevice *dev = slave->dev;
 	struct udevice *bus = dev->parent;
 	struct dm_spi_ops *ops = spi_get_ops(bus);
-	struct dm_spi_bus *spi = dev_get_uclass_priv(bus);
-	struct spi_slave *slave = dev_get_parent_priv(dev);
+	struct dm_spi_bus *spi = bus->uclass_priv;
 	int speed;
+	int ret;
 
 	speed = slave->max_hz;
 	if (spi->max_hz) {
@@ -60,30 +62,28 @@ int dm_spi_claim_bus(struct udevice *dev)
 			speed = spi->max_hz;
 	}
 	if (!speed)
-		speed = SPI_DEFAULT_SPEED_HZ;
-	if (speed != slave->speed) {
-		int ret = spi_set_speed_mode(bus, speed, slave->mode);
+		speed = 100000;
+	ret = spi_set_speed_mode(bus, speed, slave->mode);
+	if (ret)
+		return ret;
 
-		if (ret)
-			return log_ret(ret);
-		slave->speed = speed;
-	}
-
-	return log_ret(ops->claim_bus ? ops->claim_bus(dev) : 0);
+	return ops->claim_bus ? ops->claim_bus(bus) : 0;
 }
 
-void dm_spi_release_bus(struct udevice *dev)
+void spi_release_bus(struct spi_slave *slave)
 {
+	struct udevice *dev = slave->dev;
 	struct udevice *bus = dev->parent;
 	struct dm_spi_ops *ops = spi_get_ops(bus);
 
 	if (ops->release_bus)
-		ops->release_bus(dev);
+		ops->release_bus(bus);
 }
 
-int dm_spi_xfer(struct udevice *dev, unsigned int bitlen,
-		const void *dout, void *din, unsigned long flags)
+int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
+	     const void *dout, void *din, unsigned long flags)
 {
+	struct udevice *dev = slave->dev;
 	struct udevice *bus = dev->parent;
 
 	if (bus->uclass->uc_drv->id != UCLASS_SPI)
@@ -92,89 +92,34 @@ int dm_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	return spi_get_ops(bus)->xfer(dev, bitlen, dout, din, flags);
 }
 
-int spi_claim_bus(struct spi_slave *slave)
+static int spi_req_seq = 0;
+int spi_post_bind(struct udevice *dev)
 {
-	return log_ret(dm_spi_claim_bus(slave->dev));
-}
-
-void spi_release_bus(struct spi_slave *slave)
-{
-	dm_spi_release_bus(slave->dev);
-}
-
-int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
-	     const void *dout, void *din, unsigned long flags)
-{
-	return dm_spi_xfer(slave->dev, bitlen, dout, din, flags);
-}
-
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-static int spi_child_post_bind(struct udevice *dev)
-{
-	struct dm_spi_slave_platdata *plat = dev_get_parent_platdata(dev);
-
-	if (!dev_of_valid(dev))
-		return 0;
-
-	return spi_slave_ofdata_to_platdata(dev, plat);
-}
+	/* Scan the bus for devices */
+#ifdef CONFIG_OF_CONTROL
+	return dm_scan_fdt_node(dev, gd->fdt_blob, dev->of_offset, false);
+#else
+	dev->req_seq = spi_req_seq++;
+	printf("%s(%s): req_seq = %d\n", __func__, dev->name, dev->req_seq);
 #endif
-
-static int spi_post_probe(struct udevice *bus)
-{
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct dm_spi_bus *spi = dev_get_uclass_priv(bus);
-
-	spi->max_hz = dev_read_u32_default(bus, "spi-max-frequency", 0);
-#endif
-#if defined(CONFIG_NEEDS_MANUAL_RELOC)
-	struct dm_spi_ops *ops = spi_get_ops(bus);
-
-	if (ops->claim_bus)
-		ops->claim_bus += gd->reloc_off;
-	if (ops->release_bus)
-		ops->release_bus += gd->reloc_off;
-	if (ops->set_wordlen)
-		ops->set_wordlen += gd->reloc_off;
-	if (ops->xfer)
-		ops->xfer += gd->reloc_off;
-	if (ops->set_speed)
-		ops->set_speed += gd->reloc_off;
-	if (ops->set_mode)
-		ops->set_mode += gd->reloc_off;
-	if (ops->cs_info)
-		ops->cs_info += gd->reloc_off;
-#endif
-
 	return 0;
 }
 
-static int spi_child_pre_probe(struct udevice *dev)
+int spi_post_probe(struct udevice *dev)
 {
-	struct dm_spi_slave_platdata *plat = dev_get_parent_platdata(dev);
-	struct spi_slave *slave = dev_get_parent_priv(dev);
+	struct dm_spi_bus *spi = dev->uclass_priv;
 
-	/*
-	 * This is needed because we pass struct spi_slave around the place
-	 * instead slave->dev (a struct udevice). So we have to have some
-	 * way to access the slave udevice given struct spi_slave. Once we
-	 * change the SPI API to use udevice instead of spi_slave, we can
-	 * drop this.
-	 */
-	slave->dev = dev;
-
-	slave->max_hz = plat->max_hz;
-	slave->mode = plat->mode;
-	slave->wordlen = SPI_DEFAULT_WORDLEN;
+	spi->max_hz = fdtdec_get_int(gd->fdt_blob, dev->of_offset,
+				     "spi-max-frequency", 0);
 
 	return 0;
 }
 
 int spi_chip_select(struct udevice *dev)
 {
-	struct dm_spi_slave_platdata *plat = dev_get_parent_platdata(dev);
+	struct spi_slave *slave = dev_get_parentdata(dev);
 
-	return plat ? plat->cs : -ENOENT;
+	return slave ? slave->cs : -ENOENT;
 }
 
 int spi_find_chip_select(struct udevice *bus, int cs, struct udevice **devp)
@@ -183,11 +128,17 @@ int spi_find_chip_select(struct udevice *bus, int cs, struct udevice **devp)
 
 	for (device_find_first_child(bus, &dev); dev;
 	     device_find_next_child(&dev)) {
-		struct dm_spi_slave_platdata *plat;
+		struct spi_slave store;
+		struct spi_slave *slave = dev_get_parentdata(dev);
 
-		plat = dev_get_parent_platdata(dev);
-		debug("%s: plat=%p, cs=%d\n", __func__, plat, plat->cs);
-		if (plat->cs == cs) {
+		if (!slave)  {
+			slave = &store;
+			spi_ofdata_to_platdata(gd->fdt_blob, dev->of_offset,
+					       slave);
+		}
+		debug("%s: slave=%p, cs=%d\n", __func__, slave,
+		      slave ? slave->cs : -1);
+		if (slave && slave->cs == cs) {
 			*devp = dev;
 			return 0;
 		}
@@ -271,15 +222,11 @@ int spi_get_bus_and_cs(int busnum, int cs, int speed, int mode,
 		       struct udevice **busp, struct spi_slave **devp)
 {
 	struct udevice *bus, *dev;
-	struct dm_spi_slave_platdata *plat;
+	struct spi_slave *slave;
 	bool created = false;
 	int ret;
 
-#if CONFIG_IS_ENABLED(OF_PLATDATA) || CONFIG_IS_ENABLED(OF_PRIOR_STAGE)
-	ret = uclass_first_device_err(UCLASS_SPI, &bus);
-#else
 	ret = uclass_get_device_by_seq(UCLASS_SPI, busnum, &bus);
-#endif
 	if (ret) {
 		printf("Invalid bus %d (err=%d)\n", busnum, ret);
 		return ret;
@@ -295,21 +242,8 @@ int spi_get_bus_and_cs(int busnum, int cs, int speed, int mode,
 		debug("%s: Binding new device '%s', busnum=%d, cs=%d, driver=%s\n",
 		      __func__, dev_name, busnum, cs, drv_name);
 		ret = device_bind_driver(bus, drv_name, dev_name, &dev);
-		if (ret) {
-			debug("%s: Unable to bind driver (ret=%d)\n", __func__,
-			      ret);
+		if (ret)
 			return ret;
-		}
-		plat = dev_get_parent_platdata(dev);
-		plat->cs = cs;
-		if (speed) {
-			plat->max_hz = speed;
-		} else {
-			printf("Warning: SPI speed fallback to %u kHz\n",
-			       SPI_DEFAULT_SPEED_HZ / 1000);
-			plat->max_hz = SPI_DEFAULT_SPEED_HZ;
-		}
-		plat->mode = mode;
 		created = true;
 	} else if (ret) {
 		printf("Invalid chip select %d:%d (err=%d)\n", busnum, cs,
@@ -318,39 +252,73 @@ int spi_get_bus_and_cs(int busnum, int cs, int speed, int mode,
 	}
 
 	if (!device_active(dev)) {
-		struct spi_slave *slave;
+		slave = (struct spi_slave *)calloc(1,
+						   sizeof(struct spi_slave));
+		if (!slave) {
+			ret = -ENOMEM;
+			goto err;
+		}
 
-		ret = device_probe(dev);
+		ret = spi_ofdata_to_platdata(gd->fdt_blob, dev->of_offset,
+					     slave);
 		if (ret)
 			goto err;
-		slave = dev_get_parent_priv(dev);
+		slave->cs = cs;
 		slave->dev = dev;
+		slave->max_hz = speed;
+		slave->mode = mode;
+
+		slave->op_mode_rx = SPI_OPM_RX_AF;
+		if (slave->mode & SPI_RX_QUAD)
+			slave->op_mode_rx |= SPI_OPM_RX_QOF;
+		else if (slave->mode & SPI_RX_DUAL)
+			slave->op_mode_rx |= SPI_OPM_RX_DOUT;
+		else if (slave->mode & SPI_RX_SLOW)
+			slave->op_mode_rx |= SPI_OPM_RX_AS;
+
+		slave->op_mode_tx = 0;
+		if (slave->mode & SPI_TX_QUAD)
+			slave->op_mode_tx = SPI_OPM_TX_QPP;
+
+		ret = device_probe_child(dev, slave);
+		free(slave);
+		if (ret)
+			goto err;
 	}
 
-	plat = dev_get_parent_platdata(dev);
-	if (!speed) {
-		speed = plat->max_hz;
-		mode = plat->mode;
-	}
 	ret = spi_set_speed_mode(bus, speed, mode);
 	if (ret)
 		goto err;
 
 	*busp = bus;
-	*devp = dev_get_parent_priv(dev);
+	*devp = dev_get_parentdata(dev);
 	debug("%s: bus=%p, slave=%p\n", __func__, bus, *devp);
 
 	return 0;
 
 err:
-	debug("%s: Error path, created=%d, device '%s'\n", __func__,
-	      created, dev->name);
 	if (created) {
-		device_remove(dev, DM_REMOVE_NORMAL);
+		device_remove(dev);
 		device_unbind(dev);
 	}
 
 	return ret;
+}
+
+/* Compatibility function - to be removed */
+struct spi_slave *spi_setup_slave_fdt(const void *blob, int node,
+				      int bus_node)
+{
+	struct udevice *bus, *dev;
+	int ret;
+
+	ret = uclass_get_device_by_of_offset(UCLASS_SPI, bus_node, &bus);
+	if (ret)
+		return NULL;
+	ret = device_get_child_by_of_offset(bus, node, &dev);
+	if (ret)
+		return NULL;
+	return dev_get_parentdata(dev);
 }
 
 /* Compatibility function - to be removed */
@@ -362,7 +330,7 @@ struct spi_slave *spi_setup_slave(unsigned int busnum, unsigned int cs,
 	int ret;
 
 	ret = spi_get_bus_and_cs(busnum, cs, speed, mode, NULL, 0, &dev,
-				 &slave);
+				  &slave);
 	if (ret)
 		return NULL;
 
@@ -371,82 +339,37 @@ struct spi_slave *spi_setup_slave(unsigned int busnum, unsigned int cs,
 
 void spi_free_slave(struct spi_slave *slave)
 {
-	device_remove(slave->dev, DM_REMOVE_NORMAL);
+	device_remove(slave->dev);
 	slave->dev = NULL;
 }
 
-int spi_slave_ofdata_to_platdata(struct udevice *dev,
-				 struct dm_spi_slave_platdata *plat)
+int spi_ofdata_to_platdata(const void *blob, int node,
+			   struct spi_slave *spi)
 {
+#ifdef CONFIG_OF_CONTROL
 	int mode = 0;
-	int value;
 
-	plat->cs = dev_read_u32_default(dev, "reg", -1);
-	plat->max_hz = dev_read_u32_default(dev, "spi-max-frequency",
-					    SPI_DEFAULT_SPEED_HZ);
-	if (dev_read_bool(dev, "spi-cpol"))
+	spi->cs = fdtdec_get_int(blob, node, "reg", -1);
+	spi->max_hz = fdtdec_get_int(blob, node, "spi-max-frequency", 0);
+	if (fdtdec_get_bool(blob, node, "spi-cpol"))
 		mode |= SPI_CPOL;
-	if (dev_read_bool(dev, "spi-cpha"))
+	if (fdtdec_get_bool(blob, node, "spi-cpha"))
 		mode |= SPI_CPHA;
-	if (dev_read_bool(dev, "spi-cs-high"))
+	if (fdtdec_get_bool(blob, node, "spi-cs-high"))
 		mode |= SPI_CS_HIGH;
-	if (dev_read_bool(dev, "spi-3wire"))
-		mode |= SPI_3WIRE;
-	if (dev_read_bool(dev, "spi-half-duplex"))
+	if (fdtdec_get_bool(blob, node, "spi-half-duplex"))
 		mode |= SPI_PREAMBLE;
-
-	/* Device DUAL/QUAD mode */
-	value = dev_read_u32_default(dev, "spi-tx-bus-width", 1);
-	switch (value) {
-	case 1:
-		break;
-	case 2:
-		mode |= SPI_TX_DUAL;
-		break;
-	case 4:
-		mode |= SPI_TX_QUAD;
-		break;
-	default:
-		warn_non_spl("spi-tx-bus-width %d not supported\n", value);
-		break;
-	}
-
-	value = dev_read_u32_default(dev, "spi-rx-bus-width", 1);
-	switch (value) {
-	case 1:
-		break;
-	case 2:
-		mode |= SPI_RX_DUAL;
-		break;
-	case 4:
-		mode |= SPI_RX_QUAD;
-		break;
-	default:
-		warn_non_spl("spi-rx-bus-width %d not supported\n", value);
-		break;
-	}
-
-	plat->mode = mode;
-
+	spi->mode = mode;
+#endif
 	return 0;
 }
 
 UCLASS_DRIVER(spi) = {
 	.id		= UCLASS_SPI,
 	.name		= "spi",
-	.flags		= DM_UC_FLAG_SEQ_ALIAS,
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	.post_bind	= dm_scan_fdt_dev,
-#endif
+	.post_bind	= spi_post_bind,
 	.post_probe	= spi_post_probe,
-	.child_pre_probe = spi_child_pre_probe,
 	.per_device_auto_alloc_size = sizeof(struct dm_spi_bus),
-	.per_child_auto_alloc_size = sizeof(struct spi_slave),
-	.per_child_platdata_auto_alloc_size =
-			sizeof(struct dm_spi_slave_platdata),
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	.child_post_bind = spi_child_post_bind,
-#endif
 };
 
 UCLASS_DRIVER(spi_generic) = {

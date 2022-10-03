@@ -1,6 +1,17 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2010-2013, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <common.h>
@@ -33,7 +44,7 @@ void pinmux_init(void)
 		ARRAY_SIZE(dalmore_padctrl));
 }
 
-#if defined(CONFIG_MMC_SDHCI_TEGRA)
+#if defined(CONFIG_TEGRA_MMC)
 /*
  * Do I2C/PMU writes to bring up SD card bus power
  *
@@ -44,7 +55,7 @@ void board_sdmmc_voltage_init(void)
 	uchar reg, data_buffer[1];
 	int ret;
 
-	ret = i2c_get_chip_for_busnum(0, PMU_I2C_ADDRESS, 1, &dev);
+	ret = i2c_get_chip_for_busnum(0, PMU_I2C_ADDRESS, &dev);
 	if (ret) {
 		debug("%s: Cannot find PMIC I2C chip\n", __func__);
 		return;
@@ -54,7 +65,7 @@ void board_sdmmc_voltage_init(void)
 	data_buffer[0] = 0x31;
 	reg = 0x61;
 
-	ret = dm_i2c_write(dev, reg, data_buffer, 1);
+	ret = i2c_write(dev, reg, data_buffer, 1);
 	if (ret)
 		printf("%s: PMU i2c_write %02X<-%02X returned %d\n",
 			__func__, reg, data_buffer[0], ret);
@@ -63,7 +74,7 @@ void board_sdmmc_voltage_init(void)
 	data_buffer[0] = 0x01;
 	reg = 0x60;
 
-	ret = dm_i2c_write(dev, reg, data_buffer, 1);
+	ret = i2c_write(dev, reg, data_buffer, 1);
 	if (ret)
 		printf("%s: PMU i2c_write %02X<-%02X returned %d\n",
 			__func__, reg, data_buffer[0], ret);
@@ -72,12 +83,12 @@ void board_sdmmc_voltage_init(void)
 	data_buffer[0] = 0x03;
 	reg = 0x14;
 
-	ret = i2c_get_chip_for_busnum(0, BAT_I2C_ADDRESS, 1, &dev);
+	ret = i2c_get_chip_for_busnum(0, BAT_I2C_ADDRESS, &dev);
 	if (ret) {
 		debug("%s: Cannot find charger I2C chip\n", __func__);
 		return;
 	}
-	ret = dm_i2c_write(dev, reg, data_buffer, 1);
+	ret = i2c_write(dev, reg, data_buffer, 1);
 	if (ret)
 		printf("%s: BAT i2c_write %02X<-%02X returned %d\n",
 			__func__, reg, data_buffer[0], ret);

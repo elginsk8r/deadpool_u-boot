@@ -1,1 +1,0 @@
-../a1_korlan_b1/a1_korlan_b1.c

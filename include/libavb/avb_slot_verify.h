@@ -31,7 +31,6 @@
 
 #include "avb_ops.h"
 #include "avb_vbmeta_image.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

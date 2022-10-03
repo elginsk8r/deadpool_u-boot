@@ -1,17 +1,16 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * \file        aml_v2_burning.c
- * \brief       common interfaces for version 2 burning
+ * drivers/usb/gadget/v2_burning/aml_v2_burning.c
  *
- * \version     1.0.0
- * \date        09/15/2013
- * \author      Sam.Wu <yihui.wu@amlgic.com>
- *
- * Copyright (c) 2013 Amlogic. All Rights Reserved.
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
  *
  */
+
 #include "v2_burning_i.h"
 #include <mmc.h>
-#include <amlogic/cpu_id.h>
+#include <asm/arch/secure_apb.h>
+#include <asm/arch/io.h>
+#include <asm/arch/bl31_apis.h>
 
 #ifndef BOOT_DEVICE_USB
 #define BOOT_DEVICE_SD                  4
@@ -45,7 +44,8 @@ int aml_check_is_ready_for_sdc_produce(void)
     sdc_cfg_file = getenv("sdcburncfg");
     if (!sdc_cfg_file) {
         sdc_cfg_file = "aml_sdc_burn.ini";
-        setenv("sdcburncfg", sdc_cfg_file); }
+        setenv("sdcburncfg", sdc_cfg_file);
+    }
 
     cmd = "fatsize mmc 0 ${sdcburncfg}";
     ret = run_command(cmd, 0);
@@ -57,38 +57,24 @@ int aml_check_is_ready_for_sdc_produce(void)
     return 1;//is ready for sdcard producing
 }
 
-#ifdef CONFIG_AML_V3_FACTORY_BURN
-extern unsigned _get_romcode_boot_id(void);
-#else
 static unsigned _get_romcode_boot_id(void)
 {
-	cpu_id_t cpuid = get_cpu_id();
+        DWN_DBG("P_AO_SEC_GP_CFG0=0x%p\n", P_AO_SEC_GP_CFG0);
+        const unsigned boot_id = readl(P_AO_SEC_GP_CFG0) & 0xf;
 
-    unsigned boot_id = 0;
-#ifdef SYSCTRL_SEC_STATUS_REG2
-	if (MESON_CPU_MAJOR_ID_SC2 <= cpuid.family_id) {
-		boot_id = readl(SYSCTRL_SEC_STATUS_REG2);
-        DWN_DBG("boot_id 0x%x\n", boot_id);
-		boot_id = (boot_id>>4) & 0xf;
-	} else
-#elif defined(P_AO_SEC_GP_CFG0)
-    {
-		DWN_DBG("cfg0 0x%08x\n", readl(P_AO_SEC_GP_CFG0));
-		boot_id = readl(P_AO_SEC_GP_CFG0) & 0xf;
-	}
-#else
-    DWN_MSG("both P_AO_SEC_GP_CFG0 and SYSCTRL_SEC_STATUS_REG2 undefined\n");
-#endif//#ifdef SYSCTRL_SEC_STATUS_REG2
-    DWN_MSG("boot_id 1x%x\n", boot_id);
-    return boot_id;
+        DWN_DBG("boot_id()=%x\n", boot_id);
+        return boot_id;
 }
-#endif
 
 //is the uboot loaded from usb otg
 int is_tpl_loaded_from_usb(void)
 {
         const int boot_id  = _get_romcode_boot_id();
-        return (BOOT_DEVICE_USB == boot_id);
+        const unsigned forceUsbBoot = readl(P_AO_SEC_GP_CFG7) ;
+        DWN_DBG("forceUsbBoot=%p, %x\n", P_AO_SEC_GP_CFG7, forceUsbBoot);
+        int ret = (BOOT_DEVICE_USB == boot_id) || ( forceUsbBoot & (1U<<31) );
+
+        return ret;
 }
 
 //is the uboot loaded from sdcard mmc 0
@@ -123,54 +109,32 @@ int aml_burn_check_is_ready_for_burn(int flag, bd_t* bis)
         return 0;
 }
 
-int aml_burn_sdc_producing(int flag, bd_t* bis)
-{
-    optimus_work_mode_set(OPTIMUS_WORK_MODE_SDC_PRODUCE);
-
-    return optimus_burn_package_in_sdmmc(getenv("sdcburncfg"));
-}
-
-#ifdef CONFIG_USB_BURNING_TOOL
 //producing mode means boot from raw flash, i.e, uboot is loaded from usb
-static int aml_burn_usb_producing(int flag, bd_t* bis)
+int aml_burn_usb_producing(int flag, bd_t* bis)
 {
     flag = flag; bis = bis;//avoid compile warning
 
     set_usb_boot_function(CLEAR_USB_BOOT);
-#if (defined AML_USB_BURN_TOOL)
     optimus_work_mode_set(OPTIMUS_WORK_MODE_USB_PRODUCE);
-#endif//#if (defined AML_USB_BURN_TOOL)
 
     close_usb_phy_clock(0);//disconect before re-connect to enhance pc compatibility
-    optimus_clear_ovd_register();//clear OVD register for normal reboot
     return v2_usbburning(20000);
 }
 
-extern void serial_initialize(void);
-int aml_try_factory_usb_burning(int flag, bd_t* bis)
+int aml_burn_sdc_producing(int flag, bd_t* bis)
 {
-    if (!is_tpl_loaded_from_usb()) return 1;
+    optimus_work_mode_set(OPTIMUS_WORK_MODE_SDC_PRODUCE);
 
-    if ( !flag ) {
-        serial_initialize();//init for write memory
-#ifdef CONFIG_MMC
-        DWN_MSG("MMC init in usb\n");
-        mmc_initialize(bis);
-#endif
-    }
-    return aml_burn_usb_producing(flag, bis);
+    return optimus_burn_package_in_sdmmc(getenv_optimus("sdcburncfg"));
 }
-#endif// #ifdef CONFIG_USB_BURNING_TOOL
 
 //burning flash from romboot stage
 int aml_burn_factory_producing(int flag, bd_t* bis)
 {
-#ifdef CONFIG_USB_BURNING_TOOL
         if (is_tpl_loaded_from_usb())
         {
                 return aml_burn_usb_producing(flag, bis);
         }
-#endif// #ifdef CONFIG_USB_BURNING_TOOL
 
         if (is_tpl_loaded_from_ext_sdmmc())
         {
@@ -181,14 +145,23 @@ int aml_burn_factory_producing(int flag, bd_t* bis)
         return 0;
 }
 
+int aml_try_factory_usb_burning(int flag, bd_t* bis)
+{
+    if (!is_tpl_loaded_from_usb()) return 1;
+
+    if ( !flag ) {
+#ifdef CONFIG_GENERIC_MMC
+        DWN_MSG("MMC init in usb\n");
+        mmc_initialize(bis);
+#endif
+    }
+    return aml_burn_usb_producing(flag, bis);
+}
 
 int aml_try_factory_sdcard_burning(int flag, bd_t* bis)
 {
         if (!is_tpl_loaded_from_ext_sdmmc()) return 1;
-#ifdef CONFIG_SILENT_CONSOLE
-        /* enable console output */
-        gd->flags &= ~GD_FLG_SILENT;
-#endif
+
         if ( aml_check_is_ready_for_sdc_produce() )
         {
             return aml_burn_sdc_producing(flag, bis);

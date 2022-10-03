@@ -1,22 +1,10 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
-* Copyright (C) 2017 Amlogic, Inc. All rights reserved.
-* *
-This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
-* *
-This program is distributed in the hope that it will be useful, but WITHOUT
-* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-* more details.
-* *
-You should have received a copy of the GNU General Public License along
-* with this program; if not, write to the Free Software Foundation, Inc.,
-* 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-* *
-Description:
-*/
+ * drivers/usb/gadget/v2_burning/v2_common/optimus_img_decoder.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
 
 #include "../v2_sdc_burn/optimus_sdc_burn_i.h"
 
@@ -80,7 +68,7 @@ HIMAGE image_open(const char* interface, const char* device, const char* part, c
     if (!strcmp("store", interface))
     {
             DWN_DBG("imgHead=0x%p, hImg=%p\n", &hImg->imgHead, hImg);
-            ret = store_logic_read(part, IMG_OFFSET_IN_PART, HeadSz, &hImg->imgHead);
+            ret = store_read_ops((u8*)part, (u8*)&hImg->imgHead, IMG_OFFSET_IN_PART, HeadSz);
             if (ret) {
                     DWN_ERR("Fail to read image header.\n");
                     ret = __LINE__; goto _err;
@@ -88,7 +76,7 @@ HIMAGE image_open(const char* interface, const char* device, const char* part, c
 
             pImgSrcIf->devIf = IMAGE_IF_TYPE_STORE;
             pImgSrcIf->devAlignSz = 4*1024;//512;//OPTIMUS_DOWNLOAD_SLOT_SZ;
-            strcpy(pImgSrcIf->partName, part);
+            strncpy(pImgSrcIf->partName, part, sizeof pImgSrcIf->partName - 1);
     }
     else
     {
@@ -126,12 +114,6 @@ HIMAGE image_open(const char* interface, const char* device, const char* part, c
     return hImg;
 _err:
     return NULL;
-}
-
-unsigned image_get_crc(HIMAGE hImg)
-{
-    ImgInfo_t* imgInfo = (ImgInfo_t*)hImg;
-    return imgInfo->imgHead.crc;
 }
 
 
@@ -290,7 +272,7 @@ int image_item_read(HIMAGE hImg, HIMAGEITEM hItem, void* pBuf, const __u32 wantS
 
     if (IMAGE_IF_TYPE_STORE == imgInfo->imgSrcIf.devIf)
     {
-            char* part = imgInfo->imgSrcIf.partName;
+            unsigned char* part = (unsigned char*)imgInfo->imgSrcIf.partName;
             const uint64_t offsetInPart = imgInfo->imgSrcIf.itemCurSeekOffsetInImg + IMG_OFFSET_IN_PART;
             int rc = 0;
             const unsigned storeBlkSz      = imgInfo->imgSrcIf.devAlignSz;
@@ -307,7 +289,7 @@ int image_item_read(HIMAGE hImg, HIMAGEITEM hItem, void* pBuf, const __u32 wantS
 
                     DWN_MSG("offsetInPart %llx, wantSz=%x\n", offsetInPart, wantSz);
                     bufInABlk = (u8*)malloc(storeBlkSz);
-                    rc = store_logic_read(part, readOffset, storeBlkSz, bufInABlk);
+                    rc = store_read_ops(part, bufInABlk, readOffset, storeBlkSz);
                     if (rc) {
                             DWN_ERR("Fail to read: readOffset=%llx, storeBlkSz=%x\n", readOffset, storeBlkSz);
                             free(bufInABlk);
@@ -320,9 +302,9 @@ int image_item_read(HIMAGE hImg, HIMAGEITEM hItem, void* pBuf, const __u32 wantS
 
                     if (sizeNotAlignInFirstBlk < wantSz && offsetNotAlign)
                     {
-                            rc = store_logic_read(part, (offsetInPart + sizeNotAlignInFirstBlk), thisTotalReadSz, pBuf);
+                            rc = store_read_ops(part, (u8*)pBuf, (offsetInPart + sizeNotAlignInFirstBlk), thisTotalReadSz);
                             if (rc) {
-                                    DWN_ERR("Fail in store_logic_read_ops to read %u at offset %llx.\n", wantSz,
+                                    DWN_ERR("Fail in store_read_ops to read %u at offset %llx.\n", wantSz,
                                                     offsetInPart + sizeNotAlignInFirstBlk);
                                     return __LINE__;
                             }
@@ -330,9 +312,9 @@ int image_item_read(HIMAGE hImg, HIMAGEITEM hItem, void* pBuf, const __u32 wantS
             }
             else
             {
-                    rc = store_logic_read(part, offsetInPart, wantSz, pBuf);
+                    rc = store_read_ops(part, (u8*)pBuf, offsetInPart, wantSz);
                     if (rc) {
-                            DWN_ERR("Fail in store_logic_read_ops to read %u at offset %llx.\n", wantSz, offsetInPart);
+                            DWN_ERR("Fail in store_read_ops to read %u at offset %llx.\n", wantSz, offsetInPart);
                             return __LINE__;
                     }
             }
@@ -461,99 +443,6 @@ u64 optimus_img_decoder_get_data_parts_size(HIMAGE hImg, int* hasBootloader)
 
     return dataPartsSz;
 }
-
-int optimus_img_item2buf(HIMAGE hImg, const char* main, const char* sub, char* buf, int* bufsz)
-{
-    HIMAGEITEM hImgItem = NULL;
-    hImgItem = image_item_open(hImg, main, sub);
-
-    if (!hImgItem) {
-        DWN_WRN("Fail to open item [%s,%s]\n", main, sub);
-        return ITEM_NOT_EXIST;
-    }
-
-    const s64 itemSz = image_item_get_size(hImgItem);
-    if (!itemSz) {
-        DWN_ERR("Item size 0\n");
-        image_item_close(hImgItem); return __LINE__;
-    }
-    if (itemSz > *bufsz) {
-        DWN_ERR("item sz %lld > bufsz %d\n", itemSz, *bufsz);
-        image_item_close(hImgItem); return __LINE__;
-    }
-
-    int rc = image_item_read(hImg, hImgItem, buf, (unsigned)itemSz);
-    if (rc) {
-        DWN_ERR("Fail read item data, rc %d\n", rc);
-        image_item_close(hImgItem); return __LINE__;
-    }
-
-    image_item_close(hImgItem);
-    *bufsz = itemSz;
-    return 0;
-}
-
-//get item num which has same main_type
-int get_subtype_nr(HIMAGE hImg, const char* main_type)
-{
-    int i = 0;
-    int ret = 0;
-    int itemNum = 0;
-    const int totalItemNum = get_total_itemnr(hImg);
-
-    for (i = 0; i < totalItemNum; i++)
-    {
-        const char* mainType = NULL;
-        const char* sub_type  = NULL;
-
-        ret = get_item_name(hImg, i, &mainType, &sub_type);
-        if (ret) {
-            DWN_ERR("Exception:fail to get item name!\n");
-            return -__LINE__;
-        }
-
-        if (strcmp(main_type, mainType)) continue;
-        itemNum += 1;
-    }
-
-    return itemNum;
-}
-
-int get_subtype_nm_by_index(HIMAGE hImg, const char* main_type, const char** sub_type, const int itemIndex)
-{
-    int i = 0;
-    int ret = 0;
-    int itemNum = 0;
-    const int totalItemNum = get_total_itemnr(hImg);
-    const int nSubType     = get_subtype_nr(hImg, main_type);
-
-    if (nSubType < 1) {
-        DWN_ERR("err main type[%s]\n", main_type);
-        return -__LINE__;
-    }
-    if (nSubType <= itemIndex) {
-        DWN_ERR("item index %d > max %d for main[%s]\n", itemIndex, nSubType, main_type);
-        return -__LINE__;
-    }
-
-    for (i = 0; i < totalItemNum; i++)
-    {
-        const char* mainType = NULL;
-
-        ret = get_item_name(hImg, i, &mainType, sub_type);
-        if (ret) {
-            DWN_ERR("Exception:fail to get item name!\n");
-            return __LINE__;
-        }
-
-        if (strcmp(mainType, main_type)) continue;
-        if (itemIndex == itemNum) return OPT_DOWN_OK;
-        itemNum += 1;
-    }
-
-    return OPT_DOWN_FAIL;
-}
-
 
 #define MYDBG 0
 #if MYDBG

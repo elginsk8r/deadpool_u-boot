@@ -1,13 +1,14 @@
-/* dwc controller pcd drivers  */
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * (C) Copyright 2010 Amlogic, Inc
+ * drivers/usb/gadget/v2_burning/v2_usb_tool/dwc_pcd.c
  *
- * Victor Wan, victor.wan@amlogic.com,
- * 2010-03-24 @ Shanghai
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
  *
  */
+
+/* dwc controller pcd drivers  */
 #include "../v2_burning_i.h"
-#include "../../platform.h"
+#include "platform.h"
 #include "usb_ch9.h"
 #include "dwc_pcd.h"
 #include "dwc_pcd_irq.h"

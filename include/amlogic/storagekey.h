@@ -1,3 +1,11 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * include/amlogic/storagekey.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
+
 #ifndef __STORAGEKEY_H__
 #define __STORAGEKEY_H__
 

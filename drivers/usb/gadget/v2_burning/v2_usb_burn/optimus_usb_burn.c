@@ -1,15 +1,11 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * \file        optimus_usb_burn.c
- * \brief       burning itself from Pheripheral usb host
+ * drivers/usb/gadget/v2_burning/v2_usb_burn/optimus_usb_burn.c
  *
- * \version     1.0.0
- * \date        2014-9-15
- * \author      Sam.Wu <yihui.wu@amlgic.com>
- *				Chunyu.Song <chunyu.song@amlogic.com>
- *
- * Copyright (c) 2013 Amlogic. All Rights Reserved.
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
  *
  */
+
 #include "../v2_sdc_burn/optimus_sdc_burn_i.h"
 #include "../v2_sdc_burn/optimus_led.h"
 
@@ -54,14 +50,14 @@ int do_usb_burn(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
     int rcode = 0;
     const char* sdc_cfg_file = argv[1];
 
-    setenv("usb_update","1");
+	setenv("usb_update","1");
 
     if (argc < 2 ) {
         cmd_usage(cmdtp);
         return __LINE__;
     }
 
-    optimus_work_mode_set(OPTIMUS_WORK_MODE_UDISK_PRODUCE);
+    optimus_work_mode_set(OPTIMUS_WORK_MODE_SDC_UPDATE);
     show_logo_to_report_burning();//indicate enter flow of burning! when 'run update'
     if (optimus_led_open(LED_TYPE_PWM)) {
         DWN_ERR("Fail to open led for burn\n");

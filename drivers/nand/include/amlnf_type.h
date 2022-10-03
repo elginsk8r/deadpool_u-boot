@@ -1,3 +1,11 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * drivers/nand/include/amlnf_type.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
+
 #ifndef __AML_NF_TYPE_H__
 #define __AML_NF_TYPE_H__
 
@@ -10,7 +18,9 @@
 #include <malloc.h>
 #include <linux/err.h>
 #include <asm/cache.h>
-
+//#include <asm/arch/pinmux.h>
+//#include <asm/arch/reboot.h>
+//#include <asm/arch/clock.h>
 #include <linux/list.h>
 //#include <asm/sizes.h>
 //#include <amlogic/securitykey.h>

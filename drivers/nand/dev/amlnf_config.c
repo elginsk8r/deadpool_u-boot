@@ -1,7 +1,14 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * drivers/nand/dev/amlnf_config.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
 
 #include "../include/amlnf_dev.h"
 #include "../include/phynand.h"
-#include "emmc_storage.h"
+#include "storage.h"
 /***********************************************************************
  * Nand Config
  **********************************************************************/
@@ -12,77 +19,57 @@ struct amlnf_partition *amlnand_config = NULL;
 static struct partitions * part_table = NULL;
 #define SZ_1M                           0x00100000
 
-/*partition info by liuxj*/
 struct partitions partition_table[] = {
 		{
 			.name = "logo",
-			.size = 8*SZ_1M,
+			.size = 32*SZ_1M,
 			.mask_flags = STORE_CODE,
 		},
 		{
 			.name = "recovery",
-			.size = 24*SZ_1M,
-			.mask_flags = STORE_CODE,
-		},
-		{
-			.name = "misc",
-			.size = 8*SZ_1M,
-			.mask_flags = STORE_CODE,
-		},
-		{
-			.name = "dto",
-			.size = 8*SZ_1M,
-			.mask_flags = STORE_CODE,
-		},
-		{
-			.name = "cri_data",
-			.size = 8*SZ_1M,
-			.mask_flags = STORE_CACHE,
-		},
-		{
-			.name = "rsv",
-			.size = 16*SZ_1M,
-			.mask_flags = STORE_CODE,
-		},
-		{
-			.name = "param",
-			.size = 16*SZ_1M,
-			.mask_flags = STORE_CACHE,
-		},
-
-		{
-			.name = "boot",
-			.size = 16*SZ_1M,
-			.mask_flags = STORE_CODE,
-		},
-		{
-			.name = "vendor",
 			.size = 32*SZ_1M,
+			.mask_flags = STORE_CODE,
+		},
+		{
+			.name = "dtb",
+			.size = 8*SZ_1M,
 			.mask_flags = STORE_CODE,
 		},
 		{
 			.name = "tee",
+			.size = 8*SZ_1M,
+			.mask_flags = STORE_CODE,
+		},
+		{
+			.name = "crypt",
 			.size = 32*SZ_1M,
 			.mask_flags = STORE_CODE,
 		},
 		{
-			.name = "vendor",
-			.size = 256*SZ_1M,
+			.name = "misc",
+			.size = 32*SZ_1M,
 			.mask_flags = STORE_CODE,
 		},
+#ifdef CONFIG_INSTABOOT
 		{
-			.name = "odm",
-			.size = 256*SZ_1M,
+			.name = "instaboot",
+			.size = 1024*SZ_1M,
+			.mask_flags = STORE_CODE,
+		},
+#endif
+		{
+			.name = "boot",
+			.size = 32*SZ_1M,
 			.mask_flags = STORE_CODE,
 		},
 		{
 			.name = "system",
-			.size = 1856*SZ_1M,
+			.size = 1024*SZ_1M,
 			.mask_flags = STORE_CODE,
 		},
 		{
 			.name = "cache",
-			.size = 1120*SZ_1M,
+			.size = 512*SZ_1M,
 			.mask_flags = STORE_CACHE,
 		},
 		{
@@ -91,7 +78,6 @@ struct partitions partition_table[] = {
 			.mask_flags = STORE_DATA,
 		},
 };
-
 #else
 extern struct partitions * part_table;
 #define SZ_1M                           0x00100000
@@ -172,9 +158,6 @@ int amlnand_get_partition_table(struct amlnand_chip *aml_chip)
 	part_table = partition_table;
 #endif
 	aml_nand_msg("outside dtb: %p", part_table);
-
-	/*use inner partition info*/
-	#if 1
 	if (part_table == NULL) {
 		aml_nand_msg("using dtb on nand");
 		/* fixme, not initialized by outside then using dtb of our self. */
@@ -195,15 +178,12 @@ int amlnand_get_partition_table(struct amlnand_chip *aml_chip)
 	else{
 		amlnf_detect_dtb_partitions(aml_chip);
 	}
-	#endif
 
-#if 1
 	if (ret) {
 		part_table = def_partition_table;
 		aml_nand_msg("%s() %p, using default one to bootup", __func__, part_table);
 		ret = 0;
 	}
-#endif
 	config_size = MAX_NAND_PART_NUM * sizeof(struct amlnf_partition);
 	amlnand_config = aml_nand_malloc(config_size);
 	if (!amlnand_config) {
@@ -219,7 +199,7 @@ int amlnand_get_partition_table(struct amlnand_chip *aml_chip)
 		memcpy(amlnand_config[i].name, part_table[i].name, MAX_PART_NAME_LEN);
 		amlnand_config[i].size = part_table[i].size;
 		amlnand_config[i].offset = part_table[i].offset;
-		amlnand_config[i].mask_flags = (part_table[i].mask_flags & 0x0f);
+		amlnand_config[i].mask_flags = part_table[i].mask_flags;
 
 		if (amlnand_config[i].mask_flags == STORE_CACHE) {
 			aml_chip->h_cache_dev = 1;/*have cache dev*/

@@ -1,3 +1,10 @@
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+/*
+ * board/amlogic/g12a_u200_v1/firmware/ramdump.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ */
 
 #ifdef CONFIG_MDUMP_COMPRESS
 #include "ramdump.h"

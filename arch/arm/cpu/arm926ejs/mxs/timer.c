@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Freescale i.MX28 timer driver
  *
@@ -7,6 +6,8 @@
  *
  * Based on code from LTIB:
  * (C) Copyright 2009-2010 Freescale Semiconductor, Inc.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -110,9 +111,14 @@ unsigned long long get_ticks(void)
 	return timestamp;
 }
 
+ulong get_timer_masked(void)
+{
+	return tick_to_time(get_ticks());
+}
+
 ulong get_timer(ulong base)
 {
-	return tick_to_time(get_ticks()) - base;
+	return get_timer_masked() - base;
 }
 
 /* We use the HW_DIGCTL_MICROSECONDS register for sub-millisecond timer. */
