@@ -1,11 +1,28 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * common/cmd_sha2.c
+ * Copyright (C) 2014-2017 Amlogic, Inc. All rights reserved.
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * All information contained herein is Amlogic confidential.
  *
+ * This software is provided to you pursuant to Software License Agreement
+ * (SLA) with Amlogic Inc ("Amlogic"). This software may be used
+ * only in accordance with the terms of this agreement.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification is strictly prohibited without prior written permission from
+ * Amlogic.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 /*
  * Functions in this file implement Amlogic SHA2 function
  *
@@ -26,18 +43,21 @@
 #include <malloc.h>
 #include <asm/arch/regs.h>
 #include <u-boot/sha256.h>
+#include <asm/arch-c1/timer.h>
 
 #define DATA_MAX_LEN    (1 << 31) //max length of SHA2 is 2 GB
+
 static int do_sha2(cmd_tbl_t *cmdtp, int flag, int argc,
 			char * const argv[])
 {
 	int nReturn=CMD_RET_USAGE;
-	ulong addr_in,nLength,addr_out=0;
+	ulong addr_in,nLength,addr_out = 0;
 	unsigned char szSHA2[32];
 	unsigned char *pSHA2 = szSHA2;
 	int nSHA2Type = 256;
 	char *endp;
-	int i;
+	int i = 0;
+	unsigned int ntime1,ntime2,ntime;
 
 	/* need at least three arguments */
 	if (argc < 3)
@@ -78,7 +98,6 @@ static int do_sha2(cmd_tbl_t *cmdtp, int flag, int argc,
 	nReturn = __LINE__;
 
 
-
 	if (argc > 3)
 	{
 		if ( 0 == *argv[3] )
@@ -95,11 +114,17 @@ static int do_sha2(cmd_tbl_t *cmdtp, int flag, int argc,
 		pSHA2=(unsigned char *)addr_out;
 	}
 
-	sha256_csum_wd((unsigned char *)addr_in, nLength,pSHA2,0);
-	printf("\nSHA%d of addr_in: 0x%08x, len: 0x%08x ", nSHA2Type, (unsigned int)addr_in, (unsigned int)nLength);
+	ntime1 = get_time();
+	sha256_csum_wd((unsigned char *)addr_in,(unsigned int)nLength,pSHA2,0);
+	ntime2 = get_time();
+	ntime = ntime2 - ntime1;
+	printf("\n cost time: %d us, bandwidth: %d M/s",ntime, (unsigned int)((float)nLength/1024/ntime*1000000/1024));
+
 	if (argc > 3)
-		printf(", addr_out: 0x%08x \n", (unsigned int)addr_out);
-	printf("\n");
+	printf("\nSHA%d of addr_in: 0x%08x, len: 0x%08x, addr_out: 0x%08x \n", nSHA2Type, (unsigned int)addr_in, (unsigned int)nLength,(unsigned int)addr_out);
+	else
+	printf("\nSHA%d of addr_in: 0x%08x, len: 0x%08x \n", nSHA2Type, (unsigned int)addr_in, (unsigned int)nLength);
+
 
 	for (i=0; i<SHA256_SUM_LEN; i++)
 		printf("%02x%s", pSHA2[i], ((i+1) % 16==0) ? "\n" :" ");
@@ -110,6 +135,7 @@ exit:
 
 	return nReturn;
 }
+
 
 #undef DATA_MAX_LEN
 
@@ -227,7 +253,9 @@ static int do_sha2test(cmd_tbl_t *cmdtp, int flag, int argc,
 	do
 	{
 		ntime1=readl(P_ISA_TIMERE);
-		sha256_csum_wd(pBuffer, nLength,szSHA2,0 );
+
+		sha256_csum_wd(pBuffer,nLength,szSHA2,0);
+
 		ntime2=readl(P_ISA_TIMERE);
 
 		ntime = ntime2 - ntime1;

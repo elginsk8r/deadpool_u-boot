@@ -1,11 +1,14 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/usb/gadget/v2_burning/aml_sysrecovery/cmd_detect_sys_recovery_key.c
+ * \file        cmd_detect_sys_recovery_key.c
+ * \brief       Detect whether user want to enter sys_recovery
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * \version     1.0.0
+ * \date        14/11/25
+ * \author      Sam.Wu <yihui.wu@amlgic.com>
+ *
+ * Copyright (c) 2014 Amlogic. All Rights Reserved.
  *
  */
-
 #include <config.h>
 #include <common.h>
 #include <asm/arch/io.h>

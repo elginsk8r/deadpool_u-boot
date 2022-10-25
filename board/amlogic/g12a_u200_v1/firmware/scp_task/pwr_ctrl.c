@@ -1,10 +1,23 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+
 /*
- * board/amlogic/g12a_u200_v1/firmware/scp_task/pwr_ctrl.c
+ * board/amlogic/txl_skt_v1/firmware/scp_task/pwr_ctrl.c
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
  *
- */
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 
 #include <gpio.h>
 #include "pwm_ctrl.h"
@@ -16,36 +29,19 @@
 
 static void set_vddee_voltage(unsigned int target_voltage)
 {
-	unsigned int to, pwm_size = 0;
-	static int (*pwm_voltage_ee)[2];
+	unsigned int to;
 
-	/* BOOT_9 = H use PWM_CFG0(0.67v-0.97v), =L use PWM_CFG1(0.69v-0.89v) */
-	/*set BOOT_9 input mode*/
-	writel((readl(PREG_PAD_GPIO0_EN_N) | 0x200), PREG_PAD_GPIO0_EN_N);
-	if (((readl(PREG_PAD_GPIO0_EN_N) & 0x200 ) == 0x200) &&
-			((readl(PREG_PAD_GPIO0_I) & 0x200 ) == 0x0)) {
-		uart_puts("use vddee new table!");
-		uart_puts("\n");
-		pwm_voltage_ee = pwm_voltage_table_ee_new;
-		pwm_size = ARRAY_SIZE(pwm_voltage_table_ee_new);
-	} else {
-		uart_puts("use vddee table!");
-		uart_puts("\n");
-		pwm_voltage_ee = pwm_voltage_table_ee;
-		pwm_size = ARRAY_SIZE(pwm_voltage_table_ee);
-	}
-
-	for (to = 0; to < pwm_size; to++) {
-		if (pwm_voltage_ee[to][1] >= target_voltage) {
+	for (to = 0; to < ARRAY_SIZE(pwm_voltage_table_ee); to++) {
+		if (pwm_voltage_table_ee[to][1] >= target_voltage) {
 			break;
 		}
 	}
 
-	if (to >= pwm_size) {
-		to = pwm_size - 1;
+	if (to >= ARRAY_SIZE(pwm_voltage_table_ee)) {
+		to = ARRAY_SIZE(pwm_voltage_table_ee) - 1;
 	}
 
-	writel(*(*(pwm_voltage_ee + to)), AO_PWM_PWM_B);
+	writel(pwm_voltage_table_ee[to][0],AO_PWM_PWM_B);
 }
 
 static void power_off_at_24M(unsigned int suspend_from)
@@ -60,13 +56,13 @@ static void power_off_at_24M(unsigned int suspend_from)
 	writel(readl(AO_RTI_PIN_MUX_REG1) & (~(0xf << 28)), AO_RTI_PIN_MUX_REG1);
 
 	/*step down ee voltage*/
-	set_vddee_voltage(CONFIG_VDDEE_SLEEP_VOLTAGE);
+	set_vddee_voltage(AML_VDDEE_SLEEP_VOLTAGE);
 }
 
 static void power_on_at_24M(unsigned int suspend_from)
 {
 	/*step up ee voltage*/
-	set_vddee_voltage(CONFIG_VDDEE_INIT_VOLTAGE);
+	set_vddee_voltage(AML_VDDEE_INIT_VOLTAGE);
 
 	/*set test_n low to power on vcck & vcc 3.3v*/
 	writel(readl(AO_GPIO_O) | (1 << 31), AO_GPIO_O);
@@ -89,7 +85,8 @@ void get_wakeup_source(void *response, unsigned int suspend_from)
 
 	p->status = RESPONSE_OK;
 	val = (POWER_KEY_WAKEUP_SRC | AUTO_WAKEUP_SRC | REMOTE_WAKEUP_SRC |
-	       BT_WAKEUP_SRC | ETH_PHY_GPIO_SRC | CECB_WAKEUP_SRC);
+	       ETH_PHY_WAKEUP_SRC | BT_WAKEUP_SRC | ETH_PHY_GPIO_SRC
+	       | CECB_WAKEUP_SRC);
 
 	p->sources = val;
 
@@ -178,11 +175,6 @@ static unsigned int detect_key(unsigned int suspend_from)
 					&& (readl(PREG_PAD_GPIO2_O) & (0x01 << 17))
 					&& !(readl(PREG_PAD_GPIO2_EN_N) & (0x01 << 17)))
 				exit_reason = BT_WAKEUP;
-		}
-
-		if (irq[IRQ_ETH_PTM] == IRQ_ETH_PMT_NUM) {
-			irq[IRQ_ETH_PTM]= 0xFFFFFFFF;
-			exit_reason = ETH_PMT_WAKEUP;
 		}
 
 		if (exit_reason)

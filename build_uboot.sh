@@ -8,153 +8,61 @@ trap 'echo Fatal error: script ${exec_name} aborting at line $LINENO, command \"
 cpu_num=$(grep -c processor /proc/cpuinfo)
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+echo DIR:$DIR
 
 function usage(){
   echo "Usage: ${exec_name} <board> [workspace path]"
-  echo "supported boards: sabrina-b3, sabrina-b4"
+  echo "supported boards: spencer-p1/p2/b1/b3/b4, venus-p1, korlan-p0/p1/b1/b3/b4"
 }
 
-readonly default=".:--avb2"
-readonly fip_dir="$DIR/fip"
-
-readonly sign_boot_tool="$DIR/../sdk/tools/sign_bootloader.sh"
-readonly sign_boot_keys="$DIR/../sdk/keys/"
-readonly avb_tool="$DIR/../sdk/tools/avbtool"
-readonly avb_pubkey_h_dir="$DIR/include/generated"
-
-function extract_avb_key_array_to_file() {
-  local array_name="$1"
-  local file="$2"
-  if [ -z "$avb_key_array" ]; then
-    echo "Error: avb_key_array have to be set before calling this function" >&2
-  fi
-
-  local i
-  local avb_key_num=${#avb_key_array[@]}
-  for i in $(seq 0 $((avb_key_num - 1))); do
-    local avb_key="${avb_key_array[i]}"
-    "$avb_tool" extract_public_key \
-      --key "${avb_key}" \
-      --output "${array_name}_${i}"
-    xxd -i "${array_name}_${i}" >> "$file"
-  done
-  sed -i 's/^unsigned char/const uint8_t/' "$file"
-  sed -i 's/^unsigned int/const size_t/' "$file"
-  echo "const uint8_t *const ${array_name}[] = {" >> "$file"
-  for i in $(seq 0 $((avb_key_num - 1))); do
-    echo "  ${array_name}_${i}," >> "$file"
-  done
-  echo "};" >> "$file"
-  echo "const size_t ${array_name}_len[] = {" >> "$file"
-  for i in $(seq 0 $((avb_key_num - 1))); do
-    # The following line is not accepted by gcc 4.9, use sizeof instead
-    # echo "  ${array_name}_${i}_len," >> "$file"
-    echo "  sizeof(${array_name}_${i})," >> "$file"
-  done
-  echo "};" >> "$file"
-  echo "const size_t ${array_name}_num = ${avb_key_num};" >> "$file"
-}
-
-function extract_avb_keys() {
-  if [ -z "$avb_keys" ]; then
-    echo "Error: avb_keys was not assigned" >&2
-    return 1
-  fi
-  if [ -z "$avb_keys_external" ]; then
-    echo "Error: avb_keys_external was not assigned" >&2
-    return 1
-  fi
-
-  mkdir -p "$avb_pubkey_h_dir"
-  pushd "$avb_pubkey_h_dir"
-  rm -f avb2_kpub_vendor.h || true
-
-  avb_key_array=("${avb_keys[@]}")
-  extract_avb_key_array_to_file "avb2_kpub_vendor" avb2_kpub_vendor.h
-
-  avb_key_array=("${avb_keys_external[@]}")
-  extract_avb_key_array_to_file "avb2_kpub_vendor_external" avb2_kpub_vendor.h
-
-  popd
-}
+readonly fsi_folder="bootloader"
+readonly fct_folder="factory/bootloader"
+readonly fsi="$fsi_folder:"
+readonly fct="$fct_folder:"
 
 function building_uboot(){
   soc_family_name=$1
   local_name=$2
   rev=$3
   board_name=$4
+  cfg_suffix=$6
 
-  config=${local_name}_${rev}
+  config=${local_name}_${rev}${cfg_suffix}
 
-  extract_avb_keys
+  for cfg in "$fsi" "$fct"; do
+    local folder="${cfg%:*}"
 
-  echo "building u-boot for ${board}"
-  $fip_dir/mk ${config} --board_name $board_name \
-                        --update-bl2-src ../bl2 \
-                        --update-bl30-src ../bl30 \
-                        --update-bl31-src ../bl31 \
-                        --update-bl32-src ../bl32 \
-                        --update-bl2 \
-                        --update-bl30 \
-                        --update-bl31 \
-                        --update-bl32 \
-                        --avb2
+    echo "building u-boot for ${board} in ${folder}"
 
+    ./mk ${config} --board_name $board_name --bl2 fip/${soc_family_name}/bl2.bin --bl30 fip/${soc_family_name}/bl30.bin --bl31 fip/${soc_family_name}/bl31.img --bl32 fip/${soc_family_name}/bl32.img $5
 
-  if [ ! -z $workspace_path ]; then
-    # Copy bl2 and bl3x images for bootloader signing under android source.
-    local bootloader_path=${workspace_path}/device/google/$product/prebuilt/bootloader
-    mkdir -p ${bootloader_path}
-    for bl_filename in "bl2_new.bin" "bl30_new.bin" "bl31.img" "bl32.img" "bl33.bin"; do
-      cp -v $fip_dir/build/$bl_filename ${bootloader_path}/${bl_filename}.${board}
-    done
+    # make T=1 to use latest git commit time as build timestamp.
 
-    # copy ddr fw
-    for fw_filename in "aml_ddr.fw" \
-                       "ddr3_1d.fw" \
-                       "ddr4_1d.fw" \
-                       "ddr4_2d.fw" \
-                       "diag_lpddr4.fw" \
-                       "lpddr3_1d.fw" \
-                       "lpddr4_1d.fw" \
-                       "lpddr4_2d.fw" \
-                       "piei.fw" ; do
-      cp -v $fip_dir/${soc_family_name}/$fw_filename ${bootloader_path}
-    done
-  fi
-}
+    echo "mk done\n"
+    local product=`echo ${board} | cut -d "-" -f1`
+    local bootloader_path=${workspace_path}/vendor/amlogic/${product}/prebuilt/${folder}
+    if [ ! -z $workspace_path ]; then
+      mkdir -p ${bootloader_path}
+      if [ "$product" == "spencer" ] || \
+        [ "$product" == "korlan" ] || \
+        [ "$product" == "venus" ]; then
+        # Copy bl2 and bl3x images for bootloader signing under eureka source.
+        cp fip/build/bl2_new.bin ${bootloader_path}/bl2_new.bin.${board}
+        cp fip/build/bl31.img ${bootloader_path}/bl31.img.${board}
+        cp fip/build/bl32.img ${bootloader_path}/bl32.img.${board}
+        cp fip/build/bl33.bin ${bootloader_path}/bl33.bin.${board}
 
-function build_bootloader_img() {
-  local suffix=""
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --suffix)
-        suffix="_$2"
-        shift
-        ;;
-    esac
-    shift
+        # Copy ddr bin for bootloader signing under eureka source.
+        # TODO(ljchen): Remove hard code of ddr files under vendor/amlogic.
+        cp fip/${soc_family_name}/aml_ddr.fw ${bootloader_path}
+
+      else
+        cp fip/${soc_family_name}/u-boot.bin.usb.bl2 ${bootloader_path}/u-boot.bin.usb.bl2
+        cp fip/${soc_family_name}/u-boot.bin.usb.tpl ${bootloader_path}/u-boot.bin.usb.tpl
+        cp fip/${soc_family_name}/u-boot.bin ${bootloader_path}/u-boot.bin
+      fi
+    fi
   done
-
-  local bl_img_dir=${workspace_path}/device/google/${product}
-  local bootloader_img=${bl_img_dir}/bootloader${suffix}.img
-  mkdir -p ${bl_img_dir}
-
-  set -euo pipefail
-  "$sign_boot_tool" \
-    --board "$board" \
-    --prebuilt_dir "${workspace_path}/device/google/${product}/prebuilt/bootloader" \
-    --output_img "$bootloader_img" \
-    --key_dir "$sign_boot_keys" \
-
-  bootloader_version_file=${DIR}/build/include/generated/timestamp_autogenerated.h
-  bootloader_version="01.01.$(cat ${bootloader_version_file} | tail -n 1 | cut -f 2 -d '"')"
-  bootloader_sha1=$(sha1sum --tag ${bootloader_img} | cut -f 4 -d ' ')
-  echo "$bootloader_sha1 $bootloader_version" > ${bl_img_dir}/bootloader${suffix}.img.sha1
-  cat > $bl_img_dir/board-info${suffix}.txt <<EOF
-require board=sabrina
-require version-bootloader=${bootloader_version}
-EOF
 }
 
 if (( $# < 1 ))
@@ -167,43 +75,56 @@ pushd $DIR
 
 readonly board=$1
 readonly workspace_path=$2
-readonly product=$(echo ${board} | cut -d '-' -f 1)
+readonly cross_compile=$DIR/../amlogic/linaro/gcc-linaro-7.3.1-2018.05-i686_aarch64-elf/bin/aarch64-elf-
+readonly cross_compile_t32=$DIR/../amlogic/linaro/gcc-arm-none-eabi-6-2017-q2-update/bin/arm-none-eabi-
+readonly vendor_amlogic=$DIR/../vendor/amlogic
 
-readonly cross_compile=$PWD/../prebuilt/toolchain/aarch64/bin/aarch64-cros-linux-gnu-
-readonly cross_compile_t32=$PWD/../prebuilt/toolchain/arm/bin/arm-none-eabi-
+dbg_flag="debug"
+zircon_cfg=""
+
+if [ "$3" = "release" -o "$4" = "release" ]; then
+	dbg_flag="release"
+elif [ "$4" = "zircon" -o "$5" = "zircon" ]; then
+	zircon_cfg="_zircon"
+fi
+
+
+export ENABLE_UBOOT_UPDATE=1
 
 case $board in
-  sabrina-b3)
-    export CROSS_COMPILE=$cross_compile
-    export CROSS_COMPILE_T32=$cross_compile_t32
-    export ENABLE_UBOOT_UPDATE=1
-    avb_keys=(
-      "$DIR/../sdk/keys/verifiedboot_pub_dev.pem"
-      "$DIR/../sdk/keys/verifiedboot_pub_release.pem"
-    )
-    avb_keys_external=(
-      "$DIR/../sdk/keys/verifiedboot_pub_external_dev.pem"
-      "$DIR/../sdk/keys/verifiedboot_pub_external_release.pem"
-    )
-    building_uboot g12a sm1_sabrina v1 $board
-    build_bootloader_img
+  spencer-p1)
+    building_uboot c2 c2_spencer p1 $board $dbg_flag
     ;;
-  sabrina-b4)
-    export CROSS_COMPILE=$cross_compile
-    export CROSS_COMPILE_T32=$cross_compile_t32
+  spencer-p2)
+    building_uboot c2 c2_spencer p2 $board $dbg_flag
+    ;;
+  spencer-b1|spencer-b3)
+    building_uboot c2 c2_spencer bx $board $dbg_flag
+    ;;
+  spencer-b4)
     export ENABLE_UBOOT_UPDATE=0
-    avb_keys=(
-      "$DIR/../sdk/keys/verifiedboot_pub_release.pem"
-    )
-    avb_keys_external=(
-      "$DIR/../sdk/keys/verifiedboot_pub_external_release.pem"
-    )
-    building_uboot g12a sm1_sabrina v1 $board
-    build_bootloader_img --suffix release
+    building_uboot c2 c2_spencer bx $board $dbg_flag
+    ;;
+  venus-p1)
+    building_uboot c2 c2_venus p1 $board $dbg_flag
+    ;;
+  korlan-p0)
+    building_uboot a1 a1_korlan p0 $board $dbg_flag
+    ;;
+  korlan-p1)
+    building_uboot a1 a1_korlan p1 $board $dbg_flag
+    ;;
+  korlan-p2)
+    building_uboot a1 a1_korlan p2 $board $dbg_flag
+    ;;
+  korlan-b1)
+    building_uboot a1 a1_korlan b1 $board $dbg_flag
+    ;;
+  korlan-b3|korlan-b4)
+    building_uboot a1 a1_korlan bx $board $dbg_flag
     ;;
   *)
     echo "unknown board: $board"
     exit 1
 esac
-
 popd

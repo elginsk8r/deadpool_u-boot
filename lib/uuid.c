@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2011 Calxeda, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -11,10 +10,7 @@
 #include <asm/io.h>
 #include <part_efi.h>
 #include <malloc.h>
-#include <uuid.h>
-#define CONFIG_PARTITION_TYPE_GUID
-#define CONFIG_RANDOM_UUID
-#define CONFIG_CMD_UUID
+
 /*
  * UUID - Universally Unique IDentifier - 128 bits unique number.
  *        There are 5 versions and one variant of UUID defined by RFC4122
@@ -84,6 +80,7 @@ int uuid_str_valid(const char *uuid)
 }
 
 #ifdef CONFIG_PARTITION_TYPE_GUID
+
 #ifdef CONFIG_AML_GPT
 	static const struct {
 		const char *string;
@@ -107,22 +104,23 @@ int uuid_str_valid(const char *uuid)
 		{"oem",			PARTITION_ANDROID_OEM_GUID},
 		{"default",		PARTITION_LINUX_DEFAULT_GUID}
 	};
-#else
-	static const struct {
-		const char *string;
-		efi_guid_t guid;
-	} list_guid[] = {
-		{"system",	PARTITION_SYSTEM_GUID},
-		{"mbr",		LEGACY_MBR_PARTITION_GUID},
-		{"msft",	PARTITION_MSFT_RESERVED_GUID},
-		{"data",	PARTITION_BASIC_DATA_GUID},
-		{"linux",	PARTITION_LINUX_FILE_SYSTEM_DATA_GUID},
-		{"raid",	PARTITION_LINUX_RAID_GUID},
-		{"swap",	PARTITION_LINUX_SWAP_GUID},
-		{"lvm",		PARTITION_LINUX_LVM_GUID}
-	};
-#endif
 
+#else
+
+static const struct {
+	const char *string;
+	efi_guid_t guid;
+} list_guid[] = {
+	{"system",	PARTITION_SYSTEM_GUID},
+	{"mbr",		LEGACY_MBR_PARTITION_GUID},
+	{"msft",	PARTITION_MSFT_RESERVED_GUID},
+	{"data",	PARTITION_BASIC_DATA_GUID},
+	{"linux",	PARTITION_LINUX_FILE_SYSTEM_DATA_GUID},
+	{"raid",	PARTITION_LINUX_RAID_GUID},
+	{"swap",	PARTITION_LINUX_SWAP_GUID},
+	{"lvm",		PARTITION_LINUX_LVM_GUID}
+};
+#endif
 /*
  * uuid_guid_get_bin() - this function get GUID bin for string
  *
@@ -267,6 +265,8 @@ void gen_rand_uuid(unsigned char *uuid_bin)
 	unsigned int *ptr = (unsigned int *)&uuid;
 	int i;
 
+	srand(get_ticks() + rand());
+
 	/* Set all fields randomly */
 	for (i = 0; i < sizeof(struct uuid) / sizeof(*ptr); i++)
 		*(ptr + i) = cpu_to_be32(rand());
@@ -319,7 +319,7 @@ int do_uuid(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if (argc == 1)
 		printf("%s\n", uuid);
 	else
-		setenv(argv[1], uuid);
+		env_set(argv[1], uuid);
 
 	return CMD_RET_SUCCESS;
 }

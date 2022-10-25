@@ -1,13 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2014 Google, Inc
  * Simon Glass <sjg@chromium.org>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CLI_H
 #define __CLI_H
 
+#ifdef CONFIG_CLI_ENABLED
 /**
  * Go into the command loop
  *
@@ -15,6 +15,7 @@
  * CONFIG_BOOT_RETRY_TIME.
  */
 void cli_simple_loop(void);
+#endif /* CONFIG_CLI_ENABLED */
 
 /**
  * cli_simple_run_command() - Execute a command with the simple CLI
@@ -108,7 +109,7 @@ int cli_readline_into_buffer(const char *const prompt, char *buffer,
  */
 int cli_simple_parse_line(char *line, char *argv[]);
 
-#ifdef CONFIG_OF_CONTROL
+#if CONFIG_IS_ENABLED(OF_CONTROL)
 /**
  * cli_process_fdt() - process the boot command from the FDT
  *

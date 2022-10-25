@@ -1,10 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-/*
- * drivers/nand/dev/amlnf_env.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
- */
 
 #include "../include/phynand.h"
 #ifndef AML_NAND_UBOOT
@@ -122,6 +115,26 @@ exit_err:
 	}
 	return ret;
 }
+
+int amlnf_env_erase(void)
+{
+	int ret = 0;
+	if (aml_chip_env == NULL) {
+		aml_nand_msg("%s amlnf not ready yet!", __func__);
+		return -1;
+	}
+
+	ret = amlnand_erase_info_by_name(aml_chip_env,
+		(u8 *)&(aml_chip_env->uboot_env),
+		(u8 *)ENV_INFO_HEAD_MAGIC);
+	if (ret) {
+		aml_nand_msg("%s erase key error", __func__);
+	} else {
+		aml_nand_msg("env erase success");
+	}
+	return ret;
+}
+
 #ifndef AML_NAND_UBOOT
 ssize_t env_show(struct class *class, struct class_attribute *attr,
 		char *buf)
@@ -380,4 +393,46 @@ exit_err:
 	}
 	return ret;
 }
+/* update env if only it is still readable! */
+int aml_nand_update_ubootenv(struct amlnand_chip *aml_chip, char *env_ptr)
+{
+	int ret = 0;
+	char malloc_flag = 0;
+	char *env_buf = NULL;
+	struct nand_flash *flash = &aml_chip->flash;
+
+	if (env_buf == NULL) {
+		env_buf = kzalloc(CONFIG_ENV_SIZE + flash->pagesize, GFP_KERNEL);
+		malloc_flag = 1;
+		if (env_buf == NULL)
+			return -ENOMEM;
+		memset(env_buf, 0, CONFIG_ENV_SIZE);
+		ret = amlnand_read_info_by_name(aml_chip,
+			(u8 *)&(aml_chip->uboot_env),
+			(u8 *)env_buf,
+			(u8 *)ENV_INFO_HEAD_MAGIC,
+			CONFIG_ENV_SIZE);
+		if (ret) {
+			aml_nand_msg("read ubootenv error,%s\n", __func__);
+			ret = -EFAULT;
+			goto exit;
+		}
+	} else
+		env_buf = env_ptr;
+
+	ret = amlnand_save_info_by_name(aml_chip,
+		(u8 *)&(aml_chip->uboot_env),
+		(u8 *)env_buf,
+		(u8 *)ENV_INFO_HEAD_MAGIC,
+		CONFIG_ENV_SIZE);
+	if (ret < 0)
+		aml_nand_msg("aml_nand_update_secure : update secure failed");
+exit:
+	if (malloc_flag && (env_buf)) {
+		kfree(env_buf);
+		env_buf = NULL;
+	}
+	return 0;
+}
+
 

@@ -1,28 +1,29 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/efuse/efuse_usr_space_api.c
+ * \file        efuse_usr_space_api.c
+ * \brief       support read/write user space using keyname mode
+ *              mapping keyname to offset by looking /efusekey in dtb
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * \version     1.0.0
+ * \date        15/07/14
+ * \author      Sam.Wu <yihui.wu@amlgic.com>
+ *
+ * Copyright (c) 2015 Amlogic. All Rights Reserved.
  *
  */
-
 #include <config.h>
 #include <common.h>
 #include <command.h>
 #include <malloc.h>
 #include <linux/ctype.h>
+#include <asm/arch/efuse.h>
 
 #define EFUSE_DBG(fmt...)   //printf("[EFUSE_DBG]"fmt)
 #define EFUSE_MSG(fmt...)   printf("[EFUSE_MSG]"fmt)
 #define EFUSE_ERR(fmt...)   printf("[EFUSE_ERR]f(%s)L%d:", __func__, __LINE__),printf(fmt)
 
-extern uint32_t efuse_get_max(void);
-extern int efuse_read_usr(char *buf, size_t count, loff_t *ppos);
-extern int efuse_write_usr(char *buf, size_t count, loff_t *ppos);
-
 struct efusekey_info{
 	char keyname[32];
-	loff_t offset;
+	unsigned offset;
 	unsigned size;
 };
 
@@ -42,6 +43,7 @@ int efuse_usr_api_init_dtb(const char*  dt_addr)
 	int index;
 	uint32_t max_size;
     unsigned efusekeynum = 0;
+    struct efusekey_info * efusekey_infos = NULL;
 
 	ret = fdt_check_header(dt_addr);
 	if (ret < 0) {
@@ -60,7 +62,8 @@ int efuse_usr_api_init_dtb(const char*  dt_addr)
 	efusekeynum = be32_to_cpup((u32 *)phandle);
 	EFUSE_MSG("keynum is %x\n", efusekeynum);
 
-	struct efusekey_info * efusekey_infos = (struct efusekey_info *)malloc(sizeof (struct efusekey_info) *efusekeynum);
+    if (efusekey_infos) free(efusekey_infos) ;
+    efusekey_infos = (struct efusekey_info *)malloc(sizeof (struct efusekey_info) *efusekeynum);
     if (!efusekey_infos) {
         EFUSE_ERR("malloc err\n");
         return __LINE__;
@@ -91,8 +94,7 @@ int efuse_usr_api_init_dtb(const char*  dt_addr)
             EFUSE_ERR("Can't find keyname for key[%d]\n", index);
             goto err;
         }
-        memset(theKeyInf->keyname, 0, sizeof theKeyInf->keyname);
-        strncpy(theKeyInf->keyname, phandle, (sizeof theKeyInf->keyname) - 1);
+		strcpy(theKeyInf->keyname, phandle);
 
 		phandle = fdt_getprop(dt_addr, poffset, "offset", NULL);
         if (!phandle) {
@@ -111,8 +113,8 @@ int efuse_usr_api_init_dtb(const char*  dt_addr)
 		EFUSE_DBG("key[%02d] name=%12s, offset=0x%04x, size=0x%04x\n",
                 index, theKeyInf->keyname, theKeyInf->offset, theKeyInf->size);
         if (theKeyInf->offset + theKeyInf->size > max_size) {
-            EFUSE_ERR("\n offset (0x%llx) + size (0x%x) > max [0x%x]!\n", theKeyInf->offset, theKeyInf->size, max_size);
-            goto err;
+            EFUSE_ERR("\n offset (0x%x) + size (0x%x) > max [0x%x]!\n", theKeyInf->offset, theKeyInf->size, max_size);
+            return __LINE__;
         }
 	}
 
@@ -211,7 +213,7 @@ int efuse_usr_api_read_key(const char* keyname, void* databuf, const unsigned bu
     EFUSE_DBG("keyname=%s, databuf=%p, bufSz=%d, cfgCnt=%u\n", keyname, databuf, bufSz, cfgCnt);
 
     offset = theCfgKeyInf->offset;
-    memset(databuf, 0, cfgCnt);
+    memset(databuf, cfgCnt, 0);
     ret = efuse_read_usr((char*)databuf, cfgCnt, &offset);
     if (ret == -1) {
         EFUSE_ERR("ERROR: efuse read user data fail!, size=%u, offset=%llu\n", cfgCnt, offset);
@@ -288,9 +290,9 @@ static int do_usr_efuse_api(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
         }
         else
         {
-            dtbLoadAddr = getenv("dtb_mem_addr");
+            dtbLoadAddr = env_get("dtb_mem_addr");
             if (!dtbLoadAddr) {
-                setenv("dtb_mem_addr", simple_itoa(CONFIG_SYS_SDRAM_BASE + (16U<<20)));
+                env_set("dtb_mem_addr", simple_itoa(CONFIG_SYS_SDRAM_BASE + (16U<<20)));
             }
             dtbLoadAddr = (char*)simple_strtoul(dtbLoadAddr, NULL, 0);
         }
@@ -345,15 +347,10 @@ static int do_usr_efuse_api(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
             const char* input = argv[3];
             bufSz = ( strlen(input) >> 1 );
             tmpBuf = malloc(bufSz);
-            if (!tmpBuf) {
-                EFUSE_ERR("Fail alloc buf 0x%x bytes\n", bufSz);
-                return CMD_RET_FAILURE;
-            }
 
             ret = hex_ascii_to_buf(input, tmpBuf, bufSz);
             if (ret) {
                 EFUSE_ERR("Failed in change hex ascii to buf\n");
-                free(tmpBuf);
                 return __LINE__;
             }
             keydata = (char*)tmpBuf;

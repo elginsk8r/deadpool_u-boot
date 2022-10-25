@@ -1,11 +1,16 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/usb/gadget/v2_burning/v2_common/optimus_simg2img.c
+ * \file        optimus_simg2img.c
+ * \brief       sparse image to ext4 image in optimus system
+ *              a sparse image consit of "file_header + chunk_num * (chunk_header + [chunk_data]),
+ *              chunk data can be empty when chunk type is CHUNK_TYPE_DONT_CARE"
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * \version     1.0.0
+ * \date        2013/5/6
+ * \author      Sam.Wu <yihui.wu@Amlogic.com>
+ *
+ * Copyright (c) 2013 Amlogic Inc. All Rights Reserved.
  *
  */
-
 #include "../v2_burning_i.h"
 #include <partition_table.h>
 
@@ -214,14 +219,13 @@ int optimus_simg_to_media(char* simgPktHead, const u32 pktLen, u32* unParsedData
                             sperr("error FILL chunk\n");
                             return -__LINE__;
                     }
-                    switch (device_boot_flag) {
-                            case EMMC_BOOT_FLAG:
-                            case SPI_EMMC_FLAG:
+                    switch (store_get_type()) {
+                            case BOOT_EMMC:
+                            case BOOT_SD:
                                     _NeedFillAsNotErasedYet = (fillVal != 0);
                                     break;
 
-                            case NAND_BOOT_FLAG:
-                            case SPI_NAND_FLAG:
+                            case BOOT_NAND_NFTL:
                                     _NeedFillAsNotErasedYet = (fillVal != 0XFFFFFFFFU);
                                     break;
                             default:

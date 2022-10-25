@@ -1,11 +1,31 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+
 /*
- * arch/arm/include/asm/arch-g12a/mailbox.h
+ * arch/arm/include/asm/arch-txl/mailbox.h
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
+
+ /*
+  *
+ * Copyright (C) 2012 Amlogic, Inc.
+ *
+ * Author: Platform-SH@amlogic.com
  *
  */
-
 
 #ifndef __GXBB_MAILBOX_H_
 #define __GXBB_MAILBOX_H_
@@ -21,12 +41,7 @@
 #define SCPI_CMD_CLEAR_BOOT 0xB3
 
 #define SCPI_CMD_REV_PWM_DELT 0x42
-#ifdef CONFIG_RING
 #define SCPI_CMD_OSCRING_VALUE 0x43
-#endif
-#define SCPI_CMD_BL0_DATA_LEN 0xD2
-#define	SCPI_CMD_BL0_DATA_ADDR 0xD3
-#define SCPI_CMD_BL4_WAIT_UNLOCK 0xD6
 
 #define LOW_PRIORITY	0
 #define HIGH_PRIORITY 1
@@ -71,9 +86,5 @@ int thermal_get_value(unsigned int sensor_id, unsigned int *value);
 int send_usr_data(unsigned int clinet_id, unsigned int *val, unsigned int size);
 void send_pwm_delt(int32_t vcck_delt, int32_t ee_delt);
 void set_boot_first_timeout(unsigned int command);
-void bl40_wait_unlock(void);
-int send_bl40(unsigned long addr, unsigned long size);
-#ifdef CONFIG_RING
-int efuse_get_value(unsigned char *efuseinfo);
-#endif
-#endif
+int oscring_get_value(unsigned char *efuseinfo);
+ #endif

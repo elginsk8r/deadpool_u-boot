@@ -1,10 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-/*
- * drivers/nand/dev/cmd_amlnf_test.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
- */
 
 #include "../include/phynand.h"
 

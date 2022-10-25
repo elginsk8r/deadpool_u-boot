@@ -1,11 +1,7 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * board/amlogic/g12b_w400_v1/firmware/scp_task/pwm_ctrl.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
- */
-
+*board/amlogic/g12b_w400_v1/firmware/scp_task/pwm_ctrl.h
+*table for Dynamic Voltage/Frequency Scaling
+*/
 #ifndef __PWM_CTRL_H__
 #define __PWM_CTRL_H__
 

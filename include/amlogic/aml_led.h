@@ -1,11 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-/*
- * include/amlogic/aml_led.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
- */
-
 #ifndef __AML_LED_H__
 #define __AML_LED_H__
 

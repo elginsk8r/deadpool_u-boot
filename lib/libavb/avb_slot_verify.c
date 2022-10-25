@@ -1,27 +1,9 @@
+// SPDX-License-Identifier: MIT
 /*
  * Copyright (C) 2016 The Android Open Source Project
- *
- * Permission is hereby granted, free of charge, to any person
- * obtaining a copy of this software and associated documentation
- * files (the "Software"), to deal in the Software without
- * restriction, including without limitation the rights to use, copy,
- * modify, merge, publish, distribute, sublicense, and/or sell copies
- * of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
  */
 
+#include "avb_crypto.h"
 #include <libavb/avb_slot_verify.h>
 #include <libavb/avb_chain_partition_descriptor.h>
 #include "avb_cmdline.h"
@@ -33,6 +15,7 @@
 #include <libavb/avb_util.h>
 #include <libavb/avb_vbmeta_image.h>
 #include <libavb/avb_version.h>
+#include <u-boot/sha256.h>
 
 /* Maximum number of partitions that can be loaded with avb_slot_verify(). */
 #define MAX_NUMBER_OF_LOADED_PARTITIONS 32
@@ -191,6 +174,7 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
   uint8_t* image_buf = NULL;
   bool image_preloaded = false;
   uint8_t* digest;
+  uint8_t sha_digest[SHA256_SUM_LEN];
   size_t digest_len;
   const char* found;
   uint64_t image_size;
@@ -294,11 +278,20 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
   }
 
   if (avb_strcmp((const char*)hash_desc.hash_algorithm, "sha256") == 0) {
+#if 0
     AvbSHA256Ctx sha256_ctx;
     avb_sha256_init(&sha256_ctx);
     avb_sha256_update(&sha256_ctx, desc_salt, hash_desc.salt_len);
     avb_sha256_update(&sha256_ctx, image_buf, hash_desc.image_size);
     digest = avb_sha256_final(&sha256_ctx);
+#else
+    sha256_context ctx;
+    sha256_starts(&ctx);
+    sha256_update(&ctx, desc_salt, hash_desc.salt_len);
+    sha256_update(&ctx, image_buf, hash_desc.image_size);
+    sha256_finish(&ctx, sha_digest);
+    digest = sha_digest;
+#endif
     digest_len = AVB_SHA256_DIGEST_SIZE;
   } else if (avb_strcmp((const char*)hash_desc.hash_algorithm, "sha512") == 0) {
     AvbSHA512Ctx sha512_ctx;
@@ -625,9 +618,7 @@ static AvbSlotVerifyResult load_and_verify_vbmeta(
   switch (vbmeta_ret) {
     case AVB_VBMETA_VERIFY_RESULT_OK:
       avb_assert(pk_data != NULL && pk_len > 0);
-
       io_ret = ops->read_is_device_unlocked(ops, &out_is_unlocked);
-      /* Only calculate hash for successful and locked case */
       if (io_ret == AVB_IO_RESULT_OK && !out_is_unlocked) {
           AvbSHA256Ctx boot_key_sha256_ctx;
           avb_sha256_init(&boot_key_sha256_ctx);
@@ -637,6 +628,7 @@ static AvbSlotVerifyResult load_and_verify_vbmeta(
                   AVB_SHA256_DIGEST_SIZE);
       }
       break;
+
     case AVB_VBMETA_VERIFY_RESULT_OK_NOT_SIGNED:
     case AVB_VBMETA_VERIFY_RESULT_HASH_MISMATCH:
     case AVB_VBMETA_VERIFY_RESULT_SIGNATURE_MISMATCH:
@@ -1279,6 +1271,9 @@ fail:
 }
 
 void avb_slot_verify_data_free(AvbSlotVerifyData* data) {
+  if (data == NULL) {
+    return;
+  }
   if (data->ab_suffix != NULL) {
     avb_free(data->ab_suffix);
   }
@@ -1354,4 +1349,43 @@ const char* avb_slot_verify_result_to_string(AvbSlotVerifyResult result) {
   }
 
   return ret;
+}
+
+void avb_slot_verify_data_calculate_vbmeta_digest(AvbSlotVerifyData* data,
+                                                  AvbDigestType digest_type,
+                                                  uint8_t* out_digest) {
+  bool ret = false;
+  size_t n;
+
+  switch (digest_type) {
+    case AVB_DIGEST_TYPE_SHA256: {
+      AvbSHA256Ctx ctx;
+      avb_sha256_init(&ctx);
+      for (n = 0; n < data->num_vbmeta_images; n++) {
+        avb_sha256_update(&ctx,
+                          data->vbmeta_images[n].vbmeta_data,
+                          data->vbmeta_images[n].vbmeta_size);
+      }
+      avb_memcpy(out_digest, avb_sha256_final(&ctx), AVB_SHA256_DIGEST_SIZE);
+      ret = true;
+    } break;
+
+    case AVB_DIGEST_TYPE_SHA512: {
+      AvbSHA512Ctx ctx;
+      avb_sha512_init(&ctx);
+      for (n = 0; n < data->num_vbmeta_images; n++) {
+        avb_sha512_update(&ctx,
+                          data->vbmeta_images[n].vbmeta_data,
+                          data->vbmeta_images[n].vbmeta_size);
+      }
+      avb_memcpy(out_digest, avb_sha512_final(&ctx), AVB_SHA512_DIGEST_SIZE);
+      ret = true;
+    } break;
+
+      /* Do not add a 'default:' case here because of -Wswitch. */
+  }
+
+  if (!ret) {
+    avb_fatal("Unknown digest type");
+  }
 }

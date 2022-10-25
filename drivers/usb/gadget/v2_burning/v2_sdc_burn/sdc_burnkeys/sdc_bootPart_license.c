@@ -1,11 +1,14 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * sdc_bootPart_license.c
+ * \file        sdc_bootPart_license.c
+ * \brief
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * \version     1.0.0
+ * \date        2015/3/10
+ * \author      Sam.Wu <yihui.wu@amlgic.com>
+ *
+ * Copyright (c) 2015 Amlogic. All Rights Reserved.
  *
  */
-
 #include "../optimus_sdc_burn_i.h"
 #include "sdc_bootPart_license.h"
 #include <crc.h>

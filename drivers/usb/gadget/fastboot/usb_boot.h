@@ -1,9 +1,10 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/usb/gadget/fastboot/usb_boot.h
+ * Copyright (c) 2015 Amlogic, Inc. All rights reserved.
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * This source code is subject to the terms and conditions defined in the
+ * file 'LICENSE' which is part of this source code package.
  *
+ * USB top level defines
  */
 
 #ifndef __USB_BOOT_H__

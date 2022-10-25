@@ -1,11 +1,14 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * include/amlogic/keyunify.h
+ * \file        keymanage.h
+ * \brief       API from drivers/keymange
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * \version     1.0.0
+ * \date        15/07/7
+ * \author      Sam.Wu <yihui.wu@amlgic.com>
+ *
+ * Copyright (c) 2015 Amlogic. All Rights Reserved.
  *
  */
-
 #ifndef __KEYUNIFY_H__
 #define __KEYUNIFY_H__
 

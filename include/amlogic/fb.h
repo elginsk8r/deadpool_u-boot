@@ -1,11 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-/*
- * include/amlogic/fb.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
- */
-
 #ifndef _LINUX_FB_H
 #define _LINUX_FB_H
 
@@ -295,6 +287,8 @@ struct fb_con2fbmap {
 #define VESA_VSYNC_SUSPEND      1
 #define VESA_HSYNC_SUSPEND      2
 #define VESA_POWERDOWN          3
+
+#define CANVAS_ALIGNED(x)  (((x) + 63) & ~63)
 
 enum osd_index_e {
 	OSD1 = 0,

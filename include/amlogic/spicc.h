@@ -1,8 +1,9 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * include/amlogic/spicc.h
+ * Amlogic Meson SPI communication controller(SPICC)
  *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic Corporation
+ *
+ * Licensed under the GPL-2 or later.
  *
  */
 

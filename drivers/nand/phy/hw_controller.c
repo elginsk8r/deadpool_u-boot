@@ -1,11 +1,15 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-/*
- * drivers/nand/phy/hw_controller.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
- */
-
+/*****************************************************************
+**
+**  Copyright (C) 2012 Amlogic,Inc.  All rights reserved
+**
+**        Filename : hw_controller.c
+**        Revision : 1.001
+**        Author: Benjamin Zhao
+**        Description:
+**		hw controller operation function,  mainly init nand phy driver.
+**
+**
+*****************************************************************/
 #include "../include/phynand.h"
 #include <asm/arch/secure_apb.h>
 static int controller_select_chip(struct hw_controller *controller,
