@@ -1,9 +1,6 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * include/emmc_partitions.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef _AML_MMC_H
@@ -24,7 +21,7 @@
 #include <asm/cache.h>
 #include <asm/arch/clock.h>
 #include<partition_table.h>
-#include <storage.h>
+#include <emmc_storage.h>
 #include <linux/sizes.h>
 
 #define     AML_MMC_DBG
@@ -34,11 +31,10 @@
 #define     MAX_MMC_PART_NUM                32
 #define     MAX_MMC_PART_NAME_LEN           16
 
-#define 	MMC_BOOT_PARTITION_SUPPORT		1
-
 #ifndef CONFIG_AML_MMC_INHERENT_PART
 #define     PARTITION_RESERVED              (8*SZ_1M)  // 8MB
 #define     MMC_BOOT_PARTITION_RESERVED     (32*SZ_1M) // 32MB
+#define     RESERVED_GPT_OFFSET     (36*SZ_1M) // 36MB
 
 #define     MMC_BOOT_NAME                   "bootloader"
 #define     MMC_BOOT_NAME0                   "bootloader-boot0"
@@ -49,6 +45,9 @@
 #define     MMC_RESERVED_SIZE               (64*SZ_1M)
 #define		MMC_BOTTOM_RSV_SIZE				(0)
 #endif		/* CONFIG_AML_MMC_INHERENT_PART */
+
+#define     MMC_FREERTOS_NAME               "rtos-0"
+#define		MMC_NBG_NAME					"NBG"
 
 #define     MMC_CACHE_NAME                  "cache"
 // #define     MMC_CACHE_SIZE                  (512*SZ_1M) // this is not used and should be get from spl
@@ -61,8 +60,13 @@
 #define     EMMCKEY_RESERVE_OFFSET           (0x4000)
 #define     MMC_RESERVED_OFFSET              (36*SZ_1M)
 #define     MMC_BLOCK_SIZE                   (512)
+#define     KEY_COPIES                       (2)
 // #define     MMC_SECURE_NAME                 "secure"
 // #define     MMC_SECURE_SIZE                 (0x1*SZ_1M)
+
+#define MMC_DDR_PARAMETER_NAME	"ddr-parameter"
+#define DDR_PARAMETER_OFFSET	(SZ_1M * 8)
+#define DDR_PARAMETER_SIZE	(4 * 512)
 
 #define     MMC_MPT_VERSION_1               "01.00.00"
 #define     MMC_MPT_VERSION_2               "01.02.00"
@@ -109,11 +113,6 @@
 #define RANDOM_SIZE	(256 * 512)
 #define RANDOM_BLOCK_SIZE		(512)
 #define RANDOM_PATTERN	(0X52414E44)
-
-#define MMC_DDR_PARAMETER_NAME	"ddr-parameter"
-#define DDR_PARAMETER_OFFSET	(SZ_1M * 8)
-#define DDR_PARAMETER_SIZE	(4 * 512)
-
 /*
  * 2 copies dtb were stored in dtb area.
  * each is 256K.
@@ -134,6 +133,8 @@
 #define MMC_FASTBOOT_CONTEXT_NAME     "fastboot_context"
 #define FASTBOOT_CONTEXT_OFFSET  (SZ_1M * 5)
 #define FASTBOOT_CONTEXT_SIZE    (512)
+#define GPT_LBA_COUNT 34
+#define GPT_TOTAL_SIZE (GPT_LBA_COUNT * 512)
 
 struct virtual_partition {
 	char name[MAX_MMC_PART_NAME_LEN];
@@ -226,8 +227,6 @@ struct _mmc_device{
 typedef struct LockData {
 	uint8_t version_major;
 	uint8_t version_minor;
-
-	/* 0: not unlockable 1: unlockable */
 	uint8_t unlock_ability;
 
 	/* Padding to eight bytes. */
@@ -241,7 +240,7 @@ typedef struct LockData {
 
 	/* 0: enable bootloader version rollback 1: prevent bootloader version rollback*/
 	uint8_t lock_bootloader;
-	uint8_t reserved2;
+	uint8_t reserved2[1];
 } LockData_t;
 
 /*512Bytes*/
@@ -254,6 +253,8 @@ typedef struct FastbootContext {
 } FastbootContext_t;
 
 extern bool is_partition_checked;
+extern struct partitions *part_table;
+extern int parts_total_num;
 extern struct partitions emmc_partition_table[];
 
 extern int get_emmc_partition_arraysize(void);
@@ -264,18 +265,19 @@ extern int get_emmc_partition_arraysize(void);
  *	< 0 means no partition found
  *	>= 0 means valid partition
  */
-extern int get_partition_num_by_name(char *name);
+extern int get_partition_num_by_name(char const *name);
+extern int aml_gpt_valid(struct mmc *mmc);
+int mmc_gpt_read(void *source);
+int mmc_gpt_write(void *source);
+int mmc_gpt_erase(void);
 
-struct partitions* find_mmc_partition_by_name (char *name);
+struct partitions* find_mmc_partition_by_name (char const *name);
 struct partitions *aml_get_partition_by_name(const char *name);
 int mmc_boot_size(char *name, uint64_t* size);
 struct virtual_partition *aml_get_virtual_partition_by_name(const char *name);
 bool aml_is_emmc_tsd (struct mmc *mmc);
 int mmc_device_init (struct mmc *mmc);
-ulong _get_inherent_offset(const char *name);
-
-int get_lock_data(struct LockData *lock_data);
-int save_lock_data(const struct LockData *lock_data);
+int get_ept_from_gpt(struct mmc *mmc);
 
 #define PARTITION_ELEMENT(na, sz, flags) {.name = na, .size = sz, .mask_flags = flags,}
 

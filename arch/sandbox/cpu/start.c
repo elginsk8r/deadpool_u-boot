@@ -1,11 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2011-2012 The Chromium OS Authors.
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <errno.h>
 #include <os.h>
 #include <cli.h>
+#include <malloc.h>
 #include <asm/getopt.h>
 #include <asm/io.h>
 #include <asm/sections.h>
@@ -64,6 +66,11 @@ int sandbox_early_getopt_check(void)
 	os_exit(0);
 }
 
+int misc_init_f(void)
+{
+	return sandbox_early_getopt_check();
+}
+
 static int sandbox_cmdline_cb_help(struct sandbox_state *state, const char *arg)
 {
 	/* just flag to sandbox_early_getopt_check to show usage */
@@ -71,21 +78,40 @@ static int sandbox_cmdline_cb_help(struct sandbox_state *state, const char *arg)
 }
 SANDBOX_CMDLINE_OPT_SHORT(help, 'h', 0, "Display help");
 
+#ifndef CONFIG_SPL_BUILD
 int sandbox_main_loop_init(void)
 {
 	struct sandbox_state *state = state_get_current();
 
 	/* Execute command if required */
-	if (state->cmd) {
+	if (state->cmd || state->run_distro_boot) {
+		int retval = 0;
+
 		cli_init();
 
-		run_command_list(state->cmd, -1, 0);
+#ifdef CONFIG_CMDLINE
+		if (state->cmd)
+			retval = run_command_list(state->cmd, -1, 0);
+
+		if (state->run_distro_boot)
+			retval = cli_simple_run_command("run distro_bootcmd",
+							0);
+#endif
 		if (!state->interactive)
-			os_exit(state->exit_type);
+			os_exit(retval);
 	}
 
 	return 0;
 }
+#endif
+
+static int sandbox_cmdline_cb_boot(struct sandbox_state *state,
+				      const char *arg)
+{
+	state->run_distro_boot = true;
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(boot, 'b', 0, "Run distro boot commands");
 
 static int sandbox_cmdline_cb_command(struct sandbox_state *state,
 				      const char *arg)
@@ -101,6 +127,25 @@ static int sandbox_cmdline_cb_fdt(struct sandbox_state *state, const char *arg)
 	return 0;
 }
 SANDBOX_CMDLINE_OPT_SHORT(fdt, 'd', 1, "Specify U-Boot's control FDT");
+
+static int sandbox_cmdline_cb_default_fdt(struct sandbox_state *state,
+					  const char *arg)
+{
+	const char *fmt = "%s.dtb";
+	char *fname;
+	int len;
+
+	len = strlen(state->argv[0]) + strlen(fmt) + 1;
+	fname = os_malloc(len);
+	if (!fname)
+		return -ENOMEM;
+	snprintf(fname, len, fmt, state->argv[0]);
+	state->fdt_fname = fname;
+
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(default_fdt, 'D', 0,
+		"Use the default u-boot.dtb control FDT in U-Boot directory");
 
 static int sandbox_cmdline_cb_interactive(struct sandbox_state *state,
 					  const char *arg)
@@ -132,9 +177,10 @@ static int sandbox_cmdline_cb_memory(struct sandbox_state *state,
 
 	err = os_read_ram_buf(arg);
 	if (err) {
-		printf("Failed to read RAM buffer\n");
+		printf("Failed to read RAM buffer '%s': %d\n", arg, err);
 		return err;
 	}
+	state->ram_buf_read = true;
 
 	return 0;
 }
@@ -220,6 +266,62 @@ static int sandbox_cmdline_cb_terminal(struct sandbox_state *state,
 SANDBOX_CMDLINE_OPT_SHORT(terminal, 't', 1,
 			  "Set terminal to raw/cooked mode");
 
+static int sandbox_cmdline_cb_verbose(struct sandbox_state *state,
+				      const char *arg)
+{
+	state->show_test_output = true;
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(verbose, 'v', 0, "Show test output");
+
+static int sandbox_cmdline_cb_log_level(struct sandbox_state *state,
+					const char *arg)
+{
+	state->default_log_level = simple_strtol(arg, NULL, 10);
+
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(log_level, 'L', 1,
+			  "Set log level (0=panic, 7=debug)");
+
+static int sandbox_cmdline_cb_show_of_platdata(struct sandbox_state *state,
+					       const char *arg)
+{
+	state->show_of_platdata = true;
+
+	return 0;
+}
+SANDBOX_CMDLINE_OPT(show_of_platdata, 0, "Show of-platdata in SPL");
+
+int board_run_command(const char *cmdline)
+{
+	printf("## Commands are disabled. Please enable CONFIG_CMDLINE.\n");
+
+	return 1;
+}
+
+static void setup_ram_buf(struct sandbox_state *state)
+{
+	/* Zero the RAM buffer if we didn't read it, to keep valgrind happy */
+	if (!state->ram_buf_read) {
+		memset(state->ram_buf, '\0', state->ram_size);
+		printf("clear %p %x\n", state->ram_buf, state->ram_size);
+	}
+
+	gd->arch.ram_buf = state->ram_buf;
+	gd->ram_size = state->ram_size;
+}
+
+void state_show(struct sandbox_state *state)
+{
+	char **p;
+
+	printf("Arguments:\n");
+	for (p = state->argv; *p; p++)
+		printf("%s ", *p);
+	printf("\n");
+}
+
 int main(int argc, char *argv[])
 {
 	struct sandbox_state *state;
@@ -238,15 +340,15 @@ int main(int argc, char *argv[])
 	if (ret)
 		goto err;
 
-	/* Remove old memory file if required */
-	if (state->ram_buf_rm && state->ram_buf_fname)
-		os_unlink(state->ram_buf_fname);
-
 	memset(&data, '\0', sizeof(data));
 	gd = &data;
-#ifdef CONFIG_SYS_MALLOC_F_LEN
+#if CONFIG_VAL(SYS_MALLOC_F_LEN)
 	gd->malloc_base = CONFIG_MALLOC_F_ADDR;
 #endif
+#if CONFIG_IS_ENABLED(LOG)
+	gd->default_log_level = state->default_log_level;
+#endif
+	setup_ram_buf(state);
 
 	/* Do pre- and post-relocation init */
 	board_init_f(0);

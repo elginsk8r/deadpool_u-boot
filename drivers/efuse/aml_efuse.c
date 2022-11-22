@@ -1,11 +1,12 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/efuse/aml_efuse.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
+/*
+ *
+ * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
+*/
 
 #include <common.h>
 #include <asm/arch/io.h>
@@ -20,6 +21,9 @@ int  __attribute__((weak)) IS_FEAT_BOOT_VERIFY(void)
 	#ifndef ADDR_IS_FEAT_BOOT_VERIFY
 	  #ifdef EFUSE_LIC0
 		  #define ADDR_IS_FEAT_BOOT_VERIFY (EFUSE_LIC0)
+		  #define OSET_IS_FEAT_BOOT_VERIFY (0)
+	  #elif defined(OTP_LIC0)
+		  #define ADDR_IS_FEAT_BOOT_VERIFY (OTP_LIC0)
 		  #define OSET_IS_FEAT_BOOT_VERIFY (0)
 	  #else
 		  #define ADDR_IS_FEAT_BOOT_VERIFY (AO_SEC_SD_CFG10)
@@ -38,6 +42,9 @@ int  __attribute__((weak)) IS_FEAT_BOOT_ENCRYPT(void)
 	  #ifdef EFUSE_LIC0
 		#define ADDR_IS_FEAT_BOOT_ENCRYPT (EFUSE_LIC0)
 		#define OSET_IS_FEAT_BOOT_ENCRYPT (1)
+	  #elif defined(OTP_LIC0)
+		#define ADDR_IS_FEAT_BOOT_ENCRYPT (OTP_LIC0)
+		#define OSET_IS_FEAT_BOOT_ENCRYPT (1)
 	  #else
 		#define ADDR_IS_FEAT_BOOT_ENCRYPT (AO_SEC_SD_CFG10)
 		#define OSET_IS_FEAT_BOOT_ENCRYPT (28)
@@ -48,4 +55,49 @@ int  __attribute__((weak)) IS_FEAT_BOOT_ENCRYPT(void)
 
 	#undef ADDR_IS_FEAT_BOOT_ENCRYPT
 	#undef OSET_IS_FEAT_BOOT_ENCRYPT
+}
+
+int  __attribute__((weak)) IS_FEAT_DIS_EMMC_USER(void)
+{
+	return 0;
+}
+
+int  __attribute__((weak)) IS_FEAT_DIS_EMMC_BOOT_0(void)
+{
+	return 0;
+}
+
+int  __attribute__((weak)) IS_FEAT_DIS_EMMC_BOOT_1(void)
+{
+	return 0;
+}
+
+int  __attribute__((weak)) IS_FEAT_EN_4BL2_SNOR(void)
+{
+	return 0;
+}
+
+int  __attribute__((weak)) IS_FEAT_DIS_NBL2_SNOR(void)
+{
+	return 0;
+}
+
+int  __attribute__((weak)) IS_FEAT_EN_8BL2_SNAND(void)
+{
+	return 0;
+}
+
+int  __attribute__((weak)) IS_FEAT_DIS_NBL2_SNAND(void)
+{
+	return 0;
+}
+
+int  __attribute__((weak)) IS_FEAT_DIS_8BL2_NAND(void)
+{
+	return 0;
+}
+
+int  __attribute__((weak)) IS_FEAT_DIS_NBL2_NAND(void)
+{
+	return 1;
 }

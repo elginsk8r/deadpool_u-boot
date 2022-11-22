@@ -1,14 +1,25 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/nand/phy/chip_operation.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include "../include/phynand.h"
 extern int mt_L04A_nand_check(struct amlnand_chip *aml_chip);
 extern int mt_L05B_nand_check(struct amlnand_chip *aml_chip);
+extern uint32_t amlnf_get_rsv_size(const char *name);
+extern int amlnf_read_rsv(const char *name, size_t size, void *buf);
+extern int amlnf_write_rsv(const char *name, size_t size, void *buf);
+extern int amlnf_erase_rsv(const char *name);
+extern u8 amlnf_boot_cpys(const char *part_name);
+extern u64 amlnf_boot_copy_size(const char *part_name);
+extern u64 amlnf_get_size(const char *part_name);
+extern int amlnf_read(const char *part_name, loff_t off, size_t size,void *dest);
+extern int amlnf_write(const char *part_name, loff_t off, size_t size, void *source);
+extern int amlnf_erase(const char *part_name, loff_t off, size_t size, int scrub_flag);
+extern int amlnf_boot_read(const char *part_name, uint8_t copy, size_t size, void *buf);
+extern int amlnf_boot_write(const char *part_name, uint8_t copy, size_t size, void *buf);
+extern int amlnf_boot_erase(const char *part_name, uint8_t copy);
+extern int amlnf_rsv_protect(const char *name, bool ops);
 
 static int _read_page_single_plane(struct amlnand_chip *aml_chip,
 	u8 chipnr, u8 *buf, u8 *oob_buf,
@@ -1150,7 +1161,7 @@ static int write_page_two_plane(struct amlnand_chip *aml_chip,
 
 	u32 column;
 	u32 page_size;
-	u8 bch_mode, user_byte_num;
+	u8 bch_mode, user_byte_num = 0;
 	u8 slc_mode, status, st_cnt;
 	int ret = 0;
 
@@ -1737,7 +1748,6 @@ static int block_isbad(struct amlnand_chip *aml_chip)
 			if (!page_buf) {
 				aml_nand_msg("no memory for data buf, and need %x", buf_size);
 				printf( "%s: line:%d\n", __func__, __LINE__);
-                while (1) ;
 				ret = -NAND_MALLOC_FAILURE;
 				return 0;
 			}
@@ -1941,7 +1951,6 @@ static int block_markbad(struct amlnand_chip *aml_chip)
 	if (!page_buf) {
 	    aml_nand_msg("no memory for data buf, and need %x", buf_size);
 		printf( "%s: line:%d\n", __func__, __LINE__);
-        while (1) ;
 	    ret = -NAND_MALLOC_FAILURE;
 	    return 0;
 	}

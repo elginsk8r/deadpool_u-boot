@@ -1,9 +1,6 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/include/asm/arch-g12b/nand.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef __NAND_H__

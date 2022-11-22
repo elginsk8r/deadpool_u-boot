@@ -1,9 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0+
 #
 # (C) Copyright 2000-2006
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
-#
-# SPDX-License-Identifier:	GPL-2.0+
-#
 
 extra-y	= start.o
 obj-y	= cpu.o cache.o
@@ -15,16 +13,19 @@ endif
 endif
 
 obj-$(CONFIG_ARMADA100) += armada100/
-obj-$(CONFIG_AT91FAMILY) += at91/
-obj-$(CONFIG_ARCH_DAVINCI) += davinci/
-obj-$(CONFIG_KIRKWOOD) += kirkwood/
 obj-$(if $(filter lpc32xx,$(SOC)),y) += lpc32xx/
-obj-$(CONFIG_MB86R0x) += mb86r0x/
 obj-$(CONFIG_MX25) += mx25/
 obj-$(CONFIG_MX27) += mx27/
 obj-$(if $(filter mxs,$(SOC)),y) += mxs/
-obj-$(CONFIG_ARCH_NOMADIK) += nomadik/
-obj-$(CONFIG_ORION5X) += orion5x/
-obj-$(CONFIG_PANTHEON) += pantheon/
 obj-$(if $(filter spear,$(SOC)),y) += spear/
-obj-$(CONFIG_ARCH_VERSATILE) += versatile/
+
+# some files can only build in ARM or THUMB2, not THUMB1
+
+ifdef CONFIG_$(SPL_)SYS_THUMB_BUILD
+ifndef CONFIG_HAS_THUMB2
+
+CFLAGS_cpu.o := -marm
+CFLAGS_cache.o := -marm
+
+endif
+endif

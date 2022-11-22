@@ -1,9 +1,6 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * include/amlogic/aml_v2_burning.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 //is the uboot loaded from usb otg

@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014 CompuLab, Ltd. <www.compulab.co.il>
  *
  * Authors: Igor Grinberg <grinberg@compulab.co.il>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -121,12 +120,12 @@ void set_muxconf_regs(void)
 	MUX_VAL(CP(UART2_RX),		(IEN  | PTD | EN  | M4)); /*GPIO_147*/
 
 	/* MMC1 */
-	MUX_VAL(CP(MMC1_CLK),		(IDIS | PTU | EN  | M0));
-	MUX_VAL(CP(MMC1_CMD),		(IEN  | PTU | EN  | M0));
-	MUX_VAL(CP(MMC1_DAT0),		(IEN  | PTU | EN  | M0));
-	MUX_VAL(CP(MMC1_DAT1),		(IEN  | PTU | EN  | M0));
-	MUX_VAL(CP(MMC1_DAT2),		(IEN  | PTU | EN  | M0));
-	MUX_VAL(CP(MMC1_DAT3),		(IEN  | PTU | EN  | M0));
+	MUX_VAL(CP(MMC1_CLK),		(IEN  | PTU | EN  | M0));
+	MUX_VAL(CP(MMC1_CMD),		(IEN  | PTU | DIS  | M0));
+	MUX_VAL(CP(MMC1_DAT0),		(IEN  | PTU | DIS  | M0));
+	MUX_VAL(CP(MMC1_DAT1),		(IEN  | PTU | DIS  | M0));
+	MUX_VAL(CP(MMC1_DAT2),		(IEN  | PTU | DIS  | M0));
+	MUX_VAL(CP(MMC1_DAT3),		(IEN  | PTU | DIS  | M0));
 
 	/* DSS */
 	MUX_VAL(CP(DSS_PCLK),		(IDIS | PTD | DIS | M0));

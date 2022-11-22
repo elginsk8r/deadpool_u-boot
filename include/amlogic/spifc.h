@@ -1,53 +1,40 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * include/amlogic/spifc.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef __SPIFC_H__
 #define __SPIFC_H__
 
-#define SPIFC_DEFAULT_CLK_RATE 166666666
 /*
- * @reg: controller registers address.
+ * @reg: controller registers base address.
  * @mem_map: memory_mapped for read operations.
- * @clk_get(): callback to get spifc clk pointer.
- *   ret: should be "struct clk *"
- *   dev: should be "struct udevice *"
- * @clk_get_rate():
- * @clk_enable():
- * @pinctrl_get(): callback to get spifc pinctrl pointer.
- *   ret: should be "struct pinctrl *"
- *   dev: should be "struct udevice *"
- * @num_chipselect:
- * @cs_gpios:
- */
-
-/*
- * spifc driver will use the default clk81 rate 1666666666
- * if without following platform callbacks.
-	static void* spifc_clk_get(void *dev, char *name)
-	{ return NULL; }
-	static int spifc_clk_get_rate(void *clk)
-	{ return 1666666666; }
-	static int spifc_clk_enable(void *clk, bool enable)
-	{ return 0; }
-	static void* spifc_pinctrl_get(void *dev, char *name)
-	{ return NULL; }
+ * @core: clk source, usually clk_81, 166M max.
+ * @speed: spi bus frequency, and you should know
+ *			we use clk_81 as the clk source now, max
+ *	  		speed is 166M.
+ * @io_num: max io number, SIO0 SIO1 SIO2 SIO3.
+ * @max_cs: the max slave device number, we support
+ * 			spi-nor, spi-nand now.
+ * @cs_gpios: gpio array, we use the cs pin as
+ *            gpio, cause the spifc controller
+ *            can not hold enough time sometimes.
  */
 
 struct spifc_platdata {
 	ulong reg;
 	ulong mem_map;
-	void *(*clk_get)(void *dev, char *name);
-	int (*clk_get_rate)(void *clk);
-	int (*clk_enable)(void *clk, bool enable);
-	void *(*pinctrl_get)(void *dev, char *name);
-	int (*pinctrl_enable)(void *pinctrl, bool enable);
-	int num_chipselect;
-	int *cs_gpios;
+	u32 speed;
+	u32 mode;
+	u32 io_num;
+	u32 max_cs;
 };
+
+/* this is cs pin number, not slave device cs number */
+/* #define SPIFC_MAX_CS	1 */
+#define SPIFC_BUS_NUM	0
+/* slave device cs number */
+#define SPIFC_SNOR_CS	0
+#define SPIFC_SNAND_CS	1
 
 #endif /* __SPIFC_H__ */
