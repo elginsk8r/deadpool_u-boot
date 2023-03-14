@@ -1,14 +1,15 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2014 CompuLab, Ltd. <www.compulab.co.il>
  *
  * Authors: Igor Grinberg <grinberg@compulab.co.il>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _CL_COMMON_
 #define _CL_COMMON_
 
-#include <linux/errno.h>
+#include <asm/errno.h>
 
 void cl_print_pcb_info(void);
 
@@ -22,6 +23,15 @@ static inline int cl_usb_hub_init(int gpio, const char *label)
 }
 static inline void cl_usb_hub_deinit(int gpio) {}
 #endif /* CONFIG_CMD_USB */
+
+#ifdef CONFIG_SPLASH_SCREEN
+int cl_splash_screen_prepare(int nand_offset);
+#else /* !CONFIG_SPLASH_SCREEN */
+static inline int cl_splash_screen_prepare(int nand_offset)
+{
+	return -ENOSYS;
+}
+#endif /* CONFIG_SPLASH_SCREEN */
 
 #ifdef CONFIG_SMC911X
 int cl_omap3_smc911x_init(int id, int cs, u32 base_addr,

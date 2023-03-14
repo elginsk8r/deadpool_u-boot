@@ -4,7 +4,6 @@
 #include <malloc.h>
 #include <linux/types.h>
 #include <linux/err.h>
-#include <linux/kernel.h>
 
 struct unused {};
 typedef struct unused unused_t;
@@ -15,22 +14,7 @@ struct p_current{
 
 extern struct p_current *current;
 
-/* avoid conflict with <dm/device.h> */
-#ifdef dev_dbg
-#undef dev_dbg
-#endif
-#ifdef dev_vdbg
-#undef dev_vdbg
-#endif
-#ifdef dev_info
-#undef dev_info
-#endif
-#ifdef dev_err
-#undef dev_err
-#endif
-#ifdef dev_warn
-#undef dev_warn
-#endif
+#define ndelay(x)	udelay(1)
 
 #define dev_dbg(dev, fmt, args...)		\
 	debug(fmt, ##args)
@@ -40,82 +24,32 @@ extern struct p_current *current;
 	printf(fmt, ##args)
 #define dev_err(dev, fmt, args...)		\
 	printf(fmt, ##args)
-#define dev_warn(dev, fmt, args...)		\
-	printf(fmt, ##args)
+#define printk	printf
+#define printk_once	printf
 
-#define netdev_emerg(dev, fmt, args...)		\
-	printf(fmt, ##args)
-#define netdev_alert(dev, fmt, args...)		\
-	printf(fmt, ##args)
-#define netdev_crit(dev, fmt, args...)		\
-	printf(fmt, ##args)
-#define netdev_err(dev, fmt, args...)		\
-	printf(fmt, ##args)
-#define netdev_warn(dev, fmt, args...)		\
-	printf(fmt, ##args)
-#define netdev_notice(dev, fmt, args...)	\
-	printf(fmt, ##args)
-#define netdev_info(dev, fmt, args...)		\
-	printf(fmt, ##args)
-#define netdev_dbg(dev, fmt, args...)		\
-	debug(fmt, ##args)
-#define netdev_vdbg(dev, fmt, args...)		\
-	debug(fmt, ##args)
-
-#define GFP_ATOMIC ((gfp_t) 0)
-#define GFP_KERNEL ((gfp_t) 0)
-#define GFP_NOFS ((gfp_t) 0)
-#define GFP_USER ((gfp_t) 0)
-#define __GFP_NOWARN ((gfp_t) 0)
-#define __GFP_ZERO	((__force gfp_t)0x8000u)	/* Return zeroed page on success */
+#define KERN_EMERG
+#define KERN_ALERT
+#define KERN_CRIT
+#define KERN_ERR
+#define KERN_WARNING
+#define KERN_NOTICE
+#define KERN_INFO
+#define KERN_DEBUG
 
 void *kmalloc(size_t size, int flags);
-
-static inline void *kzalloc(size_t size, gfp_t flags)
-{
-	return kmalloc(size, flags | __GFP_ZERO);
-}
-
-static inline void *kmalloc_array(size_t n, size_t size, gfp_t flags)
-{
-	if (size != 0 && n > SIZE_MAX / size)
-		return NULL;
-	return kmalloc(n * size, flags | __GFP_ZERO);
-}
-
-static inline void *kcalloc(size_t n, size_t size, gfp_t flags)
-{
-	return kmalloc_array(n, size, flags | __GFP_ZERO);
-}
-
+void *kzalloc(size_t size, int flags);
 #define vmalloc(size)	kmalloc(size, 0)
 #define __vmalloc(size, flags, pgsz)	kmalloc(size, flags)
-static inline void *vzalloc(unsigned long size)
-{
-	return kzalloc(size, 0);
-}
-static inline void kfree(const void *block)
-{
-	free((void *)block);
-}
-static inline void vfree(const void *addr)
-{
-	free((void *)addr);
-}
+#define kfree(ptr)	free(ptr)
+#define vfree(ptr)	free(ptr)
 
 struct kmem_cache { int sz; };
 
 struct kmem_cache *get_mem(int element_sz);
 #define kmem_cache_create(a, sz, c, d, e)	get_mem(sz)
 void *kmem_cache_alloc(struct kmem_cache *obj, int flag);
-static inline void kmem_cache_free(struct kmem_cache *cachep, void *obj)
-{
-	free(obj);
-}
-static inline void kmem_cache_destroy(struct kmem_cache *cachep)
-{
-	free(cachep);
-}
+#define kmem_cache_free(obj, size)	do {free(size); size = NULL; } while (0)
+#define kmem_cache_destroy(obj)		do {free(obj); obj = NULL; } while (0)
 
 #define DECLARE_WAITQUEUE(...)	do { } while (0)
 #define add_wait_queue(...)	do { } while (0)
@@ -123,10 +57,28 @@ static inline void kmem_cache_destroy(struct kmem_cache *cachep)
 
 #define KERNEL_VERSION(a,b,c)	(((a) << 16) + ((b) << 8) + (c))
 
+#ifndef BUG
+#define BUG() do { \
+	printf("U-Boot BUG at %s:%d!\n", __FILE__, __LINE__); \
+} while (0)
+
+#define BUG_ON(condition) do { if (condition) BUG(); } while(0)
+#endif /* BUG */
+
+#define WARN_ON(x) if (x) {printf("WARNING in %s line %d\n" \
+				  , __FILE__, __LINE__); }
+
 #define PAGE_SIZE	4096
 
 /* drivers/char/random.c */
 #define get_random_bytes(...)
+
+/* idr.c */
+#define GFP_ATOMIC ((gfp_t) 0)
+#define GFP_KERNEL ((gfp_t) 0)
+#define GFP_NOFS ((gfp_t) 0)
+#define GFP_USER ((gfp_t) 0)
+#define __GFP_NOWARN ((gfp_t) 0)
 
 /* include/linux/leds.h */
 struct led_trigger {};
@@ -143,6 +95,12 @@ static inline void led_trigger_register_simple(const char *name,
 static inline void led_trigger_unregister_simple(struct led_trigger *trigger) {}
 static inline void led_trigger_event(struct led_trigger *trigger,
 					enum led_brightness event) {}
+
+/* include/linux/log2.h */
+static inline int is_power_of_2(unsigned long n)
+{
+	return (n != 0 && ((n & (n - 1)) == 0));
+}
 
 /* uapi/linux/limits.h */
 #define XATTR_LIST_MAX 65536	/* size of extended attribute namelist (64k) */
@@ -162,6 +120,8 @@ typedef u64 blkcnt_t;
 typedef unsigned long sector_t;
 typedef unsigned long blkcnt_t;
 #endif
+
+#define ENOTSUPP	524	/* Operation is not supported */
 
 /* module */
 #define THIS_MODULE		0
@@ -191,8 +151,6 @@ typedef unsigned long blkcnt_t;
 
 #define class_create(...)		__builtin_return_address(0)
 #define class_create_file(...)		0
-#define class_register(...)		0
-#define class_unregister(...)
 #define class_remove_file(...)
 #define class_destroy(...)
 #define misc_register(...)		0
@@ -205,13 +163,13 @@ typedef unsigned long blkcnt_t;
 
 #define dev_set_name(...)		do { } while (0)
 #define device_register(...)		0
-#define device_unregister(...)
 #define volume_sysfs_init(...)		0
 #define volume_sysfs_close(...)		do { } while (0)
 
 #define init_waitqueue_head(...)	do { } while (0)
 #define wait_event_interruptible(...)	0
 #define wake_up_interruptible(...)	do { } while (0)
+#define print_hex_dump(...)		do { } while (0)
 #define dump_stack(...)			do { } while (0)
 
 #define task_pid_nr(x)			0
@@ -230,6 +188,8 @@ struct work_struct {};
 
 unsigned long copy_from_user(void *dest, const void *src,
 			     unsigned long count);
+
+void *vzalloc(unsigned long size);
 
 typedef unused_t spinlock_t;
 typedef int	wait_queue_head_t;
@@ -302,6 +262,7 @@ typedef struct {
 
 /* from include/linux/types.h */
 
+typedef int	atomic_t;
 /**
  * struct callback_head - callback structure for use with RCU and task_work
  * @next: next update requests in a list
@@ -355,6 +316,8 @@ struct notifier_block {};
 
 typedef unsigned long dmaaddr_t;
 
+#define cpu_relax() do {} while (0)
+
 #define pm_runtime_get_sync(dev) do {} while (0)
 #define pm_runtime_put(dev) do {} while (0)
 #define pm_runtime_put_sync(dev) do {} while (0)
@@ -364,7 +327,6 @@ typedef unsigned long dmaaddr_t;
 
 #define IRQ_NONE 0
 #define IRQ_HANDLED 1
-#define IRQ_WAKE_THREAD 2
 
 #define dev_set_drvdata(dev, data) do {} while (0)
 

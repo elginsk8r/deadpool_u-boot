@@ -1,7 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2008 RuggedCom, Inc.
  * Richard Retanubun <RichardRetanubun@RuggedCom.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -17,18 +18,23 @@
 #ifndef _DISK_PART_EFI_H
 #define _DISK_PART_EFI_H
 
-#include <efi.h>
-
 #define MSDOS_MBR_SIGNATURE 0xAA55
-#define MSDOS_MBR_BOOT_CODE_SIZE 440
 #define EFI_PMBR_OSTYPE_EFI 0xEF
 #define EFI_PMBR_OSTYPE_EFI_GPT 0xEE
 
-#define GPT_HEADER_SIGNATURE_UBOOT 0x5452415020494645ULL
+#define GPT_HEADER_SIGNATURE 0x5452415020494645ULL
 #define GPT_HEADER_REVISION_V1 0x00010000
 #define GPT_PRIMARY_PARTITION_TABLE_LBA 1ULL
-#define GPT_ENTRY_NUMBERS		CONFIG_EFI_PARTITION_ENTRIES_NUMBERS
+#define GPT_ENTRY_NAME "gpt"
+#define GPT_ENTRY_NUMBERS		128
 #define GPT_ENTRY_SIZE			128
+
+#define EFI_GUID(a,b,c,d0,d1,d2,d3,d4,d5,d6,d7) \
+	((efi_guid_t) \
+	{{ (a) & 0xff, ((a) >> 8) & 0xff, ((a) >> 16) & 0xff, ((a) >> 24) & 0xff, \
+		(b) & 0xff, ((b) >> 8) & 0xff, \
+		(c) & 0xff, ((c) >> 8) & 0xff, \
+		(d0), (d1), (d2), (d3), (d4), (d5), (d6), (d7) }})
 
 #define PARTITION_SYSTEM_GUID \
 	EFI_GUID( 0xC12A7328, 0xF81F, 0x11d2, \
@@ -108,6 +114,11 @@
 
 /* linux/include/efi.h */
 typedef u16 efi_char16_t;
+
+typedef struct {
+	u8 b[16];
+} efi_guid_t;
+
 /* based on linux/include/genhd.h */
 struct partition {
 	u8 boot_ind;		/* 0x80 - active */
@@ -139,6 +150,9 @@ typedef struct _gpt_header {
 	__le32 sizeof_partition_entry;
 	__le32 partition_entry_array_crc32;
 } __packed gpt_header;
+int gpt_restore(block_dev_desc_t *dev_desc, char *str_disk_guid,
+		disk_partition_t *partitions, const int parts_count);
+
 
 typedef union _gpt_entry_attributes {
 	struct {
@@ -162,7 +176,7 @@ typedef struct _gpt_entry {
 } __packed gpt_entry;
 
 typedef struct _legacy_mbr {
-	u8 boot_code[MSDOS_MBR_BOOT_CODE_SIZE];
+	u8 boot_code[440];
 	__le32 unique_mbr_signature;
 	__le16 unknown;
 	struct partition partition_record[4];
@@ -171,7 +185,11 @@ typedef struct _legacy_mbr {
 
 #endif	/* _DISK_PART_EFI_H */
 
-int is_gpt_valid(struct blk_desc *dev_desc, u64 lba,
-		gpt_header *pgpt_head, gpt_entry **pgpt_pte);
-int part_test_efi(struct blk_desc *dev_desc);
+int pmbr_part_valid(struct partition *part);
+int is_pmbr_valid(legacy_mbr * mbr);
+int is_gpt_valid(block_dev_desc_t *dev_desc, u64 lba,
+			gpt_header *pgpt_head, gpt_entry **pgpt_pte);
+gpt_entry *alloc_read_gpt_entries(block_dev_desc_t * dev_desc,
+				gpt_header * pgpt_head);
 int is_pte_valid(gpt_entry * pte);
+

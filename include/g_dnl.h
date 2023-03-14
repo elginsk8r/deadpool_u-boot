@@ -1,7 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  *  Copyright (C) 2012 Samsung Electronics
  *  Lukasz Majewski <l.majewski@samsung.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __G_DOWNLOAD_H_
@@ -11,6 +12,13 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/composite.h>
 #include <linker_lists.h>
+
+#define CONFIG_USB_GADGET_VBUS_DRAW 500
+#define CONFIG_USB_FASTBOOT_BUF_SIZE 0xB0000000
+#define CONFIG_USB_FASTBOOT_BUF_ADDR 0x10200000
+#define CONFIG_G_DNL_MANUFACTURER 0123
+#define CONFIG_G_DNL_PRODUCT_NUM 1234
+#define USID_KEY       "usid"
 
 /*
  * @usb_fname: unescaped USB function name
@@ -33,7 +41,6 @@ struct g_dnl_bind_callback {
 };
 
 int g_dnl_bind_fixup(struct usb_device_descriptor *, const char *);
-int g_dnl_get_board_bcd_device_number(int gcnum);
 int g_dnl_board_usb_cable_connected(void);
 int g_dnl_register(const char *s);
 void g_dnl_unregister(void);
@@ -42,7 +49,6 @@ void g_dnl_set_serialnumber(char *);
 bool g_dnl_detach(void);
 void g_dnl_trigger_detach(void);
 void g_dnl_clear_detach(void);
-int run_usb_dnl_gadget(int usbctrl_index, char *usb_dnl_gadget);
-void dwc_otg_power_off_phy_fb(void);
+char * get_usid_string(void);
 
 #endif /* __G_DOWNLOAD_H_ */

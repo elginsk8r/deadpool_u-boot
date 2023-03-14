@@ -1,13 +1,16 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12a/pll.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __PLL_H
 #define __PLL_H
 
 #define PLL_TEST_SYS_TOTAL		8
-#define PLL_TEST_HDMI_TOTAL		3
+#define PLL_TEST_HDMI_TOTAL		4
 
 typedef struct sys_pll_set_s {
 	unsigned int cpu_clk;

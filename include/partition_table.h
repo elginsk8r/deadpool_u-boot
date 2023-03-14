@@ -1,19 +1,21 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/partition_table.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef _PARTITION_TABLE_H
 #define _PARTITION_TABLE_H
 // #ifdef CONFIG_STORE_COMPATIBLE
-#include <emmc_storage.h>
-#include <amlogic/storage.h>
+#include <storage.h>
 // #endif
 //#include <asm/arch/nand.h>
 //#include <asm/arch/poc.h>
 
 
-#define STORE_DBG
+//#define STORE_DBG
 #ifdef STORE_DBG
 #define store_dbg(fmt, ...) printk( "%s: line:%d " fmt "\n", \
 				  __func__, __LINE__, ##__VA_ARGS__)
@@ -49,6 +51,7 @@
 #define SPI_EMMC_FLAG			5
 
 #define _AML_DEVICE_BOOT_FLAG_DEFAULT   (0XFFFFFFFF)
+extern unsigned  device_boot_flag;
 
 #define START_ADDR 			0xd9000200
 #define TABLE_MAGIC_NAME  		"part"
@@ -60,8 +63,11 @@ extern int info_disprotect;
 extern int has_boot_slot;
 extern int has_system_slot;
 extern bool dynamic_partition;
-extern bool vendor_boot_partition;
-extern bool gpt_partition;
+
+#define DISPROTECT_KEY    		1
+#define DISPROTECT_SECURE		1<<1
+#define DISPROTECT_FBBT		1<<2
+#define DISPROTECT_HYNIX		1<<3
 
 extern int get_partition_from_dts(unsigned char * buffer);
 
@@ -73,6 +79,8 @@ extern struct partitions *get_partitions(void);
 extern int get_partition_count(void);
 extern void free_partitions(void);
 /* only nand&emmc for gxb and later soc */
+static inline int is_mainstorage_emmc(void) {return(device_boot_flag == EMMC_BOOT_FLAG);}
+static inline int is_mainstorage_nand(void) {return(device_boot_flag == NAND_BOOT_FLAG);}
 
 #endif// #ifndef _PARTITION_TABLE_H
 

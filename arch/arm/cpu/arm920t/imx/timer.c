@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2002
  * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
@@ -10,6 +9,8 @@
  *
  * (C) Copyright 2002
  * Gary Jennejohn, DENX Software Engineering, <garyj@denx.de>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -36,17 +37,17 @@ int timer_init (void)
 /*
  * timer without interrupts
  */
-static ulong get_timer_masked (void)
-{
-	return TCN1;
-}
-
 ulong get_timer (ulong base)
 {
 	return get_timer_masked() - base;
 }
 
-void __udelay (unsigned long usec)
+ulong get_timer_masked (void)
+{
+	return TCN1;
+}
+
+void udelay_masked (unsigned long usec)
 {
 	ulong endtime = get_timer_masked() + usec;
 	signed long diff;
@@ -55,6 +56,11 @@ void __udelay (unsigned long usec)
 		ulong now = get_timer_masked ();
 		diff = endtime - now;
 	} while (diff >= 0);
+}
+
+void __udelay (unsigned long usec)
+{
+	udelay_masked(usec);
 }
 
 /*
@@ -72,7 +78,11 @@ unsigned long long get_ticks(void)
  */
 ulong get_tbclk (void)
 {
-	return CONFIG_SYS_HZ;
+	ulong tbclk;
+
+	tbclk = CONFIG_SYS_HZ;
+
+	return tbclk;
 }
 
 /*

@@ -1,24 +1,27 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * common/ramdump.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <common.h>
 #include <asm/arch/bl31_apis.h>
+#include <asm/reboot.h>
 #include <asm/arch/secure_apb.h>
 #include <ramdump.h>
 #include <emmc_partitions.h>
+#include <asm/cpu_id.h>
 
 #define DEBUG_RAMDUMP	0
-#define AMLOGIC_KERNEL_PANIC		0x0c
-#define AMLOGIC_WATCHDOG_REBOOT		0x0d
-
 
 unsigned long ramdump_base = 0;
 unsigned long ramdump_size = 0;
 unsigned int get_reboot_mode(void)
 {
 	uint32_t reboot_mode_val = ((readl(AO_SEC_SD_CFG15) >> 12) & 0xf);
+
 	return reboot_mode_val;
 }
 
@@ -89,9 +92,9 @@ static void ramdump_env_setup(unsigned long addr, unsigned long size)
 	 * (initrd_high - 0x010800000)
 	 * dts file size < (fdt_high - initrd_high)
 	 */
-	env_set("initrd_high", "0x04400000");
-	env_set("fdt_high",    "0x04E00000");
-	line = env_get("bootargs");
+	setenv("initrd_high", "0x04400000");
+	setenv("fdt_high",    "0x04E00000");
+	line = getenv("bootargs");
 	if (!line)
 		return;
 
@@ -115,7 +118,7 @@ static void ramdump_env_setup(unsigned long addr, unsigned long size)
 	p1[0] = ' ';
 	sprintf(p1 + 1, "%s=%s ramdump=%lx,%lx",
 		(char *)data, (char *)(data + 6), addr, size);
-	env_set("bootargs", o);
+	setenv("bootargs", o);
 
 #if DEBUG_RAMDUMP
 	run_command("printenv bootargs", 1);
@@ -130,7 +133,7 @@ void check_ramdump(void)
 	char *env;
 	int reboot_mode;
 
-	env = env_get("ramdump_enable");
+	env = getenv("ramdump_enable");
 	if (env) {
 		printf("%s,%s\n", __func__, env);
 		if (!strcmp(env, "1")) {

@@ -1,13 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2017 - Beniamino Galvani <b.galvani@gmail.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
-#include <asm/arch-meson/i2c.h>
+//#include <asm/arch/i2c.h>
 #include <asm/io.h>
-#include <clk.h>
 #include <dm.h>
 #include <i2c.h>
+#include <errno.h>
+#include <amlogic/i2c.h>
+
+#define MESON_I2C_CLK_RATE  166666667
+
+#define BIT(nr)         (1UL << (nr))
+#define GENMASK(h, l) \
+(((~0UL) << (l)) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
 
 #define I2C_TIMEOUT_MS		100
 
@@ -42,14 +50,7 @@ struct i2c_regs {
 	u32 tok_rdata1;
 };
 
-struct meson_i2c_data {
-	u8 delay_ajust;
-	u8 div_factor;
-	u32 clkin_rate;
-};
-
 struct meson_i2c {
-	struct clk clk;
 	struct i2c_regs *regs;
 	struct i2c_msg *msg;	/* Current I2C message */
 	bool last;		/* Whether the message is the last */
@@ -57,7 +58,9 @@ struct meson_i2c {
 	uint pos;		/* Position of current transfer in message */
 	u32 tokens[2];		/* Sequence of tokens to be written */
 	uint num_tokens;	/* Number of tokens to be written */
-	struct meson_i2c_data *data;
+	uint clock_frequency;
+	uint div_factor;
+	uint delay_ajust;
 };
 
 static void meson_i2c_reset_tokens(struct meson_i2c *i2c)
@@ -158,7 +161,8 @@ static void meson_i2c_do_start(struct meson_i2c *i2c, struct i2c_msg *msg)
 	token = (msg->flags & I2C_M_RD) ? TOKEN_SLAVE_ADDR_READ :
 		TOKEN_SLAVE_ADDR_WRITE;
 
-	writel(msg->addr << 1, &i2c->regs->slave_addr);
+	clrsetbits_le32(&i2c->regs->slave_addr, GENMASK(7, 0),
+					(msg->addr << 1) & GENMASK(7, 0));
 	meson_i2c_add_token(i2c, TOKEN_START);
 	meson_i2c_add_token(i2c, token);
 }
@@ -168,7 +172,7 @@ static int meson_i2c_xfer_msg(struct meson_i2c *i2c, struct i2c_msg *msg,
 {
 	ulong start;
 
-	debug("meson i2c: %s addr 0x%x len %u\n",
+	debug("meson i2c: %s addr %x len %u\n",
 	      (msg->flags & I2C_M_RD) ? "read" : "write",
 	      msg->addr, msg->len);
 
@@ -227,27 +231,133 @@ static int meson_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 	return 0;
 }
 
-static int meson_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
+/*
+ * Count = clk/freq  = H + L
+ * Duty  = H/(H + L) = 1/2	-- duty 50%
+ * 1. register desription
+ * in I2C_CONTROL_REG , n = [28:29][21:12], control the high level time
+ *			n consists of 12bit, [21:12] is the low 10bit,
+ *			[28:29] is the bit 11 and 12.
+ * in I2C_SLAVE_ADDRESS, m = [27:16], control the low level time,
+ *			 bit 28 enable the function
+ *
+ * 2.I2C controller internal characteristic
+ * H = n + delay
+ * L = 2m
+ * (H:high clock counts equals n + 15 clocks which
+ *    cost by sampling and filtering
+ *  L:low clock counts equals m multiply by 2)
+ *
+ * 3.high level and low level relationship:
+ * H/L = (n + 15)/2m = 1/1
+ * H+L = 2m + n +15 = Count
+ * Count = 166M/freq = 166M/100k
+ *
+ * =>
+ *
+ * n = Count/2 - delay
+ * m = Count/4
+ *
+ * n equals div_h, m equals div_l below
+ * Standard Mode : 100k
+ */
+static int meson_i2c_set_std_speed(struct udevice *bus, unsigned int speed)
 {
 	struct meson_i2c *i2c = dev_get_priv(bus);
-	unsigned int clk_rate = i2c->data->clkin_rate;
-	unsigned int div;
+	unsigned int clk_rate = MESON_I2C_CLK_RATE;
+	unsigned int div_h, div_l;
+	unsigned int div_temp;
 
-	div = DIV_ROUND_UP(clk_rate, speed * i2c->data->div_factor);
+	div_temp = DIV_ROUND_UP(clk_rate, speed);
+	div_h = DIV_ROUND_UP(div_temp, 2) - i2c->delay_ajust;
+	div_l = DIV_ROUND_UP(div_temp, 4);
 
 	/* clock divider has 12 bits */
-	if (div >= (1 << 12)) {
-		debug("meson i2c: requested bus frequency too low\n");
-		div = (1 << 12) - 1;
+	if (div_h >= (1 << 12)) {
+		debug("requested bus frequency too low\n");
+		div_h = (1 << 12) - 1;
 	}
 
+	if (div_l >= (1 << 12)) {
+		debug("requested bus frequency too low\n");
+		div_l = (1 << 12) - 1;
+	}
+
+	/*control reg:12-21 bits*/
 	clrsetbits_le32(&i2c->regs->ctrl, REG_CTRL_CLKDIV_MASK,
-			(div & GENMASK(9, 0)) << REG_CTRL_CLKDIV_SHIFT);
+			(div_h & GENMASK(9, 0)) << REG_CTRL_CLKDIV_SHIFT);
 
 	clrsetbits_le32(&i2c->regs->ctrl, REG_CTRL_CLKDIVEXT_MASK,
-			(div >> 10) << REG_CTRL_CLKDIVEXT_SHIFT);
+			(div_h >> 10) << REG_CTRL_CLKDIVEXT_SHIFT);
 
-	debug("meson i2c: set clk %u, src %u, div %u\n", speed, clk_rate, div);
+	/* set SCL low delay */
+	clrsetbits_le32(&i2c->regs->slave_addr, GENMASK(27, 16),
+					(div_l << 16) & GENMASK(27, 16));
+
+	/* enable to control SCL low time */
+	clrsetbits_le32(&i2c->regs->slave_addr, BIT(28), BIT(28));
+
+	debug("meson i2c: set clk %u, src %u, div_h %u, div_l %u\n",
+			speed, clk_rate, div_h, div_l);
+
+	return 0;
+}
+
+/*
+ * Duty  = H/(H + L) = 2/5	-- duty 40%%   H/L = 2/3
+ * Refer to meson_i2c_set_std_speed note.
+ * Fast Mode : 400k
+ * High Mode : 3400k
+ */
+static int meson_i2c_set_fast_speed(struct udevice *bus, unsigned int speed)
+{
+	struct meson_i2c *i2c = dev_get_priv(bus);
+	unsigned int clk_rate = MESON_I2C_CLK_RATE;
+	unsigned int div_h, div_l;
+	unsigned int div_temp;
+
+	div_temp = DIV_ROUND_UP(clk_rate * 2, speed * 5);
+	div_h = div_temp - i2c->delay_ajust;
+	div_l = DIV_ROUND_UP(clk_rate * 3, speed * 10);
+
+	/* clock divider has 12 bits */
+	if (div_h >= (1 << 12)) {
+		debug("requested bus frequency too low\n");
+		div_h = (1 << 12) - 1;
+	}
+
+	if (div_l >= (1 << 12)) {
+		debug("requested bus frequency too low\n");
+		div_l = (1 << 12) - 1;
+	}
+
+	/*control reg:12-21 bits*/
+	clrsetbits_le32(&i2c->regs->ctrl, REG_CTRL_CLKDIV_MASK,
+			(div_h & GENMASK(9, 0)) << REG_CTRL_CLKDIV_SHIFT);
+
+	clrsetbits_le32(&i2c->regs->ctrl, REG_CTRL_CLKDIVEXT_MASK,
+			(div_h >> 10) << REG_CTRL_CLKDIVEXT_SHIFT);
+
+
+	/* set SCL low delay */
+	clrsetbits_le32(&i2c->regs->slave_addr, GENMASK(27, 16),
+					(div_l << 16) & GENMASK(27, 16));
+
+	/* enable to control SCL low time */
+	clrsetbits_le32(&i2c->regs->slave_addr, BIT(28), BIT(28));
+
+	debug("meson i2c: set clk %u, src %u, div_h %u, div_l %u\n",
+			speed, clk_rate, div_h, div_l);
+
+	return 0;
+}
+
+static int meson_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
+{
+	if (speed >= 400000)
+		meson_i2c_set_fast_speed(bus, speed);
+	else
+		meson_i2c_set_std_speed(bus, speed);
 
 	return 0;
 }
@@ -255,67 +365,50 @@ static int meson_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
 static int meson_i2c_probe(struct udevice *bus)
 {
 	struct meson_i2c *i2c = dev_get_priv(bus);
+	struct meson_i2c_platdata *plat = dev_get_platdata(bus);
+	unsigned int i;
 
-	i2c->data = (struct meson_i2c_data *)dev_get_driver_data(bus);
+	debug("index = %d, reg = 0x%lx, rate = %d, div = %d, delay = %d ,clock-frequency = %d\n",
+	plat->i2c_index,plat->reg,plat->clock_rate,plat->div_factor,plat->delay_ajust,plat->clock_frequency);
+
+	i2c->regs = (struct i2c_regs *)plat->reg;
+	i2c->div_factor = plat->div_factor;
+	i2c->delay_ajust = plat->delay_ajust;
+	i2c->clock_frequency = plat->clock_frequency;
+	bus->priv = i2c;
+
+	/* init i2c REGs */
+	for (i = 0; i < 8;i++)
+		writel(0, &i2c->regs->ctrl + i);
 
 	clrbits_le32(&i2c->regs->ctrl, REG_CTRL_START);
 
 	return 0;
 }
 
-static int meson_i2c_ofdata_to_platdata(struct udevice *dev)
-{
-	struct meson_i2c *i2c = dev_get_priv(dev);
-
-	i2c->regs = dev_read_addr_ptr(dev);
-
-	return 0;
-}
-
-static const struct meson_i2c_data i2c_meson_meson6_data = {
-	.div_factor = 4,
-	.delay_ajust = 15,
-	.clkin_rate = MESON_I2C_CLK_RATE,
-};
-
-static const struct meson_i2c_data i2c_meson_gx_data = {
-	.div_factor = 4,
-	.delay_ajust = 15,
-	.clkin_rate = MESON_I2C_CLK_RATE,
-};
-
-static const struct meson_i2c_data i2c_meson_data = {
-	.div_factor = 3,
-	.delay_ajust = 15,
-	.clkin_rate = MESON_I2C_CLK_RATE,
-};
-
-static const struct meson_i2c_data i2c_meson_a1_data = {
-	.div_factor = 3,
-	.delay_ajust = 15,
-	.clkin_rate = 64000000,
-};
-
 static const struct dm_i2c_ops meson_i2c_ops = {
 	.xfer          = meson_i2c_xfer,
 	.set_bus_speed = meson_i2c_set_bus_speed,
 };
 
+#ifdef CONFIG_OF_CONTROL
 static const struct udevice_id meson_i2c_ids[] = {
-	{ .compatible = "amlogic,meson6-i2c", .data = (long)&i2c_meson_meson6_data },
-	{ .compatible = "amlogic,meson-gx-i2c", .data = (long)&i2c_meson_gx_data },
-	{ .compatible = "amlogic,meson-gxbb-i2c", .data = (long)&i2c_meson_gx_data },
-	{ .compatible = "amlogic,meson-i2c", .data = (long)&i2c_meson_data },
-	{ .compatible = "amlogic,meson-a1-i2c", .data = (long)&i2c_meson_a1_data },
+	{ .compatible = "amlogic,meson6-i2c" },
+	{ .compatible = "amlogic,meson-gx-i2c" },
+	{ .compatible = "amlogic,meson-gxbb-i2c" },
+	{ .compatible = "amlogic,meson-txlx-i2c" },
 	{ }
 };
+#endif
 
 U_BOOT_DRIVER(i2c_meson) = {
 	.name = "i2c_meson",
 	.id   = UCLASS_I2C,
+#ifdef CONFIG_OF_CONTROL
 	.of_match = meson_i2c_ids,
-	.ofdata_to_platdata = meson_i2c_ofdata_to_platdata,
+#endif
 	.probe = meson_i2c_probe,
 	.priv_auto_alloc_size = sizeof(struct meson_i2c),
 	.ops = &meson_i2c_ops,
+	.per_child_auto_alloc_size = sizeof (struct meson_i2c_slavedata),
 };

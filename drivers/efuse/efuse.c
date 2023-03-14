@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/efuse/efuse.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <config.h>
@@ -8,17 +11,17 @@
 #include <command.h>
 #include <asm/arch/io.h>
 #include <asm/arch/efuse.h>
+#include "efuse_regs.h"
 
 char efuse_buf[EFUSE_BYTES] = {0};
 
 ssize_t efuse_read(char *buf, size_t count, loff_t *ppos)
 {
-	unsigned int pos = *ppos;
+	unsigned pos = *ppos;
 
 	struct efuse_hal_api_arg arg;
 	unsigned int retcnt;
 	int ret;
-
 	arg.cmd = EFUSE_HAL_API_READ;
 	arg.offset = pos;
 	arg.size = count;
@@ -35,9 +38,9 @@ ssize_t efuse_read(char *buf, size_t count, loff_t *ppos)
 
 ssize_t efuse_write(const char *buf, size_t count, loff_t *ppos)
 {
-	unsigned int pos = *ppos;
+	unsigned pos = *ppos;
 
-	if ((pos & 0xffff) >= EFUSE_BYTES)
+	if ((pos&0xffff) >= EFUSE_BYTES)
 		return 0;	/* Past EOF */
 	if (count > EFUSE_BYTES - pos)
 		count = EFUSE_BYTES - pos;
@@ -46,14 +49,12 @@ ssize_t efuse_write(const char *buf, size_t count, loff_t *ppos)
 
 	struct efuse_hal_api_arg arg;
 	unsigned int retcnt;
-
 	arg.cmd = EFUSE_HAL_API_WRITE;
 	arg.offset = pos;
 	arg.size = count;
 	arg.buffer_phy = (unsigned long)buf;
 	arg.retcnt_phy = (unsigned long)&retcnt;
 	int ret;
-
 	ret = meson_trustzone_efuse(&arg);
 	if (ret == 0) {
 		*ppos = retcnt;
@@ -113,7 +114,6 @@ uint32_t efuse_get_max(void)
 {
 	struct efuse_hal_api_arg arg;
 	int ret;
-
 	arg.cmd = EFUSE_HAL_API_USER_MAX;
 
 	ret = meson_trustzone_efuse_get_max(&arg);

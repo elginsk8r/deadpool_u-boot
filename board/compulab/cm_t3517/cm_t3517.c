@@ -1,12 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014 CompuLab, Ltd. <www.compulab.co.il>
  *
  * Authors: Igor Grinberg <grinberg@compulab.co.il>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <environment.h>
 #include <status_led.h>
 #include <net.h>
 #include <netdev.h>
@@ -50,12 +50,12 @@ static struct omap_musb_board_data cm_t3517_musb_board_data = {
 };
 
 static struct musb_hdrc_platform_data cm_t3517_musb_pdata = {
-#if defined(CONFIG_USB_MUSB_HOST)
+#if defined(CONFIG_MUSB_HOST)
 	.mode           = MUSB_HOST,
-#elif defined(CONFIG_USB_MUSB_GADGET)
+#elif defined(CONFIG_MUSB_GADGET)
 	.mode		= MUSB_PERIPHERAL,
 #else
-#error "Please define either CONFIG_USB_MUSB_HOST or CONFIG_USB_MUSB_GADGET"
+#error "Please define either CONFIG_MUSB_HOST or CONFIG_MUSB_GADGET"
 #endif
 	.config         = &cm_t3517_musb_config,
 	.power          = 250,
@@ -74,8 +74,8 @@ static void cm_t3517_musb_init(void)
 			CONF2_REFFREQ_13MHZ | CONF2_SESENDEN |
 			CONF2_VBDTCTEN | CONF2_DATPOL);
 
-	if (!musb_register(&cm_t3517_musb_pdata, &cm_t3517_musb_board_data,
-			   (void *)AM35XX_IPSS_USBOTGSS_BASE))
+	if (musb_register(&cm_t3517_musb_pdata, &cm_t3517_musb_board_data,
+			  (void *)AM35XX_IPSS_USBOTGSS_BASE))
 		printf("Failed initializing AM35x MUSB!\n");
 }
 #else
@@ -89,8 +89,8 @@ int board_init(void)
 	/* boot param addr */
 	gd->bd->bi_boot_params = (OMAP34XX_SDRC_CS0 + 0x100);
 
-#if defined(CONFIG_LED_STATUS) && defined(CONFIG_LED_STATUS_BOOT_ENABLE)
-	status_led_set(CONFIG_LED_STATUS_BOOT, CONFIG_LED_STATUS_ON);
+#if defined(CONFIG_STATUS_LED) && defined(STATUS_LED_BOOT)
+	status_led_set(STATUS_LED_BOOT, STATUS_LED_ON);
 #endif
 
 	cm_t3517_musb_init();
@@ -98,24 +98,15 @@ int board_init(void)
 	return 0;
 }
 
-/*
- * Routine: get_board_rev
- * Description: read system revision
- */
-u32 get_board_rev(void)
-{
-	return cl_eeprom_get_board_rev(CONFIG_SYS_I2C_EEPROM_BUS);
-};
-
 int misc_init_r(void)
 {
 	cl_print_pcb_info();
-	omap_die_id_display();
+	dieid_num_r();
 
 	return 0;
 }
 
-#if defined(CONFIG_MMC)
+#if defined(CONFIG_GENERIC_MMC) && !defined(CONFIG_SPL_BUILD)
 #define SB_T35_CD_GPIO 144
 #define SB_T35_WP_GPIO 59
 
@@ -141,7 +132,7 @@ static int am3517_get_efuse_enetaddr(u8 *enetaddr)
 	enetaddr[4] = (u8)((lsb >> 8)  & 0xff);
 	enetaddr[5] = (u8)(lsb & 0xff);
 
-	return is_valid_ethaddr(enetaddr);
+	return is_valid_ether_addr(enetaddr);
 }
 
 static inline int cm_t3517_init_emac(bd_t *bis)
@@ -168,21 +159,21 @@ static int cm_t3517_handle_mac_address(void)
 	unsigned char enetaddr[6];
 	int ret;
 
-	ret = eth_env_get_enetaddr("ethaddr", enetaddr);
+	ret = eth_getenv_enetaddr("ethaddr", enetaddr);
 	if (ret)
 		return 0;
 
-	ret = cl_eeprom_read_mac_addr(enetaddr, CONFIG_SYS_I2C_EEPROM_BUS);
+	ret = cl_eeprom_read_mac_addr(enetaddr);
 	if (ret) {
 		ret = am3517_get_efuse_enetaddr(enetaddr);
 		if (ret)
 			return ret;
 	}
 
-	if (!is_valid_ethaddr(enetaddr))
+	if (!is_valid_ether_addr(enetaddr))
 		return -1;
 
-	return eth_env_set_enetaddr("ethaddr", enetaddr);
+	return eth_setenv_enetaddr("ethaddr", enetaddr);
 }
 
 #define SB_T35_ETH_RST_GPIO 164

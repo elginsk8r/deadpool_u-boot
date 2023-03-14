@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_common/amlImage_if.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __AMLIMAGE_IF_H__
@@ -113,15 +116,6 @@ int get_item_name(HIMAGE hImg, int itemId, const char** main_type, const char** 
 int get_total_itemnr(HIMAGE hImg);
 
 u64 optimus_img_decoder_get_data_parts_size(HIMAGE hImg, int* hasBootloader);
-
-
-unsigned image_get_crc(HIMAGE hImg);
-
-int optimus_img_item2buf(HIMAGE hImg, const char* main, const char* sub, char* buf, int* bufsz);
-
-int get_subtype_nr(HIMAGE hImg, const char* main_type);
-
-int get_subtype_nm_by_index(HIMAGE hImg, const char* main_type, const char** sub_type, const int itemIndex);
 
 #endif//ifndef __AMLIMAGE_IF_H__
 

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * eco5pk.c - board file for 8D Technology's AM3517 based eco5pk board
  *
@@ -6,6 +5,8 @@
  *
  * Copyright (C) 2011-2012 8D Technologies inc.
  * Copyright (C) 2009 Texas Instruments Incorporated
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <netdev.h>
@@ -16,7 +17,7 @@
 #include <asm/arch/emac_defs.h>
 #include <asm/gpio.h>
 #include <i2c.h>
-#include <u-boot/crc.h>
+#include <crc.h>
 #include <asm/mach-types.h>
 #include "eco5pk.h"
 

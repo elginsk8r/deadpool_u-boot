@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12a/ddr_define.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #define CONFIG_BOARD_ID_MASK				0xFF
@@ -194,10 +197,10 @@
 
 
 /* print ddr training window */
-//#ifndef CONFIG_DDR_FULL_TEST
-//#define CONFIG_DDR_FULL_TEST				0
-//#endif
-//#define DDR_FULL_TEST						(CONFIG_DDR_FULL_TEST<<10)
+#ifndef CONFIG_DDR_FULL_TEST
+#define CONFIG_DDR_FULL_TEST				0
+#endif
+#define DDR_FULL_TEST						(CONFIG_DDR_FULL_TEST<<10)
 
 /* non-sec region scramble function */
 #ifndef CONFIG_DDR_NONSEC_SCRAMBLE
@@ -245,8 +248,6 @@
 #define DDR_FUNC_LPDDR3_SOC_ODT_ONLY_UP						(0<<25)
 #endif
 #define DDR_FUNC_FAST_BOOT_CHECK_CHIP_ID					(1<<30)
-#define DDR_FUNC_CONFIG_DFE_FUNCTION						(1<<29)
-#define DDR_FUNC_CONFIG_DDR_DVFS_FUNCTION					(1<<28)
 #define DDR_FUNC							(DDR_FUNC_D2PLL					| \
 											DDR_FUNC_LP						| \
 											DDR_FUNC_ZQ_PD					| \
@@ -263,7 +264,7 @@
 											DDR_FUNC_LPDDR3_CA_TRAINING_CA1_BIT0| \
 											DDR_FUNC_LPDDR3_CA_TRAINING_CA1_BIT1| \
 											DDR_FUNC_LPDDR3_SOC_ODT_ONLY_UP	| \
-											(0x80000000) 						\
+											(1 << 31) 						\
 											)
 
 

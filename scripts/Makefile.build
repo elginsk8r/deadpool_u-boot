@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-2.0
 # ==========================================================================
 # Building
 # ==========================================================================
@@ -42,9 +41,8 @@ subdir-ccflags-y :=
 
 # Read auto.conf if it exists, otherwise ignore
 # Modified for U-Boot
--include include/config/auto.conf
+-include $(prefix)/include/config/auto.conf
 -include $(prefix)/include/autoconf.mk
-include scripts/Makefile.uncmd_spl
 
 include scripts/Kbuild.include
 
@@ -254,9 +252,8 @@ sub_cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH
 	"$(if $(part-of-module),1,0)" "$(@)";
 recordmcount_source := $(srctree)/scripts/recordmcount.pl
 endif
-cmd_record_mcount =						\
-	if [ "$(findstring $(CC_FLAGS_FTRACE),$(_c_flags))" =	\
-	     "$(CC_FLAGS_FTRACE)" ]; then			\
+cmd_record_mcount = 						\
+	if [ "$(findstring -pg,$(_c_flags))" = "-pg" ]; then	\
 		$(sub_cmd_record_mcount)			\
 	fi;
 endif
@@ -414,17 +411,6 @@ $(call multi_depend, $(multi-used-m), .o, -objs -y)
 
 targets += $(multi-used-y) $(multi-used-m)
 
-
-# Add intermediate targets:
-# When building objects with specific suffix patterns, add intermediate
-# targets that the final targets are derived from.
-intermediate_targets = $(foreach sfx, $(2), \
-				$(patsubst %$(strip $(1)),%$(sfx), \
-					$(filter %$(strip $(1)), $(targets))))
-# %.lex.o <- %.lex.c <- %.l
-# %.tab.o <- %.tab.[ch] <- %.y
-targets += $(call intermediate_targets, .lex.o, .lex.c) \
-	   $(call intermediate_targets, .tab.o, .tab.c .tab.h)
 
 # Descending
 # ---------------------------------------------------------------------------
