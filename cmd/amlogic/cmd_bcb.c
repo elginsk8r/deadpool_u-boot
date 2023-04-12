@@ -44,6 +44,21 @@ struct bootloader_message {
     char reserved[192];
 };
 
+
+static int clear_misc_partition(char *clearbuf, int size)
+{
+    char *partition = "misc";
+
+    memset(clearbuf, 0, size);
+    if (store_write((const char *)partition,
+        0, size, (unsigned char *)clearbuf) < 0) {
+        printf("failed to clear %s.\n", partition);
+        return -1;
+    }
+
+    return 0;
+}
+
 static int do_RunBcbCommand(
     cmd_tbl_t * cmdtp,
     int flag,
@@ -157,6 +172,25 @@ static int do_RunBcbCommand(
         }
         printf("run command:run recovery_from_flash successful.\n");
         return 0;
+    }
+
+    if (!memcmp(command_mark, command, strlen(command_mark))) {
+        printf("%s\n", recovery);
+        if (run_command((char *)recovery, 0) < 0) {
+            printf("run_command for cmd:%s failed.\n", recovery);
+            goto ERR;
+        }
+        printf("run command successful.\n");
+
+        if (clear_misc_partition(clearbuf, sizeof(clearbuf)) < 0) {
+            printf("clear misc partition failed.\n");
+            goto ERR;
+        } else {
+            printf("clear misc partition successful.\n");
+        }
+    } else {
+        printf("command mark(%s) not match %s,don't execute.\n",
+            command_mark, command);
     }
 
     return 0;

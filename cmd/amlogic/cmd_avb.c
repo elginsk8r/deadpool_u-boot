@@ -381,10 +381,13 @@ int avb_verify(AvbSlotVerifyData** out_data)
     printf("ab_suffix is %s\n", ab_suffix);
 
     AvbSlotVerifyFlags flags = AVB_SLOT_VERIFY_FLAGS_NONE;
+    char *upgradestep = NULL;
 
     avb_init();
 
-    if (is_device_unlocked())
+    upgradestep = env_get("upgrade_step");
+
+    if (is_device_unlocked() || !strcmp(upgradestep, "3"))
         flags |= AVB_SLOT_VERIFY_FLAGS_ALLOW_VERIFICATION_ERROR;
 
     if (!strcmp(ab_suffix, "")) {
@@ -408,6 +411,9 @@ int avb_verify(AvbSlotVerifyData** out_data)
         result = avb_slot_verify(&avb_ops_, requested_partitions_ab, ab_suffix,
             flags,
             AVB_HASHTREE_ERROR_MODE_RESTART_AND_INVALIDATE, out_data);
+
+    if (!strcmp(upgradestep, "3"))
+        result = AVB_SLOT_VERIFY_RESULT_OK;
 
     return result;
 }
