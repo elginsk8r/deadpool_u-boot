@@ -1,9 +1,6 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * board/amlogic/g12a_u200_v1/g12a_u200_v1.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include <common.h>
@@ -11,31 +8,24 @@
 #include <errno.h>
 #include <environment.h>
 #include <fdt_support.h>
-#include <libfdt.h>
-#include <asm/cpu_id.h>
+#include <linux/libfdt.h>
+#include <amlogic/cpu_id.h>
 #include <asm/arch/secure_apb.h>
-#ifdef CONFIG_SYS_I2C_AML
-#include <aml_i2c.h>
-#endif
-#ifdef CONFIG_SYS_I2C_MESON
-#include <amlogic/i2c.h>
-#endif
-#ifdef CONFIG_PWM_MESON
-#include <pwm.h>
-#include <amlogic/pwm.h>
-#endif
+#include <asm/arch/pinctrl_init.h>
 #ifdef CONFIG_AML_VPU
-#include <vpu.h>
+#include <amlogic/media/vpu/vpu.h>
 #endif
-#include <vpp.h>
+#ifdef CONFIG_AML_VPP
+#include <amlogic/media/vpp/vpp.h>
+#endif
 #ifdef CONFIG_AML_V2_FACTORY_BURN
 #include <amlogic/aml_v2_burning.h>
 #endif// #ifdef CONFIG_AML_V2_FACTORY_BURN
-#ifdef CONFIG_AML_HDMITX20
-#include <amlogic/hdmi.h>
+#ifdef CONFIG_AML_HDMITX
+#include <amlogic/media/vout/hdmitx.h>
 #endif
 #ifdef CONFIG_AML_LCD
-#include <amlogic/aml_lcd.h>
+#include <amlogic/media/vout/lcd/aml_lcd.h>
 #endif
 #include <asm/arch/eth_setup.h>
 #include <phy.h>
@@ -43,10 +33,7 @@
 #include <linux/sizes.h>
 #include <asm-generic/gpio.h>
 #include <dm.h>
-#ifdef CONFIG_AML_SPIFC
-#include <amlogic/spifc.h>
-#endif
-#include <asm/arch/timer.h>
+#include <asm/armv8/mmu.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -317,6 +304,7 @@ static void board_mmc_register(unsigned port)
 }
 int board_mmc_init(bd_t	*bis)
 {
+#if 0
 #ifdef CONFIG_VLSI_EMULATOR
 	//board_mmc_register(SDIO_PORT_A);
 #else
@@ -325,60 +313,10 @@ int board_mmc_init(bd_t	*bis)
 	board_mmc_register(SDIO_PORT_B);
 	board_mmc_register(SDIO_PORT_C);
 //	board_mmc_register(SDIO_PORT_B1);
+#endif
 	return 0;
 }
 
-#ifdef CONFIG_SYS_I2C_AML
-#if 0
-static void board_i2c_set_pinmux(void){
-	/*********************************************/
-	/*                | I2C_Master_AO        |I2C_Slave            |       */
-	/*********************************************/
-	/*                | I2C_SCK                | I2C_SCK_SLAVE  |      */
-	/* GPIOAO_4  | [AO_PIN_MUX: 6]     | [AO_PIN_MUX: 2]   |     */
-	/*********************************************/
-	/*                | I2C_SDA                 | I2C_SDA_SLAVE  |     */
-	/* GPIOAO_5  | [AO_PIN_MUX: 5]     | [AO_PIN_MUX: 1]   |     */
-	/*********************************************/
-
-	//disable all other pins which share with I2C_SDA_AO & I2C_SCK_AO
-	clrbits_le32(P_AO_RTI_PIN_MUX_REG, ((1<<2)|(1<<24)|(1<<1)|(1<<23)));
-	//enable I2C MASTER AO pins
-	setbits_le32(P_AO_RTI_PIN_MUX_REG,
-	(MESON_I2C_MASTER_AO_GPIOAO_4_BIT | MESON_I2C_MASTER_AO_GPIOAO_5_BIT));
-
-	udelay(10);
-};
-#endif
-struct aml_i2c_platform g_aml_i2c_plat = {
-	.wait_count         = 1000000,
-	.wait_ack_interval  = 5,
-	.wait_read_interval = 5,
-	.wait_xfer_interval = 5,
-	.master_no          = AML_I2C_MASTER_AO,
-	.use_pio            = 0,
-	.master_i2c_speed   = AML_I2C_SPPED_400K,
-	.master_ao_pinmux = {
-		.scl_reg    = (unsigned long)MESON_I2C_MASTER_AO_GPIOAO_4_REG,
-		.scl_bit    = MESON_I2C_MASTER_AO_GPIOAO_4_BIT,
-		.sda_reg    = (unsigned long)MESON_I2C_MASTER_AO_GPIOAO_5_REG,
-		.sda_bit    = MESON_I2C_MASTER_AO_GPIOAO_5_BIT,
-	}
-};
-#if 0
-static void board_i2c_init(void)
-{
-	//set I2C pinmux with PCB board layout
-	board_i2c_set_pinmux();
-
-	//Amlogic I2C controller initialized
-	//note: it must be call before any I2C operation
-	aml_i2c_init();
-
-	udelay(10);
-}
-#endif
-#endif
 #endif
 
 #if defined(CONFIG_BOARD_EARLY_INIT_F)
@@ -388,219 +326,29 @@ int board_early_init_f(void){
 }
 #endif
 
-#ifdef CONFIG_USB_XHCI_AMLOGIC_V2
-#include <asm/arch/usb-v2.h>
-#include <asm/arch/gpio.h>
-#define CONFIG_GXL_USB_U2_PORT_NUM	2
-
-#ifdef CONFIG_USB_XHCI_AMLOGIC_USB3_V2
-#define CONFIG_GXL_USB_U3_PORT_NUM	1
-#else
-#define CONFIG_GXL_USB_U3_PORT_NUM	0
-#endif
-
-static void gpio_set_vbus_power(char is_power_on)
-{
-	int ret;
-
-	ret = gpio_request(CONFIG_USB_GPIO_PWR,
-		CONFIG_USB_GPIO_PWR_NAME);
-	if (ret && ret != -EBUSY) {
-		printf("gpio: requesting pin %u failed\n",
-			CONFIG_USB_GPIO_PWR);
-		return;
-	}
-
-	if (is_power_on) {
-		gpio_direction_output(CONFIG_USB_GPIO_PWR, 1);
-	} else {
-		gpio_direction_output(CONFIG_USB_GPIO_PWR, 0);
-	}
-}
-
-struct amlogic_usb_config g_usb_config_GXL_skt={
-	CONFIG_GXL_XHCI_BASE,
-	USB_ID_MODE_HARDWARE,
-	gpio_set_vbus_power,//gpio_set_vbus_power, //set_vbus_power
-	CONFIG_GXL_USB_PHY2_BASE,
-	CONFIG_GXL_USB_PHY3_BASE,
-	CONFIG_GXL_USB_U2_PORT_NUM,
-	CONFIG_GXL_USB_U3_PORT_NUM,
-	.usb_phy2_pll_base_addr = {
-		CONFIG_USB_PHY_20,
-		CONFIG_USB_PHY_21,
-	}
-};
-
-#endif /*CONFIG_USB_XHCI_AMLOGIC*/
-
-#ifdef CONFIG_AML_HDMITX20
-static void hdmi_tx_set_hdmi_5v(void)
-{
-}
-#endif
-
-/*
- * mtd nand partition table, only care the size!
- * offset will be calculated by nand driver.
- */
-#ifdef CONFIG_AML_MTD
-static struct mtd_partition normal_partition_info[] = {
-#ifdef CONFIG_DISCRETE_BOOTLOADER
-    /* MUST NOT CHANGE this part unless u know what you are doing!
-     * inherent parition for descrete bootloader to store fip
-     * size is determind by TPL_SIZE_PER_COPY*TPL_COPY_NUM
-     * name must be same with TPL_PART_NAME
-     */
-    {
-        .name = "tpl",
-        .offset = 0,
-        .size = 0,
-    },
-#endif
-    {
-        .name = "logo",
-        .offset = 0,
-        .size = 2*SZ_1M,
-    },
-    {
-        .name = "recovery",
-        .offset = 0,
-        .size = 16*SZ_1M,
-    },
-    {
-        .name = "boot",
-        .offset = 0,
-        .size = 15*SZ_1M,
-    },
-    {
-        .name = "system",
-        .offset = 0,
-        .size = 280*SZ_1M,
-    },
-	/* last partition get the rest capacity */
-    {
-        .name = "data",
-        .offset = MTDPART_OFS_APPEND,
-        .size = MTDPART_SIZ_FULL,
-    },
-};
-struct mtd_partition *get_aml_mtd_partition(void)
-{
-	return normal_partition_info;
-}
-int get_aml_partition_count(void)
-{
-	return ARRAY_SIZE(normal_partition_info);
-}
-#endif /* CONFIG_AML_MTD */
-
-#ifdef CONFIG_AML_SPIFC
-/*
- * BOOT_3: NOR_HOLDn:reg0[15:12]=3
- * BOOT_4: NOR_D:reg0[19:16]=3
- * BOOT_5: NOR_Q:reg0[23:20]=3
- * BOOT_6: NOR_C:reg0[27:24]=3
- * BOOT_7: NOR_WPn:reg0[31:28]=3
- * BOOT_14: NOR_CS:reg1[27:24]=3
- */
-#define SPIFC_NUM_CS 1
-static int spifc_cs_gpios[SPIFC_NUM_CS] = {54};
-
-static int spifc_pinctrl_enable(void *pinctrl, bool enable)
-{
-	unsigned int val;
-
-	val = readl(P_PERIPHS_PIN_MUX_0);
-	val &= ~(0xfffff << 12);
-	if (enable)
-		val |= 0x33333 << 12;
-	writel(val, P_PERIPHS_PIN_MUX_0);
-
-	val = readl(P_PERIPHS_PIN_MUX_1);
-	val &= ~(0xf << 24);
-	writel(val, P_PERIPHS_PIN_MUX_1);
-	return 0;
-}
-
-static const struct spifc_platdata spifc_platdata = {
-	.reg = 0xffd14000,
-	.mem_map = 0xf6000000,
-	.pinctrl_enable = spifc_pinctrl_enable,
-	.num_chipselect = SPIFC_NUM_CS,
-	.cs_gpios = spifc_cs_gpios,
-};
-
-U_BOOT_DEVICE(spifc) = {
-	.name = "spifc",
-	.platdata = &spifc_platdata,
-};
-#endif /* CONFIG_AML_SPIFC */
-
 extern void aml_pwm_cal_init(int mode);
-
-#ifdef CONFIG_SYS_I2C_MESON
-static const struct meson_i2c_platdata i2c_data[] = {
-	{ 0, 0xffd1f000, 166666666, 3, 15, 100000 },
-	{ 1, 0xffd1e000, 166666666, 3, 15, 100000 },
-	{ 2, 0xffd1d000, 166666666, 3, 15, 100000 },
-	{ 3, 0xffd1c000, 166666666, 3, 15, 100000 },
-	{ 4, 0xff805000, 166666666, 3, 15, 100000 },
-};
-
-U_BOOT_DEVICES(meson_i2cs) = {
-	{ "i2c_meson", &i2c_data[0] },
-	{ "i2c_meson", &i2c_data[1] },
-	{ "i2c_meson", &i2c_data[2] },
-	{ "i2c_meson", &i2c_data[3] },
-	{ "i2c_meson", &i2c_data[4] },
-};
-
-/*
- *GPIOAO_10//I2C_SDA_AO
- *GPIOAO_11//I2C_SCK_AO
- *pinmux configuration seperated with i2c controller configuration
- * config it when you use
- */
-void set_i2c_ao_pinmux(void)
-{
-	return;
-}
-#endif /*end CONFIG_SYS_I2C_MESON*/
-
-#ifdef CONFIG_PWM_MESON
-static const struct meson_pwm_platdata pwm_data[] = {
-	{ PWM_AB, 0xffd1b000, IS_DOUBLE_CHANNEL, IS_BLINK },
-	{ PWM_CD, 0xffd1a000, IS_DOUBLE_CHANNEL, IS_BLINK },
-	{ PWM_EF, 0xffd19000, IS_DOUBLE_CHANNEL, IS_BLINK },
-	{ PWMAO_AB, 0xff807000, IS_DOUBLE_CHANNEL, IS_BLINK },
-	{ PWMAO_CD, 0xff802000, IS_DOUBLE_CHANNEL, IS_BLINK },
-};
-
-U_BOOT_DEVICES(meson_pwm) = {
-	{ "amlogic,general-pwm", &pwm_data[0] },
-	{ "amlogic,general-pwm", &pwm_data[1] },
-	{ "amlogic,general-pwm", &pwm_data[2] },
-	{ "amlogic,general-pwm", &pwm_data[3] },
-	{ "amlogic,general-pwm", &pwm_data[4] },
-};
-#endif /*end CONFIG_PWM_MESON*/
 
 int board_init(void)
 {
-	sys_led_init();
-    //Please keep CONFIG_AML_V2_FACTORY_BURN at first place of board_init
-    //As NOT NEED other board init If USB BOOT MODE
+	printf("board init\n");
+
+	/*in kernel P_RESET1_LEVEL has been clear,
+	 * uboot need set these bits about usb,
+	 * otherwise the usb has problem.
+	 */
+	*(volatile uint32_t *)P_RESET1_LEVEL |= (3 << 16);
+
+//Please keep CONFIG_AML_V2_FACTORY_BURN at first place of board_init
+//As NOT NEED other board init If USB BOOT MODE
 #ifdef CONFIG_AML_V2_FACTORY_BURN
 	if ((0x1b8ec003 != readl(P_PREG_STICKY_REG2)) && (0x1b8ec004 != readl(P_PREG_STICKY_REG2))) {
-				aml_try_factory_usb_burning(0, gd->bd);
+		aml_try_factory_usb_burning(0, gd->bd);
 	}
 #endif// #ifdef CONFIG_AML_V2_FACTORY_BURN
-#ifdef CONFIG_USB_XHCI_AMLOGIC_V2
-	board_usb_pll_disable(&g_usb_config_GXL_skt);
-	board_usb_init(&g_usb_config_GXL_skt,BOARD_USB_MODE_HOST);
-#endif /*CONFIG_USB_XHCI_AMLOGIC*/
 
+	pinctrl_devices_active(PIN_CONTROLLER_NUM);
+#if 0
+	sys_led_init();
 #if 0
 	aml_pwm_cal_init(0);
 #endif//
@@ -608,10 +356,8 @@ int board_init(void)
 	extern int amlnf_init(unsigned char flag);
 	amlnf_init(0);
 #endif
-#ifdef CONFIG_SYS_I2C_MESON
-	set_i2c_ao_pinmux();
-#endif
 
+#endif
 	return 0;
 }
 
@@ -667,15 +413,16 @@ void aml_config_dtb(void)
 	return;
 }
 
-
 #ifdef CONFIG_BOARD_LATE_INIT
 int board_late_init(void)
 {
-	 TE(__func__);
+	printf("board late init\n");
+	run_command("mmc dev 1", 0);
+#if 0
 		//update env before anyone using it
 		run_command("get_rebootmode; echo reboot_mode=${reboot_mode}; "\
 						"if test ${reboot_mode} = factory_reset; then "\
-						"defenv_reserv;save; fi;", 0);
+						"defenv_reserv aml_dt;setenv upgrade_step 2;save; fi;", 0);
 		run_command("if itest ${upgrade_step} == 1; then "\
 						"defenv_reserv; setenv upgrade_step 2; saveenv; fi;", 0);
 		/*add board late init function here*/
@@ -712,34 +459,38 @@ int board_late_init(void)
 
 		/* load unifykey */
 		run_command("keyunify init 0x1234", 0);
+#endif
+/*open vpu  hdmitx and cvbs driver*/
 #ifdef CONFIG_AML_VPU
 	vpu_probe();
 #endif
+
+#ifdef CONFIG_AML_VPP
 	vpp_init();
-#ifdef CONFIG_AML_HDMITX20
-	hdmi_tx_set_hdmi_5v();
+#endif
+
+#ifdef CONFIG_AML_HDMITX
 	hdmi_tx_init();
 #endif
+
 #ifdef CONFIG_AML_CVBS
 	run_command("cvbs init", 0);
 #endif
+
 #ifdef CONFIG_AML_LCD
 	lcd_probe();
 #endif
 
+#if 0
+	/**/
+	aml_config_dtb();
+#endif
 #ifdef CONFIG_AML_V2_FACTORY_BURN
 	if (0x1b8ec003 == readl(P_PREG_STICKY_REG2))
 		aml_try_factory_usb_burning(1, gd->bd);
-		aml_try_factory_sdcard_burning(0, gd->bd);
+	aml_try_factory_sdcard_burning(0, gd->bd);
 #endif// #ifdef CONFIG_AML_V2_FACTORY_BURN
 
-    if (MESON_CPU_MAJOR_ID_SM1 == get_cpu_id().family_id) {
-		setenv("board_defined_bootup", "bootup_D3");
-	}
-	/**/
-	aml_config_dtb();
-
-	TE(__func__);
 	return 0;
 }
 #endif
@@ -753,7 +504,7 @@ int usb_get_update_result(void)
 	if (upgrade_step == 1)
 	{
 		run_command("defenv", 1);
-		run_command("setenv upgrade_step 2", 1);
+		run_command("env_set upgrade_step 2", 1);
 		run_command("saveenv", 1);
 		return 0;
 	}
@@ -791,14 +542,9 @@ int checkhw(char * name)
 #if defined(CONFIG_SYS_MEM_TOP_HIDE)
 	ddr_size += CONFIG_SYS_MEM_TOP_HIDE;
 #endif
-	char *ddr_mode = getenv("mem_size");
 	if (MESON_CPU_MAJOR_ID_SM1 == cpu_id.family_id) {
 		switch (ddr_size) {
 			case 0x80000000:
-				if (!strcmp(ddr_mode, "1g")) {
-					strcpy(loc_name, "sm1_ac200_1g\0");
-					break;
-				}
 				strcpy(loc_name, "sm1_ac200_2g\0");
 				break;
 			case 0x40000000:
@@ -815,10 +561,6 @@ int checkhw(char * name)
 	else {
 		switch (ddr_size) {
 			case 0x80000000:
-				if (!strcmp(ddr_mode, "1g")) {
-					strcpy(loc_name, "g12a_u200_1g\0");
-					break;
-				}
 				strcpy(loc_name, "g12a_u200_2g\0");
 				break;
 			case 0x40000000:
@@ -833,18 +575,80 @@ int checkhw(char * name)
 		}
 	}
 	strcpy(name, loc_name);
-	setenv("aml_dt", loc_name);
+	env_set("aml_dt", loc_name);
 	return 0;
 }
 #endif
 
-const char * const _env_args_reserve_[] =
-{
-		"aml_dt",
-		"firstboot",
-		"lock",
-		"upgrade_step",
-		"bootloader_version",
-
-		NULL//Keep NULL be last to tell END
+static struct mm_region bd_mem_map[] = {
+	{
+		.virt = 0x0UL,
+		.phys = 0x0UL,
+		.size = 0x80000000UL,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
+			 PTE_BLOCK_INNER_SHARE
+	}, {
+		.virt = 0x80000000UL,
+		.phys = 0x80000000UL,
+		.size = 0x80000000UL,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
+			 PTE_BLOCK_NON_SHARE |
+			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
+	}, {
+		/* List terminator */
+		0,
+	}
 };
+
+struct mm_region *mem_map = bd_mem_map;
+
+int print_cpuinfo(void) {
+	printf("print_cpuinfo\n");
+	return 0;
+}
+
+int mach_cpu_init(void) {
+	printf("mach_cpu_init\n");
+	return 0;
+}
+
+int ft_board_setup(void *blob, bd_t *bd)
+{
+	/* eg: bl31/32 rsv */
+	return 0;
+}
+
+static const struct mtd_partition spinand_partitions[] = {
+	{
+		.name = "logo",
+		.offset = 0,
+		.size = 2 * SZ_1M,
+	},
+	{
+		.name = "boot",
+		.offset = 0,
+		.size = 16 * SZ_1M,
+	},
+	{
+		.name = "dspA",
+		.offset = 0,
+		.size = 16 * SZ_1M,
+	},
+	{
+		.name = "dspB",
+		.offset = 0,
+		.size = 64 * SZ_1M,
+	},
+	/* last partition get the rest capacity */
+	{
+		.name = "data",
+		.offset = MTDPART_OFS_APPEND,
+		.size = MTDPART_SIZ_FULL,
+	}
+};
+
+const struct mtd_partition *get_spinand_partition_table(int *partitions)
+{
+	*partitions = ARRAY_SIZE(spinand_partitions);
+	return spinand_partitions;
+}

@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 1997-2002 ELTEC Elektronik AG
  * Frank Gottschling <fgottschling@eltec.de>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -18,14 +17,6 @@
 #ifndef _VIDEO_FB_H_
 #define _VIDEO_FB_H_
 
-#if defined(CONFIG_SYS_CONSOLE_FG_COL) && defined(CONFIG_SYS_CONSOLE_BG_COL)
-#define CONSOLE_BG_COL            CONFIG_SYS_CONSOLE_BG_COL
-#define CONSOLE_FG_COL            CONFIG_SYS_CONSOLE_FG_COL
-#else
-#define CONSOLE_BG_COL            0x00
-#define CONSOLE_FG_COL            0xa0
-#endif
-
 /*
  * Graphic Data Format (GDF) bits for VIDEO_DATA_FORMAT
  */
@@ -36,7 +27,6 @@
 #define GDF_24BIT_888RGB        4
 #define GDF__8BIT_332RGB        5
 
-#define CANVAS_ALIGNED(x)  (((x) + 63) & ~63)
 /******************************************************************************/
 /* Export Graphic Driver Control                                              */
 /******************************************************************************/
@@ -69,7 +59,6 @@ typedef struct graphic_device {
 /******************************************************************************/
 
 void *video_hw_init (int display_mode);       /* returns GraphicDevice struct or NULL */
-int get_osd_layer(void);
 
 #ifdef VIDEO_HW_BITBLT
 void video_hw_bitblt (
@@ -115,19 +104,5 @@ enum pci_type_e {
 	BMP_PIC,
 	RAW_PIC,
 };
-
-typedef struct {
-	int width;
-	int height;
-	int row_bytes;
-	int pixel_bytes;
-	unsigned char* data;
-} GRSurface;
-
-typedef struct {
-	GRSurface* texture;
-	int char_width;
-	int char_height;
-} GRFont;
 
 #endif /*_VIDEO_FB_H_ */

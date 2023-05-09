@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2011 Free Electrons
  * David Wagner <david.wagner@free-electrons.com>
@@ -5,8 +6,6 @@
  * Inspired from envcrc.c:
  * (C) Copyright 2001
  * Paolo Scaffardi, AIRVENT SAM s.p.a - RIMINI(ITALY), arsenio@tin.it
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <errno.h>
@@ -162,13 +161,13 @@ int main(int argc, char **argv)
 		txt_fd = STDIN_FILENO;
 
 		do {
-			filebuf = realloc(filebuf, readlen);
+			filebuf = realloc(filebuf, filesize + readlen);
 			if (!filebuf) {
 				fprintf(stderr, "Can't realloc memory for the input file buffer\n");
 				return EXIT_FAILURE;
 			}
 			readbytes = read(txt_fd, filebuf + filesize, readlen);
-			if (errno) {
+			if (readbytes < 0) {
 				fprintf(stderr, "Error while reading stdin: %s\n",
 						strerror(errno));
 				return EXIT_FAILURE;
@@ -214,14 +213,10 @@ int main(int argc, char **argv)
 		}
 		ret = close(txt_fd);
 	}
-	/* The +1 is for the additionnal ending \0. See below. */
-	if (filesize + 1 > envsize) {
-		fprintf(stderr, "The input file is larger than the environment partition size\n");
-		return EXIT_FAILURE;
-	}
 
-	/* Replace newlines separating variables with \0 */
-	for (fp = 0, ep = 0 ; fp < filesize ; fp++) {
+	/* Parse a byte at time until reaching the file OR until the environment fills
+	 * up. Check ep against envsize - 1 to allow for extra trailing '\0'. */
+	for (fp = 0, ep = 0 ; fp < filesize && ep < envsize - 1; fp++) {
 		if (filebuf[fp] == '\n') {
 			if (fp == 0 || filebuf[fp-1] == '\n') {
 				/*
@@ -247,6 +242,25 @@ int main(int argc, char **argv)
 			continue;
 		} else {
 			envptr[ep++] = filebuf[fp];
+		}
+	}
+	/* If there are more bytes in the file still, it means the env filled up
+	 * before parsing the whole file.  Eat comments & whitespace here to see if
+	 * there was anything meaning full left in the file, and if so, throw a error
+	 * and exit. */
+	for( ; fp < filesize; fp++ )
+	{
+		if (filebuf[fp] == '\n') {
+			if (fp == 0 || filebuf[fp-1] == '\n') {
+				/* Ignore blank lines */
+				continue;
+			}
+		} else if ((fp == 0 || filebuf[fp-1] == '\n') && filebuf[fp] == '#') {
+			while (++fp < filesize && filebuf[fp] != '\n')
+			continue;
+		} else {
+			fprintf(stderr, "The environment file is too large for the target environment storage\n");
+			return EXIT_FAILURE;
 		}
 	}
 	/*

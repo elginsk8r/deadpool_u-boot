@@ -1,35 +1,25 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/pwm/pwm-meson.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include <common.h>
 #include <dm.h>
 #include <pwm.h>
-#include <amlogic/pwm.h>
+#include <regmap.h>
 #include <linux/err.h>
-#include <asm/io.h>
-#include <dm/device-internal.h>
-#include <dm/uclass-internal.h>
+#include <linux/io.h>
 #include <linux/sizes.h>
+#include <linux/printk.h>
 #include <div64.h>
-#include <amlogic/pwm.h>
+
 #include "pwm-meson.h"
-
-#define pwm_info(fmt, args...) \
-	printf("[info]%s: " fmt, __func__, ## args)
-
-#define pwm_err(fmt, args...) \
-	printf("[error]%s: " fmt, __func__, ## args)
 
 struct meson_pwm_priv{
 	struct meson_pwm_reg *regs;
 	struct meson_pwm_state *pwm_state;
-	bool	is_double_channel;
-	bool	is_blink;
+	struct meson_pwm_data *pwm_data;
+	u32 extern_clk_addr;
 };
 
 static u64 meson_pwm_clock_get_rate(void)
@@ -46,19 +36,19 @@ static int pwm_meson_get_polarity(struct udevice *dev, uint channel)
 	unsigned int tmp, val;
 
 	switch (channel) {
-	case MESON_PWM0:
-	case MESON_PWM2:
-		val = 0x1 << 26;
-		break;
+		case MESON_PWM0:
+		case MESON_PWM2:
+			val = 0x1 << 26;
+			break;
 
-	case MESON_PWM1:
-	case MESON_PWM3:
-		val = 0x1 << 27;
-		break;
+		case MESON_PWM1:
+		case MESON_PWM3:
+			val = 0x1 << 27;
+			break;
 
-	default:
-		pwm_err("Id is invalid\n");
-		return -EINVAL;
+		default:
+			pr_err("Id is invalid\n");
+			return 0;
 	}
 
 	tmp = readl(&regs->miscr);
@@ -80,20 +70,20 @@ static void pwm_constant_enable(struct udevice *dev, uint channel)
 	struct meson_pwm_reg *regs = priv->regs;
 
 	switch (channel) {
-	case MESON_PWM0:
-	case MESON_PWM2:
-		setbits_le32(&regs->miscr, 1 << 28);
-		break;
+		case MESON_PWM0:
+		case MESON_PWM2:
+			setbits_le32(&regs->miscr, 1 << 28);
+			break;
 
-	case MESON_PWM1:
-	case MESON_PWM3:
-		setbits_le32(&regs->miscr, 1 << 29);
-		break;
+		case MESON_PWM1:
+		case MESON_PWM3:
+			setbits_le32(&regs->miscr, 1 << 29);
+			break;
 
-	default:
-		pwm_err("Id is invalid\n");
-		break;
-	}
+		default:
+			pr_err("Id is invalid\n");
+			break;
+		}
 }
 
 static void pwm_constant_disable(struct udevice *dev, uint channel)
@@ -102,20 +92,20 @@ static void pwm_constant_disable(struct udevice *dev, uint channel)
 	struct meson_pwm_reg *regs = priv->regs;
 
 	switch (channel) {
-	case MESON_PWM0:
-	case MESON_PWM2:
-		clrbits_le32(&regs->miscr, 1 << 28);
-		break;
+		case MESON_PWM0:
+		case MESON_PWM2:
+			clrbits_le32(&regs->miscr, 1 << 28);
+			break;
 
-	case MESON_PWM1:
-	case MESON_PWM3:
-		clrbits_le32(&regs->miscr, 1 << 29);
-		break;
+		case MESON_PWM1:
+		case MESON_PWM3:
+			clrbits_le32(&regs->miscr, 1 << 29);
+			break;
 
-	default:
-		pwm_err("Id is invalid\n");
-		break;
-	}
+		default:
+			pr_err("Id is invalid\n");
+			break;
+		}
 }
 
 static void pwm_meson_config(struct udevice *dev, unsigned channel)
@@ -123,24 +113,31 @@ static void pwm_meson_config(struct udevice *dev, unsigned channel)
 	struct meson_pwm_priv *priv = dev_get_priv(dev);
 	struct meson_pwm_reg *regs = priv->regs;
 	struct meson_pwm_state *pwm_state = priv->pwm_state;
+	fdt_addr_t clk_addr = priv->extern_clk_addr;
 
 	switch (channel) {
-	case MESON_PWM0:
-		/*set div and clock enable*/
-		setbits_le32(&regs->miscr, (pwm_state[channel].pre_div << 8 | 1 << 15));
-		/*set duty*/
-		writel((pwm_state[channel].hi << 16 | pwm_state[channel].lo), &regs->dar);
-		break;
+		case MESON_PWM0:
+			/*set div and clock enable*/
+			if (priv->pwm_data->extern_clk)
+				clrsetbits_le32(clk_addr, (0xff << 0) | (3 << 9) ,(pwm_state[channel].pre_div << 0 | 1 << 8));
+			else
+				setbits_le32(&regs->miscr, (pwm_state[channel].pre_div << 8 | 1 << 15));
+			/*set duty*/
+			writel((pwm_state[channel].hi << 16 | pwm_state[channel].lo), &regs->dar);
+			break;
 
-	case MESON_PWM1:
-		/*set div and clock enable*/
-		setbits_le32(&regs->miscr, (pwm_state[channel].pre_div << 16 | 1 << 23));
-		/*set duty*/
-		writel((pwm_state[channel].hi << 16 | pwm_state[channel].lo), &regs->dbr);
-		break;
+		case MESON_PWM1:
+			/*set div and clock enable*/
+			if (priv->pwm_data->extern_clk)
+				clrsetbits_le32(clk_addr, (0xff << 16) | (3 << 25) ,(pwm_state[channel].pre_div << 16 | 1 << 24));
+			else
+				setbits_le32(&regs->miscr, (pwm_state[channel].pre_div << 16 | 1 << 23));
+			/*set duty*/
+			writel((pwm_state[channel].hi << 16 | pwm_state[channel].lo), &regs->dbr);
+			break;
 
-	default:
-		break;
+		default:
+			break;
 	}
 }
 
@@ -151,22 +148,22 @@ static void pwm_meson_config_ext(struct udevice *dev, unsigned channel)
 	struct meson_pwm_state *pwm_state = priv->pwm_state;
 
 	switch (channel) {
-	case MESON_PWM2:
-		/*set div and clock enable*/
-		/*setbits_le32(&regs->miscr, (pwm_state[channel].pre_div << 8 | 1 << 15));*/
-		/*set duty*/
-		writel((pwm_state[channel].hi << 16 | pwm_state[channel].lo), &regs->da2r);
-		break;
+		case MESON_PWM2:
+			/*set div and clock enable*/
+			/*setbits_le32(&regs->miscr, (pwm_state[channel].pre_div << 8 | 1 << 15));*/
+			/*set duty*/
+			writel((pwm_state[channel].hi << 16 | pwm_state[channel].lo), &regs->da2r);
+			break;
 
-	case MESON_PWM3:
-		/*set div and clock enable*/
-		/*setbits_le32(&regs->miscr, (pwm_state[channel].pre_div << 16 | 1 << 23));*/
-		/*set duty*/
-		writel((pwm_state[channel].hi << 16 | pwm_state[channel].lo), &regs->db2r);
-		break;
+		case MESON_PWM3:
+			/*set div and clock enable*/
+			/*setbits_le32(&regs->miscr, (pwm_state[channel].pre_div << 16 | 1 << 23));*/
+			/*set duty*/
+			writel((pwm_state[channel].hi << 16 | pwm_state[channel].lo), &regs->db2r);
+			break;
 
-	default:
-		break;
+		default:
+			break;
 	}
 }
 
@@ -195,7 +192,7 @@ static int meson_pwm_cacl(struct udevice *dev, uint channel, uint period,
 	}
 
 	if (pre_div >= 0x7f) {
-		pwm_err("unable to get period pre_div\n");
+		pr_err("unable to get period pre_div\n");
 		return -EINVAL;
 	}
 
@@ -212,7 +209,7 @@ static int meson_pwm_cacl(struct udevice *dev, uint channel, uint period,
 		duty_cnt = DIV_ROUND_CLOSEST_ULL((u64)duty * 1000,
 					fin_ps * (pre_div + 1));
 		if (duty_cnt > 0xffff) {
-			pwm_err("unable to get duty cycle\n");
+			pr_err("unable to get duty cycle\n");
 			return -EINVAL;
 		}
 
@@ -241,14 +238,14 @@ static int meson_pwm_set_config(struct udevice *dev, uint channel, uint period_n
 	struct meson_pwm_priv *priv = dev_get_priv(dev);
 	struct meson_pwm_state *pwm_state = priv->pwm_state;
 
-	if ((!priv->is_double_channel) && (channel >= MESON_PWM2)) {
-		pwm_err("sub channel is not support\n");
-		return -EINVAL;
+	if ((duty_ns < 0) || (period_ns <= 0)) {
+		pr_err("Not available duty_ns period_ns error\n");
+		return -1;
 	}
 
-	if ((duty_ns > period_ns) || !period_ns) {
-		pwm_err("Not available duty_ns period_ns error\n");
-		return -EINVAL;
+	if (duty_ns > period_ns) {
+		pr_err("Not available duty_ns period_ns error\n");
+		return -1;
 	}
 
 	if (pwm_state[channel].period != period_ns ||
@@ -266,8 +263,7 @@ static int meson_pwm_set_config(struct udevice *dev, uint channel, uint period_n
 			break;
 
 		default:
-			pwm_err("Id is invalid\n");
-			return -EINVAL;
+			break;
 		}
 	}
 
@@ -277,46 +273,98 @@ static int meson_pwm_set_config(struct udevice *dev, uint channel, uint period_n
 	return 0;
 };
 
+static void meson_pwm_meson_enable(struct udevice *dev, unsigned channel)
+{
+	struct meson_pwm_priv *priv = dev_get_priv(dev);
+	struct meson_pwm_reg *regs = priv->regs;
+	struct meson_pwm_state *pwm_state = priv->pwm_state;
+	fdt_addr_t clk_addr = priv->extern_clk_addr;
+	unsigned int val, val_clk, orig;
+
+	switch (channel) {
+		case MESON_PWM0:
+			val = 1 << 0;
+			val_clk = 1 << 8;
+			break;
+		case MESON_PWM1:
+			val = 1 << 1;
+			val_clk = 1 << 24;
+			break;
+		case MESON_PWM2:
+			val = 1 << 25;
+			val_clk = 1 << 8;
+			break;
+		case MESON_PWM3:
+			val = 1 << 24;
+			val_clk = 1 << 24;
+			break;
+		default:
+			pr_err("channel is not legal\n");
+			return;
+	}
+
+	orig = readl(&regs->miscr);
+	orig |= val;
+	writel(orig, &regs->miscr);
+	if (priv->pwm_data->extern_clk) {
+		orig = readl(clk_addr);
+		orig |= val_clk;
+		writel(orig, clk_addr);
+	}
+	pwm_state[channel].enabled = 1;
+}
+
+static void meson_pwm_meson_disable(struct udevice *dev, unsigned channel)
+{
+	struct meson_pwm_priv *priv = dev_get_priv(dev);
+	struct meson_pwm_reg *regs = priv->regs;
+	struct meson_pwm_state *pwm_state = priv->pwm_state;
+	fdt_addr_t clk_addr = priv->extern_clk_addr;
+	unsigned int val, val_clk, orig;
+
+	switch (channel) {
+	case MESON_PWM0:
+		val = 1 << 0;
+		val_clk = 1 << 8;
+		break;
+	case MESON_PWM1:
+		val = 1 << 1;
+		val_clk = 1 << 24;
+		break;
+	case MESON_PWM2:
+		val = 1 << 25;
+		val_clk = 1 << 8;
+		break;
+	case MESON_PWM3:
+		val = 1 << 24;
+		val_clk = 1 << 24;
+		break;
+	default:
+		pr_err("channel is not legal\n");
+		return;
+	}
+
+	orig = readl(&regs->miscr);
+	orig &= ~val;
+	writel(orig, &regs->miscr);
+	if (priv->pwm_data->extern_clk) {
+		orig = readl(clk_addr);
+		orig &= ~val_clk;
+		writel(orig, clk_addr);
+	}
+	pwm_state[channel].enabled = 0;
+}
+
 static int meson_pwm_set_enable(struct udevice *dev, uint channel, bool enable)
 {
 	struct meson_pwm_priv *priv = dev_get_priv(dev);
 	struct meson_pwm_state *pwm_state = priv->pwm_state;
-	struct meson_pwm_reg *regs = priv->regs;
-	unsigned int val, orig;
 
 	if (pwm_state[channel].enabled != enable) {
-
-		if ((!priv->is_double_channel) && (channel >= MESON_PWM2)) {
-			pwm_err("sub channel is not support\n");
-			return -EINVAL;
-		}
-
-		switch (channel) {
-		case MESON_PWM0:
-			val = 1 << 0;
-			break;
-		case MESON_PWM1:
-			val = 1 << 1;
-			break;
-		case MESON_PWM2:
-			val = 1 << 25;
-			break;
-		case MESON_PWM3:
-			val = 1 << 24;
-			break;
-		default:
-			pwm_err("channel is not legal\n");
-			return -EINVAL;
-		}
-
-		orig = readl(&regs->miscr);
 		if (enable)
-			orig |= val;
+			meson_pwm_meson_enable(dev,channel);
 		else
-			orig &= ~val;
-
-		writel(orig, &regs->miscr);
-		pwm_state[channel].enabled = 0;
+			meson_pwm_meson_disable(dev,channel);
 	}
 
 	return 0;
@@ -345,7 +393,7 @@ static int meson_pwm_set_invert(struct udevice *dev, uint channel, bool polarity
 		break;
 
 	default:
-		pwm_err("Id is invalid\n");
+		pr_err("Id is invalid\n");
 		break;
 	}
 #endif
@@ -361,14 +409,9 @@ static int meson_pwm_set_times(struct udevice *dev, uint channel, uint times)
 	struct meson_pwm_priv *priv = dev_get_priv(dev);
 	struct meson_pwm_reg *regs = priv->regs;
 
-	if (!priv->is_double_channel) {
-		pwm_err("times is not support\n");
-		return -EINVAL;
-	}
-
 	if ((times > 256) || (times <= 0)) {
-		pwm_err("Not available times error\n");
-		return -EINVAL;
+		pr_err("Not available times error\n");
+		return -1;
 	}
 
 	switch (channel) {
@@ -393,8 +436,8 @@ static int meson_pwm_set_times(struct udevice *dev, uint channel, uint times)
 		break;
 
 	default:
-		pwm_err("Id is invalid\n");
-		return -EINVAL;
+		pr_err("Id is invalid\n");
+		break;
 	}
 
 	return 0;
@@ -405,14 +448,9 @@ static int meson_pwm_set_blink_times(struct udevice *dev, uint channel, uint tim
 	struct meson_pwm_priv *priv = dev_get_priv(dev);
 	struct meson_pwm_reg *regs = priv->regs;
 
-	if (!priv->is_double_channel || !priv->is_blink) {
-		pwm_err("Blink is not support\n");
-		return -EINVAL;
-	}
-
 	if ((times > 16) || (times <= 0)) {
-		pwm_err("Not available times error\n");
-		return -EINVAL;
+		pr_err("Not available times error\n");
+		return -1;
 	}
 
 	switch (channel) {
@@ -429,8 +467,8 @@ static int meson_pwm_set_blink_times(struct udevice *dev, uint channel, uint tim
 		break;
 
 	default:
-		pwm_err("Id is invalid\n");
-		return -EINVAL;
+		pr_err("Id is invalid\n");
+		break;
 	}
 
 	return 0;
@@ -440,11 +478,6 @@ static int meson_pwm_blink_enable(struct udevice *dev, uint channel, bool enable
 {
 	struct meson_pwm_priv *priv = dev_get_priv(dev);
 	struct meson_pwm_reg *regs = priv->regs;
-
-	if (!priv->is_double_channel || !priv->is_blink) {
-		pwm_err("Blink is not support\n");
-		return -EINVAL;
-	}
 
 	switch (channel) {
 	case MESON_PWM0:
@@ -464,8 +497,8 @@ static int meson_pwm_blink_enable(struct udevice *dev, uint channel, bool enable
 		break;
 
 	default:
-		pwm_err("Id is invalid\n");
-		return -EINVAL;
+		pr_err("Id is invalid\n");
+		break;
 	}
 
 	return 0;
@@ -474,12 +507,24 @@ static int meson_pwm_blink_enable(struct udevice *dev, uint channel, bool enable
 static int meson_pwm_probe(struct udevice *dev)
 {
 	struct meson_pwm_priv *priv = dev_get_priv(dev);
-	struct meson_pwm_platdata *plat = dev_get_platdata(dev);
 
-	priv->regs = (struct meson_pwm_reg *)plat->reg;
+	priv->pwm_data = (struct meson_pwm_data *)dev_get_driver_data(dev);
+	priv->regs = (struct meson_pwm_reg *)dev_read_addr_index(dev, 0);
+	if (priv->regs == (void *)FDT_ADDR_T_NONE) {
+		pr_err("Coun't get pwm base regs addr\n");
+		return -1;
+	}
+
+	/* If you use external clk, get clk regs addr */
+	if (priv->pwm_data->extern_clk) {
+		priv->extern_clk_addr = dev_read_addr_index(dev, 1);
+		if (priv->extern_clk_addr == FDT_ADDR_T_NONE) {
+			pr_err("Coun't get pwm clk regs addr\n");
+			return -1;
+		}
+	}
+
 	priv->pwm_state = (struct meson_pwm_state *)calloc(4, sizeof(struct meson_pwm_state));
-	priv->is_double_channel = plat->is_double_channel;
-	priv->is_blink = plat->is_blink;
 
 	return 0;
 }
@@ -493,6 +538,14 @@ int meson_pwm_remove(struct udevice *dev)
 	return 0;
 }
 
+static const struct meson_pwm_data pwm_meson_g12a_data = {
+	.extern_clk = 0,
+};
+
+static const struct meson_pwm_data pwm_meson_v2_data = {
+	.extern_clk = 1,
+};
+
 static const struct pwm_ops meson_pwm_ops = {
 	.set_config = meson_pwm_set_config,
 	.set_enable = meson_pwm_set_enable,
@@ -502,9 +555,17 @@ static const struct pwm_ops meson_pwm_ops = {
 	.set_blink_enable = meson_pwm_blink_enable,
 };
 
+static const struct udevice_id meson_pwm_ids[] = {
+		{.compatible = "amlogic,g12a-ee-pwm", .data = (long)&pwm_meson_g12a_data},
+		{.compatible = "amlogic,g12a-ao-pwm", .data = (long)&pwm_meson_g12a_data},
+		{.compatible = "amlogic,meson-v2-pwm", .data = (long)&pwm_meson_v2_data},
+		{}
+};
+
 U_BOOT_DRIVER(meson_pwm) = {
-	.name = "amlogic,general-pwm",
+	.name = "meson_pwm",
 	.id = UCLASS_PWM,
+	.of_match = meson_pwm_ids,
 	.ops = &meson_pwm_ops,
 	.probe = meson_pwm_probe,
 	.remove = meson_pwm_remove,

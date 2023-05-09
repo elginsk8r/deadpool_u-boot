@@ -1,9 +1,6 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/usb/gadget/v2_burning/v2_common/optimus_download.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef __OPTIMUS_DOWNLOAD_H__
@@ -57,7 +54,7 @@ int v2_key_read(const char* keyName, u8* keyVal, const unsigned keyValLen, char*
  */
 unsigned v2_key_burn(const char* keyName, const u8* keyVal, const unsigned keyValLen, char* errInfo);
 
-#ifdef CONFIG_AML_MTD   //Assume MTD <==> small memory size
+#if 1//defined(CONFIG_AML_MTD)   //Assume MTD <==> small memory size
 #define DDR_MEM_ADDR_START  ( 0x010<<20 )
 #define OPTIMUS_DOWNLOAD_TRANSFER_BUF_TOTALSZ   (0X20<<20)//32M
 #else
@@ -74,14 +71,12 @@ unsigned v2_key_burn(const char* keyName, const u8* keyVal, const unsigned keyVa
 #define OPTIMUS_SPARSE_IMG_LEFT_DATA_ADDR_LOW   (DDR_MEM_ADDR_START + (2U<<20))//Don't access First 1M address
 #define OPTIMUS_SPARSE_IMG_LEFT_DATA_MAX_SZ    (0X2<<20) //back up address for sparse image, 2M
 
-#define OPTIMUS_GETENV_BUF                      (char*)(OPTIMUS_SPARSE_IMG_LEFT_DATA_ADDR_LOW - CONFIG_ENV_SIZE)
-#define OPTIMUS_ENV_MAXLEN                      (CONFIG_ENV_SIZE / 2)
-
 //[Buffer 2] This 64M buffer is used to cache image data received from USB download,
 //            This Buffer size  should be 64M, other size has pending bugs when sparse image is very large.
 #define OPTIMUS_DOWNLOAD_TRANSFER_BUF_ADDR      (OPTIMUS_SPARSE_IMG_LEFT_DATA_ADDR_LOW + OPTIMUS_SPARSE_IMG_LEFT_DATA_MAX_SZ)
 
 #define OPTIMUS_DOWNLOAD_SLOT_SZ                (64<<10)    //64K
+#define OPTIMUS_LOCAL_UPGRADE_SLOT_SZ           (OPTIMUS_DOWNLOAD_SLOT_SZ * 16) //1M per time for fatload
 #define OPTIMUS_DOWNLOAD_SLOT_SZ_SHIFT_BITS     (16)    //64K
 #define OPTIMUS_DOWNLOAD_SLOT_NUM               (OPTIMUS_DOWNLOAD_TRANSFER_BUF_TOTALSZ/OPTIMUS_DOWNLOAD_SLOT_SZ)
 
@@ -161,6 +156,8 @@ int optimus_update_progress(const unsigned thisBurnSz);
 
 //common internal function
 int optimus_erase_bootloader(const char* extBootDev);
+void optimus_clear_ovd_register(void);
+
 void optimus_reset(const int cfgFlag);
 int optimus_storage_init(int toErase);//init dest burning staorge
 int optimus_storage_exit(void);
@@ -177,6 +174,8 @@ int platform_busy_increase_un_reported_size(const unsigned nBytes);
 #define OPTIMUS_WORK_MODE_SDC_UPDATE      (0xefe7)
 #define OPTIMUS_WORK_MODE_SDC_PRODUCE     (0xefe8)
 #define OPTIMUS_WORK_MODE_SYS_RECOVERY    (0xefe9)
+#define OPTIMUS_WORK_MODE_UDISK_UPDATE    (0xefea)
+#define OPTIMUS_WORK_MODE_UDISK_PRODUCE   (0xefeb)
 int optimus_work_mode_get(void);
 int optimus_work_mode_set(int workmode);
 
@@ -190,7 +189,9 @@ int optimus_work_mode_set(int workmode);
 
 //ENV for auto jump into producing
 #define _ENV_TIME_OUT_TO_AUTO_BURN "identifyWaitTime"
+#ifndef AML_SYS_RECOVERY_PART
 #define AML_SYS_RECOVERY_PART      "aml_sysrecovery"
+#endif// #ifndef AML_SYS_RECOVERY_PART
 
 #if defined(CONFIG_AML_MTD) && (defined(UBIFS_IMG) || defined(CONFIG_CMD_UBIFS))
 #define OPTIMUS_BURN_TARGET_SUPPORT_UBIFS       1
@@ -198,9 +199,10 @@ int optimus_work_mode_set(int workmode);
 #define OPTIMUS_BURN_TARGET_SUPPORT_UBIFS       0
 #endif// #if defined(CONFIG_AML_MTD) && (defined(UBIFS_IMG) || defined(CONFIG_CMD_UBIFS))
 
-//getenv wrapper to avoid coverity tained string error
-//cannot called nested as it shares the same buffer
-const char* getenv_optimus(const char* name);
+#ifndef P_AO_SEC_SD_CFG0
+#define P_AO_SEC_GP_CFG0 	SYSCTRL_SEC_STATUS_REG4
+#define P_PREG_STICKY_REG2	SYSCTRL_SEC_STICKY_REG2
+#endif// #ifndef P_AO_SEC_SD_CFG0
 
 #endif//ifndef __OPTIMUS_DOWNLOAD_H__
 

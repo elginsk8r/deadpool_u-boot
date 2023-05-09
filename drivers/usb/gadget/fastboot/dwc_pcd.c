@@ -1,16 +1,13 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/usb/gadget/fastboot/dwc_pcd.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include "usb_boot.h"
 #include "usb_ch9.h"
 #include "dwc_pcd.h"
 #include "dwc_pcd_irq.h"
-#include "platform.c"
+#include "../platform.h"
 
 gadget_wrapper_t gadget_wrapper;
 
@@ -125,7 +122,7 @@ int f_dwc_core_init()
 
     DBG("\ndwc_otg core init enter!\n");
 
-	f_set_usb_phy_config();
+    set_usb_phy_config(0);
 
     if (0x4F543000 != (dwc_read_reg32(DWC_REG_GSNPSID) & 0xFFFFF000)) {
         ERR("Bad value for SNPSID\n");
@@ -208,6 +205,7 @@ void f_dwc_otg_pullup(int is_on)
     else dwc_modify_reg32(DWC_REG_DCTL,0,2);// disconnect data line
 }
 
+
 int usb_pcd_irq_loop()
 {
 	return f_dwc_pcd_irq();
@@ -230,7 +228,7 @@ int dwc_otg_bind_gadget_driver(struct usb_gadget_driver *driver)
 	return 0;
 }
 
-static inline void usb_ep_set_maxpacket_limit(struct usb_ep *ep,
+static inline void dwcpcd_usb_ep_set_maxpacket_limit(struct usb_ep *ep,
                                               unsigned maxpacket_limit)
 {
 	ep->maxpacket = maxpacket_limit;
@@ -336,8 +334,10 @@ static void dwc_otg_pcd_free_request(struct usb_ep *ep, struct usb_request *req)
 static dwc_otg_pcd_ep_t *get_ep_from_handle(pcd_struct_t *pcd, void *handle)
 {
 	int i;
+	if (pcd->dwc_eps[0].priv == handle)
+		return &pcd->dwc_eps[0];
 
-	for (i = 0; i < 4; i++) {
+	for (i = 1; i < NUM_EP; i++) {
 		if (pcd->dwc_eps[i].priv == handle) {
 			return &pcd->dwc_eps[i];
 		}
@@ -352,6 +352,7 @@ static int ep_queue(struct usb_ep *usb_ep, struct usb_request *usb_req,
 {
 	pcd_struct_t *pcd;
 	struct dwc_otg_pcd_ep *ep = NULL;
+//	int retval = 0;
 
 	if (!usb_req || !usb_req->complete || !usb_req->buf) {
 		printf("bad params\n");
@@ -384,6 +385,12 @@ static int ep_queue(struct usb_ep *usb_ep, struct usb_request *usb_req,
 	ep->req = usb_req;
 
 	pcd_queue(ep->dwc_ep.num, ep->dwc_ep.is_in, usb_req);
+
+	/*deadcode
+	 *
+	if (retval)
+		return -3;
+	 */
 
 	return 0;
 }
@@ -520,7 +527,7 @@ void gadget_add_eps(gadget_wrapper_t *d)
 		 * here?  Before EP type is set?
 		 */
 		ep->maxpacket = 512;
-		usb_ep_set_maxpacket_limit(ep, 512);
+		dwcpcd_usb_ep_set_maxpacket_limit(ep, 512);
 		list_add_tail(&ep->ep_list, &d->gadget.ep_list);
 	}
 
@@ -536,7 +543,7 @@ void gadget_add_eps(gadget_wrapper_t *d)
 		 * here?  Before EP type is set?
 		 */
 		ep->maxpacket = 512;
-		usb_ep_set_maxpacket_limit(ep, 512);
+		dwcpcd_usb_ep_set_maxpacket_limit(ep, 512);
 
 		list_add_tail(&ep->ep_list, &d->gadget.ep_list);
 	}
@@ -545,7 +552,7 @@ void gadget_add_eps(gadget_wrapper_t *d)
 	list_del_init(&d->ep0.ep_list);
 
 	d->ep0.maxpacket = 64;
-	usb_ep_set_maxpacket_limit(&d->ep0, 64);
+	dwcpcd_usb_ep_set_maxpacket_limit(&d->ep0, 64);
 }
 
 static void dwc_otg_pcd_init_ep(pcd_struct_t *pcd, dwc_otg_pcd_ep_t *pcd_ep,
@@ -596,7 +603,6 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 		&& driver->speed != USB_SPEED_HIGH)
 	    || !driver->bind || !driver->disconnect || !driver->setup)
 		return -EINVAL;
-
 	if (dev->driver)
 		return -EBUSY;
 
@@ -621,6 +627,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 	retval = driver->bind(&dev->gadget);
 	if (retval) {
 		dev->driver = 0;
+		printf("target device_add failed, error %d\n", retval);
 		return retval;
 	}
 
@@ -635,6 +642,8 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 
 	if (!driver || driver != dev->driver)
 		return -EINVAL;
+
+	driver->disconnect(&dev->gadget);
 
 	driver->unbind(&dev->gadget);
 
@@ -674,7 +683,7 @@ void dwc_otg_power_off_phy_fb(void)
 
 	if (!sof) {
 		ERR("sof timeout, reset usb phy tuning\n");
-		set_usb_phy21_tuning_fb_reset();
+		set_usb_phy21_tuning_update_reset();
 		mdelay(150);
 	}
 
@@ -682,7 +691,7 @@ void dwc_otg_power_off_phy_fb(void)
 }
 #endif//#if (defined CONFIG_USB_DEVICE_V2)
 
-int usb_gadget_handle_interrupts(void)
+int usb_gadget_handle_interrupts(int index)
 {
 #if (defined CONFIG_USB_DEVICE_V2)
 	unsigned Time_sof = get_timer(0);

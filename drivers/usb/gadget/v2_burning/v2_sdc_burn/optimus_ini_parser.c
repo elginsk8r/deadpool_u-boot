@@ -1,9 +1,6 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_ini_parser.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include "optimus_sdc_burn_i.h"
@@ -227,6 +224,28 @@ int parse_ini_file_2_valid_lines(const char* filePath, char* iniBuf, const unsig
     return lineNum;
 }
 
+int parse_ini_buf_2_valid_lines(char* iniBuf, const unsigned bufSz, char* lines[])
+{
+    const int MaxLines = 1024;//
+    int ret = 0;
+    unsigned lineNum = 0;
+
+    iniBuf[bufSz] = 0;
+
+    //step1:first loop to seprate buffer to lines
+    ret = _optimus_parse_buf_2_lines(iniBuf, bufSz, (const char**)lines, &lineNum, MaxLines);
+    if (ret) {
+            err("Fail to parse buf to lines.ret=%d\n", ret);
+            return 0;
+    }
+
+    //step 2: abandon comment or space lines
+    ret = _optimus_abandon_ini_comment_lines(lines, lineNum);
+
+    return lineNum;
+}
+
+
 int optimus_ini_trans_lines_2_usr_params(const char* const lines[], const unsigned lineNum,
                         int (*pCheckSetUseFul)(const char* setName),
                         int (*pParseCfgVal)(const char* setName, const char* keyName, const char* keyVal))
@@ -371,6 +390,9 @@ int optimus_ini_trans_lines_2_usr_params(const char* const lines[], const unsign
                                                 }
                                         }
                                 }
+                                break;
+
+                        default:
                                 break;
                 }
 

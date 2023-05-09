@@ -1,9 +1,6 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/nand/include/amlnf_dev.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef __AML_NFTL_BLOCK_H
@@ -13,6 +10,7 @@
 #include "hw_ctrl.h"
 #include "amlnf_ctrl.h"
 #include "amlnf_cfg.h"
+
 #include "partition_table.h"
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/cpu_sdio.h>
