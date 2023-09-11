@@ -1,8 +1,12 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_usb_tool/dwc_pcd_irq.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
+/* dwc driver irq header */
 #ifndef __DWC_PCD_IRQ_H__
 #define __DWC_PCD_IRQ_H__
 

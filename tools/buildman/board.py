@@ -1,5 +1,7 @@
-# SPDX-License-Identifier: GPL-2.0+
 # Copyright (c) 2012 The Chromium OS Authors.
+#
+# SPDX-License-Identifier:	GPL-2.0+
+#
 
 import re
 
@@ -90,9 +92,9 @@ class Board:
         self.board_name = board_name
         self.vendor = vendor
         self.soc = soc
-        self.options = options
         self.props = [self.target, self.arch, self.cpu, self.board_name,
-                      self.vendor, self.soc, self.options]
+                      self.vendor, self.soc]
+        self.options = options
         self.build_it = False
 
 
@@ -237,41 +239,30 @@ class Boards:
             terms.append(term)
         return terms
 
-    def SelectBoards(self, args, exclude=[], boards=None):
+    def SelectBoards(self, args, exclude=[]):
         """Mark boards selected based on args
-
-        Normally either boards (an explicit list of boards) or args (a list of
-        terms to match against) is used. It is possible to specify both, in
-        which case they are additive.
-
-        If boards and args are both empty, all boards are selected.
 
         Args:
             args: List of strings specifying boards to include, either named,
                   or by their target, architecture, cpu, vendor or soc. If
                   empty, all boards are selected.
             exclude: List of boards to exclude, regardless of 'args'
-            boards: List of boards to build
 
         Returns:
-            Tuple
-                Dictionary which holds the list of boards which were selected
-                    due to each argument, arranged by argument.
-                List of errors found
+            Dictionary which holds the number of boards which were selected
+            due to each argument, arranged by argument.
         """
         result = {}
-        warnings = []
         terms = self._BuildTerms(args)
 
-        result['all'] = []
+        result['all'] = 0
         for term in terms:
-            result[str(term)] = []
+            result[str(term)] = 0
 
         exclude_list = []
         for expr in exclude:
             exclude_list.append(Expr(expr))
 
-        found = []
         for board in self._boards:
             matching_term = None
             build_it = False
@@ -282,10 +273,6 @@ class Boards:
                         matching_term = str(term)
                         build_it = True
                         break
-            elif boards:
-                if board.target in boards:
-                    build_it = True
-                    found.append(board.target)
             else:
                 build_it = True
 
@@ -298,12 +285,7 @@ class Boards:
             if build_it:
                 board.build_it = True
                 if matching_term:
-                    result[matching_term].append(board.target)
-                result['all'].append(board.target)
+                    result[matching_term] += 1
+                result['all'] += 1
 
-        if boards:
-            remaining = set(boards) - set(found)
-            if remaining:
-                warnings.append('Boards not found: %s\n' % ', '.join(remaining))
-
-        return result, warnings
+        return result

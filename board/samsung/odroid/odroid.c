@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2014 Samsung Electronics
  * Przemyslaw Marczak <p.marczak@samsung.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -11,14 +12,11 @@
 #include <asm/arch/gpio.h>
 #include <asm/gpio.h>
 #include <asm/arch/cpu.h>
-#include <dm.h>
 #include <power/pmic.h>
-#include <power/regulator.h>
 #include <power/max77686_pmic.h>
 #include <errno.h>
-#include <mmc.h>
 #include <usb.h>
-#include <usb/dwc2_udc.h>
+#include <usb/s3c_udc.h>
 #include <samsung/misc.h>
 #include "setup.h"
 
@@ -63,29 +61,27 @@ const char *get_board_type(void)
 #endif
 
 #ifdef CONFIG_SET_DFU_ALT_INFO
-char *get_dfu_alt_system(char *interface, char *devstr)
+char *get_dfu_alt_system(void)
 {
-	return env_get("dfu_alt_system");
+	return getenv("dfu_alt_system");
 }
 
-char *get_dfu_alt_boot(char *interface, char *devstr)
+char *get_dfu_alt_boot(void)
 {
-	struct mmc *mmc;
 	char *alt_boot;
-	int dev_num;
 
-	dev_num = simple_strtoul(devstr, NULL, 10);
-
-	mmc = find_mmc_device(dev_num);
-	if (!mmc)
-		return NULL;
-
-	if (mmc_init(mmc))
-		return NULL;
-
-	alt_boot = IS_SD(mmc) ? CONFIG_DFU_ALT_BOOT_SD :
-				CONFIG_DFU_ALT_BOOT_EMMC;
-
+	switch (get_boot_mode()) {
+	case BOOT_MODE_SD:
+		alt_boot = CONFIG_DFU_ALT_BOOT_SD;
+		break;
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_EMMC_SD:
+		alt_boot = CONFIG_DFU_ALT_BOOT_EMMC;
+		break;
+	default:
+		alt_boot = NULL;
+		break;
+	}
 	return alt_boot;
 }
 #endif
@@ -252,12 +248,12 @@ static void board_clock_init(void)
 	 * MOUTc2c = 800 Mhz
 	 * MOUTpwi = 108 MHz
 	 *
-	 * sclk_g2d_acp = MOUTg2d / (ratio + 1) = 200 (3)
+	 * sclk_g2d_acp = MOUTg2d / (ratio + 1) = 400 (1)
 	 * sclk_c2c = MOUTc2c / (ratio + 1) = 400 (1)
 	 * aclk_c2c = sclk_c2c / (ratio + 1) = 200 (1)
 	 * sclk_pwi = MOUTpwi / (ratio + 1) = 18 (5)
 	 */
-	set = G2D_ACP_RATIO(3) | C2C_RATIO(1) | PWI_RATIO(5) |
+	set = G2D_ACP_RATIO(1) | C2C_RATIO(1) | PWI_RATIO(5) |
 	      C2C_ACLK_RATIO(1) | DVSEM_RATIO(1) | DPM_RATIO(1);
 
 	clrsetbits_le32(&clk->div_dmc1, clr, set);
@@ -404,6 +400,30 @@ static void board_gpio_init(void)
 #endif
 }
 
+static int pmic_init_max77686(void)
+{
+	struct pmic *p = pmic_get("MAX77686_PMIC");
+
+	if (pmic_probe(p))
+		return -ENODEV;
+
+	/* Set LDO Voltage */
+	max77686_set_ldo_voltage(p, 20, 1800000);	/* LDO20 eMMC */
+	max77686_set_ldo_voltage(p, 21, 2800000);	/* LDO21 SD */
+	max77686_set_ldo_voltage(p, 22, 2800000);	/* LDO22 eMMC */
+
+	return 0;
+}
+
+#ifdef CONFIG_SYS_I2C_INIT_BOARD
+static void board_init_i2c(void)
+{
+	/* I2C_0 */
+	if (exynos_pinmux_config(PERIPH_ID_I2C0, PINMUX_FLAG_NONE))
+		debug("I2C%d not configured\n", (I2C_0));
+}
+#endif
+
 int exynos_early_init_f(void)
 {
 	board_clock_init();
@@ -413,6 +433,10 @@ int exynos_early_init_f(void)
 
 int exynos_init(void)
 {
+	/* The last MB of memory is reserved for secure firmware */
+	gd->ram_size -= SZ_1M;
+	gd->bd->bi_dram[CONFIG_NR_DRAM_BANKS - 1].size -= SZ_1M;
+
 	board_gpio_init();
 
 	return 0;
@@ -420,15 +444,11 @@ int exynos_init(void)
 
 int exynos_power_init(void)
 {
-	const char *mmc_regulators[] = {
-		"VDDQ_EMMC_1.8V",
-		"VDDQ_EMMC_2.8V",
-		"TFLASH_2.8V",
-		NULL,
-	};
-
-	if (regulator_list_autoset(mmc_regulators, NULL, true))
-		pr_err("Unable to init all mmc regulators\n");
+#ifdef CONFIG_SYS_I2C_INIT_BOARD
+	board_init_i2c();
+#endif
+	pmic_init(I2C_0);
+	pmic_init_max77686();
 
 	return 0;
 }
@@ -436,22 +456,22 @@ int exynos_power_init(void)
 #ifdef CONFIG_USB_GADGET
 static int s5pc210_phy_control(int on)
 {
-	struct udevice *dev;
-	int ret;
+	struct pmic *p_pmic;
 
-	ret = regulator_get_by_platname("VDD_UOTG_3.0V", &dev);
-	if (ret) {
-		pr_err("Regulator get error: %d\n", ret);
-		return ret;
-	}
+	p_pmic = pmic_get("MAX77686_PMIC");
+	if (!p_pmic)
+		return -ENODEV;
+
+	if (pmic_probe(p_pmic))
+		return -1;
 
 	if (on)
-		return regulator_set_mode(dev, OPMODE_ON);
+		return max77686_set_ldo_mode(p_pmic, 12, OPMODE_ON);
 	else
-		return regulator_set_mode(dev, OPMODE_LPM);
+		return max77686_set_ldo_mode(p_pmic, 12, OPMODE_LPM);
 }
 
-struct dwc2_plat_otg_data s5pc210_otg_data = {
+struct s3c_plat_otg_data s5pc210_otg_data = {
 	.phy_control	= s5pc210_phy_control,
 	.regs_phy	= EXYNOS4X12_USBPHY_BASE,
 	.regs_otg	= EXYNOS4X12_USBOTG_BASE,
@@ -465,8 +485,7 @@ struct dwc2_plat_otg_data s5pc210_otg_data = {
 int board_usb_init(int index, enum usb_init_type init)
 {
 #ifdef CONFIG_CMD_USB
-	struct udevice *dev;
-	int ret;
+	struct pmic *p_pmic;
 
 	/* Set Ref freq 0 => 24MHz, 1 => 26MHz*/
 	/* Odroid Us have it at 24MHz, Odroid Xs at 26MHz */
@@ -484,31 +503,23 @@ int board_usb_init(int index, enum usb_init_type init)
 	/* Power off and on BUCK8 for LAN9730 */
 	debug("LAN9730 - Turning power buck 8 OFF and ON.\n");
 
-	ret = regulator_get_by_platname("VCC_P3V3_2.85V", &dev);
-	if (ret) {
-		pr_err("Regulator get error: %d\n", ret);
-		return ret;
+	p_pmic = pmic_get("MAX77686_PMIC");
+	if (p_pmic && !pmic_probe(p_pmic)) {
+		max77686_set_buck_voltage(p_pmic, 8, 750000);
+		max77686_set_buck_voltage(p_pmic, 8, 3300000);
 	}
 
-	ret = regulator_set_enable(dev, true);
-	if (ret) {
-		pr_err("Regulator %s enable setting error: %d\n", dev->name, ret);
-		return ret;
-	}
-
-	ret = regulator_set_value(dev, 750000);
-	if (ret) {
-		pr_err("Regulator %s value setting error: %d\n", dev->name, ret);
-		return ret;
-	}
-
-	ret = regulator_set_value(dev, 3300000);
-	if (ret) {
-		pr_err("Regulator %s value setting error: %d\n", dev->name, ret);
-		return ret;
-	}
 #endif
+
 	debug("USB_udc_probe\n");
-	return dwc2_udc_probe(&s5pc210_otg_data);
+	return s3c_udc_probe(&s5pc210_otg_data);
 }
 #endif
+
+void reset_misc(void)
+{
+	/* Reset eMMC*/
+	gpio_set_value(EXYNOS4X12_GPIO_K12, 0);
+	mdelay(10);
+	gpio_set_value(EXYNOS4X12_GPIO_K12, 1);
+}

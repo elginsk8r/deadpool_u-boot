@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014
  * DENX Software Engineering
@@ -15,6 +14,8 @@
  *		some functions added to address abstraction
  *
  * All rights reserved.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include "imagetool.h"
@@ -26,11 +27,7 @@
 int fit_verify_header(unsigned char *ptr, int image_size,
 			struct image_tool_params *params)
 {
-	if (fdt_check_header(ptr) != EXIT_SUCCESS ||
-	    fit_check_format(ptr, IMAGE_SIZE_INVAL))
-		return EXIT_FAILURE;
-
-	return EXIT_SUCCESS;
+	return fdt_check_header(ptr);
 }
 
 int fit_check_image_types(uint8_t type)

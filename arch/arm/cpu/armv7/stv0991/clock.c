@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2014, STMicroelectronics - All Rights Reserved
- * Author(s): Vikas Manocha, <vikas.manocha@st.com> for STMicroelectronics.
+ * (C) Copyright 2014
+ * Vikas Manocha, ST Micoelectronics, vikas.manocha@st.com.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/io.h>
@@ -32,9 +33,7 @@ void clock_setup(int peripheral)
 		/* Clock selection for ethernet tx_clk & rx_clk*/
 		writel((readl(&stv0991_cgu_regs->eth_ctrl) & ETH_CLK_MASK)
 				| ETH_CLK_CTRL, &stv0991_cgu_regs->eth_ctrl);
-		break;
-	case QSPI_CLOCK_CFG:
-		writel(QSPI_CLK_CTRL, &stv0991_cgu_regs->qspi_freq);
+
 		break;
 	default:
 		break;

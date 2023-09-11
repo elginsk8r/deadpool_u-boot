@@ -7,6 +7,7 @@
 #include <common.h>
 #include <dm.h>
 #include <pwm.h>
+#include <asm/errno.h>
 
 int pwm_set_invert(struct udevice *dev, uint channel, bool polarity)
 {

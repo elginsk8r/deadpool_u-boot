@@ -61,6 +61,7 @@
 #define EEPROM_SIZE 0xb /*12 16-bit chunks, or 24 bytes*/
 
 #define DSIZE		0x00000FFF
+#define ETH_ALEN	6
 #define CRC_SIZE	4
 #define TOUT_LOOP	500000
 #define TX_BUF_SIZE	1536
@@ -840,8 +841,7 @@ natsemi_poll(struct eth_device *dev)
 		     rx_status);
 		retstat = 0;
 	} else {		/* give packet to higher level routine */
-		net_process_received_packet((rxb + cur_rx * RX_BUF_SIZE),
-					    length);
+		NetReceive((rxb + cur_rx * RX_BUF_SIZE), length);
 		retstat = 1;
 	}
 

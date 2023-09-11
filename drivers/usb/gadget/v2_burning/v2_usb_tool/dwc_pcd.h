@@ -1,12 +1,17 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_usb_tool/dwc_pcd.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
+
+/* dwc controller pcd drivers header */
 
 #ifndef __DWC_PCD_H__
 #define __DWC_PCD_H__
 
-#if defined(CONFIG_AML_USB_BURN_FULL_SPEED)
+#if CONFIG_AML_USB_BURN_FULL_SPPED
 #define USE_FULL_SPEED
 #endif// #if CONFIG_AML_USB_BURN_FULL_SPPED
 
@@ -159,7 +164,6 @@ typedef struct pcd_struct_s{
         uint32_t	d32[2];
     }setup_pkt;
 	 int ep0state;
-	 int ep0last_state;
 
 	 /* for USB_REQ_GET_STATUS */
 	 unsigned status;

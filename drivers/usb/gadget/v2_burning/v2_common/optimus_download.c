@@ -1,16 +1,25 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_common/optimus_download.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../v2_burning_i.h"
-#include <linux/libfdt.h>
+#include <libfdt.h>
 #include <partition_table.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/bl31_apis.h>
 #include <asm/io.h>
 #include <asm/arch/mailbox.h>
-#include <asm/arch/cpu_config.h>
+
+#define ROM_BOOT_SKIP_BOOT_ENABLED_4_USB      1//skip boot to usb supported by romboot
+#ifdef SCPI_CMD_SDCARD_BOOT
+#define ROM_BOOT_SKIP_BOOT_ENABLED_4_SDC      1//skip boot sdcard supported by romboot
+#else
+#define ROM_BOOT_SKIP_BOOT_ENABLED_4_SDC      0
+#endif//#ifdef SCPI_CMD_SDCARD_BOOT
 
 extern unsigned int get_multi_dt_entry(unsigned long fdt_addr);
 int is_optimus_storage_inited(void);
@@ -35,142 +44,6 @@ int v2_key_command(const int argc, char * const argv[], char *info)
     return OPT_DOWN_FAIL;
 }
 #endif//#ifndef CONFIG_UNIFY_KEY_MANAGE
-#ifndef CONFIG_USB_BURNING_TOOL
-#define platform_busy_increase_un_reported_size(sz)
-#endif// #ifndef CONFIG_USB_BURNING_TOOL
-
-#if 1//storage wrapper
-#define FBS_ERR(a, fmt...) DWN_ERR(fmt)
-#define FBS_EXIT(a, fmt...) do {DWN_ERR(fmt); return -__LINE__;} while(0)
-#define FB_ERR  DWN_ERR
-#define FB_MSG  DWN_MSG
-static int is_bootloader_discrte(bool* discreteMode)
-{
-    struct storage_info_t storeInfo;
-    if (store_get_device_info(&storeInfo)) {
-        FB_ERR("Fail get store dev info\n");
-        return __LINE__;
-    }
-    *discreteMode = (DISCRETE_BOOTLOADER == storeInfo.mode);
-    return 0;
-}
-
-static int bootloader_copy_sz(void)
-{
-    bool discreteMode = false;
-    if (is_bootloader_discrte(&discreteMode)) {
-        return 0;
-    }
-    if (discreteMode) {
-        return BL2_SIZE/*store_boot_copy_size("bl2")*/ + store_boot_copy_size("tpl");
-    } else {
-        return store_boot_copy_size("bootloader");
-    }
-
-    return 0;
-}
-
-static int _bootloader_write(u8* dataBuf, unsigned off, unsigned binSz, const char* bootName)
-{
-    int iCopy = 0;
-    const int bootCpyNum = store_boot_copy_num(bootName);
-    const int bootCpySz  = (int)store_boot_copy_size(bootName);
-    FB_MSG("[%s] CpyNum %d, bootCpySz 0x%x\n", bootName, bootCpyNum, bootCpySz);
-    if (binSz + off > bootCpySz) FBS_EXIT(_ACK, "bootloader sz(0x%x) + off(0x%x) > bootCpySz 0x%x\n", binSz, off, bootCpySz);
-
-    if (off) {
-        FBS_ERR(_ACK, "current only 0 suuported!\n");
-        return -__LINE__;
-    }
-
-    for (; iCopy < bootCpyNum; ++iCopy) {
-        int ret = store_boot_write(bootName, iCopy, binSz, dataBuf);
-        if (ret) FBS_EXIT(_ACK, "FAil in program[%s] at copy[%d]\n", bootName, iCopy);
-    }
-
-    return 0;
-}
-
-static int _discrete_bootloader_write(u8* dataBuf, unsigned off, unsigned binSz)
-{
-    int bl2CopySz  = BL2_SIZE/*(int)store_boot_copy_size("bl2")*/;
-    FB_MSG("bl2CopySz 0x%x, binSz 0x%x\n", bl2CopySz, binSz);
-
-    int ret = _bootloader_write(dataBuf, 0, bl2CopySz, "bl2");
-    if (ret) FBS_EXIT(_ACK, "Fail in program bl2\n");
-    if (binSz <= bl2CopySz) return 0;
-
-    ret = _bootloader_write(dataBuf + bl2CopySz, 0, binSz - bl2CopySz, "tpl");
-    if (ret) FBS_EXIT(_ACK, "Fail in burn tpl\n");
-    return 0;
-}
-
-static int bootloader_write(u8* dataBuf, unsigned off, unsigned binSz)
-{
-    bool discreteMode = false;
-    if (is_bootloader_discrte(&discreteMode)) {
-        return -__LINE__;
-    }
-    if (!discreteMode) {
-        return _bootloader_write(dataBuf, off, binSz, "bootloader");
-    } else {
-        return _discrete_bootloader_write(dataBuf, off, binSz);
-    }
-    return -__LINE__;
-}
-
-static int _bootloader_read(u8* pBuf, unsigned off, unsigned binSz, const char* bootName)
-{
-    int iCopy = 0;
-    const int bootCpyNum = store_boot_copy_num(bootName);
-    const int bootCpySz  = (int)store_boot_copy_size(bootName);
-
-    if (binSz + off > bootCpySz) {
-        FBS_ERR(_ACK, "bootloader sz(0x%x) + off(0x%x) > bootCpySz 0x%x\n", binSz, off, bootCpySz);
-        return -__LINE__;
-    }
-    if (off) FBS_EXIT(_ACK, "current only 0 suuported!\n");
-
-    for (iCopy = 0; iCopy < bootCpyNum; ++iCopy) {
-        void* dataBuf = iCopy ? pBuf + binSz : pBuf;
-        int ret = store_boot_read(bootName, iCopy, binSz, dataBuf);
-        if (ret) FBS_EXIT("Fail to read boot[%s] at copy[%d]\n", bootName, iCopy);
-        if (iCopy) {
-            if (memcmp(pBuf, dataBuf, binSz))
-                FBS_EXIT(_ACK, "[%s] copy[%d] content NOT the same as copy[0]\n", bootName, iCopy);
-        }
-    }
-
-    return 0;
-}
-
-static int _discrete_bootloader_read(u8* dataBuf, unsigned off, unsigned binSz)
-{
-    int bl2CopySz  = BL2_SIZE/*(int)store_boot_copy_size("bl2")*/;
-    FB_MSG("bl2CopySz 0x%x, binSz 0x%x\n", bl2CopySz, binSz);
-
-    int ret = _bootloader_read(dataBuf, 0, bl2CopySz, "bl2");
-    if (ret) FBS_EXIT(_ACK, "Fail in program bl2\n");
-    if (binSz <= bl2CopySz) return 0;
-
-    ret = _bootloader_read(dataBuf + bl2CopySz, 0, binSz - bl2CopySz, "tpl");
-    if (ret) FBS_EXIT(_ACK, "Fail in burn tpl\n");
-    return 0;
-}
-
-static int bootloader_read(u8* pBuf, unsigned off, unsigned binSz)
-{
-    bool discreteMode = false;
-    if (is_bootloader_discrte(&discreteMode)) {
-        return -__LINE__;
-    }
-
-    if (discreteMode)
-        return _discrete_bootloader_read(pBuf, off, binSz);
-
-    return _bootloader_read(pBuf, off, binSz, "bootloader");
-}
-#endif// #if 1//storage wrapper
 
 static unsigned long _dtb_is_loaded = 0;
 
@@ -219,7 +92,7 @@ struct ImgBurnInfo{
 };
 
 static struct ImgBurnInfo OptimusImgBurnInfo = {0};
-static const char*   _usbDownPartImgType = "";
+extern const char*   _usbDownPartImgType ;
 
 struct imgBurnInfo_sparse{
 
@@ -236,48 +109,50 @@ struct imgBurnInfo_bootloader{
 
 COMPILE_TIME_ASSERT(IMG_BURN_INFO_SZ == sizeof(struct ImgBurnInfo));
 
-#if CONFIG_AML_STORAGE
+#if defined(CONFIG_STORE_COMPATIBLE)
+#if defined(CONFIG_AML_MTD)
+#define _assert_logic_partition_cap(thePartName, nandPartCap) 0
+#else
 //asset logical partition size >= CFG size in storage.c
 //nand often make mistake this size, emmc should always ok
 static int _assert_logic_partition_cap(const char* thePartName, const uint64_t nandPartCap)
 {
-    extern struct partitions * part_table;
+        extern struct partitions * part_table;
 
-    int partIndex                   = 0;
-    struct partitions * thePart     = NULL;
-    if (NULL == part_table) return 0;
-    if (!strcmp("1", thePartName)) return 0;
+        int partIndex                   = 0;
+        struct partitions * thePart     = NULL;
+		if (NULL == part_table)
+            return 0;
+        if (!strcmp("1", thePartName)) return 0;
+        for (thePart = part_table; partIndex < 32; ++thePart, ++partIndex)
+        {
+                const uint64_t partSzInBytes = thePart->size;
+                if (memcmp(thePartName, thePart->name, strlen(thePartName))) continue;
 
-    for (thePart = part_table; partIndex < 36; ++thePart, ++partIndex)
-    {
-        if (memcmp(thePartName, thePart->name, strnlen(thePartName, MAX_PART_NAME_LEN))) continue;
+                DWN_DBG("cfg partSzInBytes %llx for part(%s)\n", partSzInBytes, thePartName);
+                if (NAND_PART_SIZE_FULL == partSzInBytes) {return 0;}
+                if (partSzInBytes > nandPartCap) {
+                        DWN_ERR("partSz of logic part(%s): sz dts %llx > Sz flash %llx\n",
+                                        thePartName, partSzInBytes, nandPartCap);
+                        return __LINE__;
+                }
 
-        const uint64_t dtsPartSz = thePart->size;
-        DWN_DBG("cfg dtsPartSz %llx for part(%s)\n", dtsPartSz, thePartName);
-        if (NAND_PART_SIZE_FULL == dtsPartSz) {return 0;}
-        if (dtsPartSz > nandPartCap) {
-            DWN_ERR("partSz of logic part(%s): sz dts %llx > Sz flash %llx\n",
-                    thePartName, dtsPartSz, nandPartCap);
-            return __LINE__;
+                return 0;
         }
 
-        return 0;
-    }
-
-    DWN_ERR("Can't find your download part(%s)\n", thePartName);
-    return __LINE__;
+        DWN_ERR("Can't find your download part(%s)\n", thePartName);
+        return __LINE__;
 }
-#else
-#define _assert_logic_partition_cap(thePartName, nandPartCap) 0
-#endif// #if CONFIG_AML_STORAGE
+#endif// #if defined(CONFIG_AML_MTD)
+#endif// #if defined(CONFIG_STORE_COMPATIBLE)
 
 //return value is the actual size it write
 static int optimus_download_dtb_image(struct ImgBurnInfo* pDownInfo, u32 dataSzReceived, const u8* data)
 {
     int ret = 0;
     DWN_MSG("%s:dataSzReceived=0x%x\n", __func__, dataSzReceived);
-    store_rsv_erase("dtb");
-    ret = store_rsv_write("dtb", dataSzReceived, (u8*)data);
+    store_erase_ops((u8*)"dtb", 0, 0, 0);
+    ret = store_dtb_rw((void*)data, dataSzReceived, 1);
 
     return ret ? 0 : dataSzReceived;
 }
@@ -289,7 +164,7 @@ static int optimus_verify_dtb(struct ImgBurnInfo* pDownInfo, u8* genSum)
     uint64_t size = 0;
 
     size=pDownInfo->imgPktSz;
-    ret = store_rsv_read("dtb", size, pBuf);
+    ret = store_dtb_rw(pBuf, size, 2);//'2' means using 'store dtb iread' rather than 'read'
     if (ret) {
         DWN_ERR("Fail to read dtb\n");
         return __LINE__;
@@ -300,27 +175,32 @@ static int optimus_verify_dtb(struct ImgBurnInfo* pDownInfo, u8* genSum)
     return ret;
 }
 
+//32k, Now nand not need align any more, but I remember spi nor flash need 32k aligh
+#define BOOTLOADER_ALIGN_BITS   0//15
+
 //return value is the actual size it write
 static int optimus_download_bootloader_image(struct ImgBurnInfo* pDownInfo, u32 dataSzReceived, const u8* data)
 {
     int ret = OPT_DOWN_OK;
-    int size = dataSzReceived;
+    uint64_t size = dataSzReceived;
 
     if (dataSzReceived < pDownInfo->imgPktSz) {
         DWN_ERR("please write back bootloader after all data rx end.0x(%x, %x)\n", dataSzReceived, (u32)pDownInfo->imgPktSz);
         return 0;
     }
 
-    if (size > bootloader_copy_sz()) {
-        DWN_ERR("uboot.bin size 0x%x > 2M unsupported\n", size);
+    if (size > (2U<<20)) {
+        DWN_ERR("uboot.bin size 0x%llx > 2M unsupported\n", size);
         return 0;
     }
 
-    ret = bootloader_write((u8*)data, 0, size);
-    if (ret) {
-        DWN_ERR("FAil in program bootloader\n");
-        return 0;
-    }
+#if BOOTLOADER_ALIGN_BITS
+    size += (1U<<BOOTLOADER_ALIGN_BITS) -1;
+    size >>= BOOTLOADER_ALIGN_BITS;
+    size <<= BOOTLOADER_ALIGN_BITS;
+#endif// #if BOOTLOADER_ALIGN_BITS
+    ret = store_boot_write((unsigned char*)data, 0, size);
+    if (dataSzReceived != size)DWN_MSG("align bootloader sz from 0x%x to 0x%llx\n", dataSzReceived, size) ;
 
     return ret ? 0 : dataSzReceived;
 }
@@ -329,17 +209,28 @@ static int optimus_verify_bootloader(struct ImgBurnInfo* pDownInfo, u8* genSum)
 {
     int ret = OPT_DOWN_OK;
     unsigned char* pBuf = (unsigned char*)OPTIMUS_DOWNLOAD_TRANSFER_BUF_ADDR;
-    int size = 0;
-    int bootRealSz = pDownInfo->imgPktSz;
+    uint64_t size = 0;
+    uint64_t off  = 0;
 
-    size=bootRealSz;
-    ret = bootloader_read(pBuf, 0, size);
+#if defined(CONFIG_AML_MTD) && defined(CONFIG_DISCRETE_BOOTLOADER)
+    if ( NAND_BOOT_FLAG == device_boot_flag )
+        off  = (1ULL << 62) - 1; //verify mode for verify discrete bootloader
+#endif//#if defined(CONFIG_AML_MTD)
+
+    size=pDownInfo->imgPktSz;
+#if BOOTLOADER_ALIGN_BITS
+    size += (1U<<BOOTLOADER_ALIGN_BITS) -1;
+    size >>= BOOTLOADER_ALIGN_BITS;
+    size <<= BOOTLOADER_ALIGN_BITS;
+#endif// #if BOOTLOADER_ALIGN_BITS
+    ret = store_boot_read(pBuf, off, size);
     if (ret) {
         DWN_ERR("Fail to read bootloader\n");
         return __LINE__;
     }
 
-    sha1_csum(pBuf, bootRealSz, genSum);
+    sha1_csum(pBuf, (u32)pDownInfo->imgPktSz, genSum);
+
     return ret;
 }
 
@@ -347,7 +238,7 @@ static int optimus_verify_bootloader(struct ImgBurnInfo* pDownInfo, u8* genSum)
 u32 optimus_cb_simg_write_media(const unsigned destAddrInSec, const unsigned dataSzInBy, const char* data)
 {
     int ret = OPT_DOWN_OK;
-    const char* partName = OptimusImgBurnInfo.partName;
+    unsigned char* partName = (unsigned char*)OptimusImgBurnInfo.partName;
 
     if (OPTIMUS_MEDIA_TYPE_STORE < OptimusImgBurnInfo.storageMediaType) {
         DWN_ERR("storage type %d not supported yet!\n", OptimusImgBurnInfo.storageMediaType);
@@ -355,7 +246,8 @@ u32 optimus_cb_simg_write_media(const unsigned destAddrInSec, const unsigned dat
     }
 
     DWN_DBG("1addrOffset=0x%llx, dataSz=0x%x, data = 0x%p\t", (((u64)destAddrInSec)<<9), dataSzInBy, (void*)data);
-    ret = store_logic_write(partName, (((u64)destAddrInSec)<<9), dataSzInBy, (void*)data);
+    //FIXME:why dirty value if not convert to u64
+    ret = store_write_ops(partName, (u8*)data, (((u64)destAddrInSec)<<9), (u64)dataSzInBy);
     if (ret) {
         DWN_ERR("Fail to write to media, ret = %d\n", ret);
         return 0;
@@ -392,7 +284,7 @@ static u32 optimus_download_normal_image(struct ImgBurnInfo* pDownInfo, u32 data
 
     DWN_DBG("addrOffset=0x%llx, dataSz=0x%x, data = 0x%p\n", addrOrOffsetInBy, dataSz, data);
 
-    ret = store_logic_write(pDownInfo->partName, addrOrOffsetInBy, dataSz, (void*)data);
+    ret = store_write_ops((u8*)pDownInfo->partName, (u8*)data, addrOrOffsetInBy, (u64)dataSz);
     if (ret) {
         DWN_ERR("Fail to write to media\n");
         return 0;
@@ -415,6 +307,38 @@ static int optimus_storage_open(struct ImgBurnInfo* pDownInfo, const u8* data, c
     {
         DWN_MSG("Burn Start...\n");
         pDownInfo->imgBurnSta = OPTIMUS_IMG_STA_BURN_ING;
+#if defined(CONFIG_AML_MTD)
+        //Need erasing if 'Have not erasing the WHOLE chip' and 'NOT bootloader'
+        if ( (NAND_BOOT_FLAG == device_boot_flag || SPI_NAND_FLAG == device_boot_flag) && MediaType < OPTIMUS_MEDIA_TYPE_MEM )
+        #if  defined(CONFIG_DISCRETE_BOOTLOADER)
+            if ( strcmp(CONFIG_TPL_PART_NAME, partName) )
+        #endif//#if  defined(CONFIG_DISCRETE_BOOTLOADER)
+            if (!pDownInfo->isDumpMode && !(is_optimus_storage_inited()>>16) && strcmp("bootloader", partName)) {
+                char cmd[96];
+                sprintf(cmd, "store erase partition %s", partName);
+                DWN_MSG("cmd[%s]\n", cmd);
+                run_command(cmd, 0);
+            }
+    #if defined(OPTIMUS_BURN_TARGET_SUPPORT_UBIFS)
+        if (IMG_TYPE_UBIFS == pDownInfo->imgType) //get size if not bootloader
+        {
+            char cmd[64];
+            static int _ubiDeviceIndex = 0;
+            sprintf(cmd, "ubi part %s", partName);
+            ret = run_command(cmd, 0);
+            if (ret) {
+                DWN_ERR("Fail in run cmd[%s]\n", cmd); return __LINE__;
+            }
+            sprintf(cmd, "ubi device %d", _ubiDeviceIndex++);
+            ret = run_command(cmd, 0);
+            sprintf(cmd, "ubi create %s", partName);
+            ret = run_command(cmd, 0);
+            if (ret) {
+                DWN_ERR("Fail in run cmd[%s]\n", cmd); return __LINE__;
+            }
+        }
+    #endif// #if defined(OPTIMUS_BURN_TARGET_SUPPORT_UBIFS)
+#endif//#if defined(CONFIG_AML_MTD)
     }
     else if(pDownInfo->imgSzDisposed == pDownInfo->imgPktSz && OPTIMUS_IMG_STA_BURN_COMPLETE == pDownInfo->imgBurnSta)
     {
@@ -430,6 +354,7 @@ static int optimus_storage_open(struct ImgBurnInfo* pDownInfo, const u8* data, c
             {
                 if (IMG_TYPE_BOOTLOADER != pDownInfo->imgType && !pDownInfo->devHdle) //if not bootloader and device not open
                 {
+                    /*pDownInfo->devHdle = aml_nftl_get_dev(partName);*/
                     pDownInfo->devHdle = (void*)1;
                     if (!pDownInfo->devHdle) {
                         DWN_ERR("Fail to open nand part %s\n", partName);
@@ -582,7 +507,7 @@ static int optimus_storage_read(struct ImgBurnInfo* pDownInfo, u64 addrOrOffsetI
 {
     int ret = 0;
     const int MediaType = pDownInfo->storageMediaType;
-    const char* partName = pDownInfo->partName;
+    unsigned char* partName = (unsigned char*)pDownInfo->partName;
 
     addrOrOffsetInBy += pDownInfo->partBaseOffset;
 
@@ -594,14 +519,14 @@ static int optimus_storage_read(struct ImgBurnInfo* pDownInfo, u64 addrOrOffsetI
             {
                 if (IMG_TYPE_BOOTLOADER == pDownInfo->imgType)
                 {
-                    ret = bootloader_read(buff, 0, readSzInBy);
+                    ret = store_boot_read(buff, addrOrOffsetInBy, (u64)readSzInBy);
                 }
                 else if (IMG_TYPE_DTB == pDownInfo->imgType) {
-                    ret = store_rsv_read("dtb", readSzInBy, buff);
+                    ret = store_dtb_rw(buff, readSzInBy, 0);
                 }
                 else
                 {
-                    ret = store_logic_read(partName, addrOrOffsetInBy, readSzInBy, buff);
+                    ret = store_read_ops(partName, buff, addrOrOffsetInBy, (u64)readSzInBy);
                     platform_busy_increase_un_reported_size(readSzInBy);
                 }
                 if (ret) {
@@ -754,17 +679,19 @@ static int _parse_img_download_info(struct ImgBurnInfo* pDownInfo, const char* p
     }
 
     pDownInfo->partBaseOffset   = partBaseOffset;
-    memcpy(pDownInfo->partName, partName, strlen(partName));
+    strncpy(pDownInfo->partName, partName, sizeof pDownInfo->partName - 1);
 
     if (OPTIMUS_MEDIA_TYPE_MEM > pDownInfo->storageMediaType) //if command for burning partition
     {
         if (strcmp("bootloader", partName) && strcmp("_aml_dtb", partName)) //get size if not bootloader
         {
-            u64 partCap = store_part_size(partName);
-            if (!partCap) {
+            u64 partCap = 0;
+            ret = store_get_partititon_size((u8*)partName, &partCap);
+            if (ret) {
                 DWN_ERR("Fail to get size for part %s\n", partName);
                 return __LINE__;
             }
+            partCap <<= 9;//trans sector to byte
             DWN_MSG("flash LOGIC partCap 0x%llxB\n", partCap);
             if (imgSz > partCap) {
                 DWN_ERR("imgSz 0x%llx out of cap 0x%llx\n", imgSz, partCap);
@@ -807,18 +734,18 @@ static int _disk_intialed_ok = 0;
 
 int is_optimus_storage_inited(void)
 {
-    return _disk_intialed_ok;
+        return _disk_intialed_ok;
 }
 
 int optimus_save_loaded_dtb_to_flash(void)
 {
-    unsigned char* dtbLoadedAddr = (unsigned char*)OPTIMUS_DTB_LOAD_ADDR;
+        unsigned char* dtbLoadedAddr = (unsigned char*)OPTIMUS_DTB_LOAD_ADDR;
 
-    if (!_dtb_is_loaded) return 0;
+        if (!_dtb_is_loaded) return 0;
 
-    //dtb erasing before write, or some NAND chip maybe cannot write real
-    store_rsv_erase("dtb");
-    return store_rsv_write("dtb", _dtb_is_loaded, dtbLoadedAddr);
+        //dtb erasing before write
+        store_erase_ops((u8*)"dtb", 0, 0, 0);
+        return store_dtb_rw(dtbLoadedAddr, _dtb_is_loaded, 1);
 }
 
 int optimus_storage_init(int toErase)
@@ -828,14 +755,14 @@ int optimus_storage_init(int toErase)
     unsigned char* dtbLoadedAddr = (unsigned char*)OPTIMUS_DTB_LOAD_ADDR;
 
     if (_disk_intialed_ok) {//To assert only actual disk intialed once
-        DWN_MSG("Disk inited but init again!!!\n");
-        /*return 0;*/
+        DWN_MSG("Disk inited again.\n");
+        return 0;
     }
 
     if (OPTIMUS_WORK_MODE_USB_PRODUCE != optimus_work_mode_get()) //Already inited in other work mode
     {
-        /*DWN_MSG("Exit before re-init\n");*/
-        /*store_exit1();*/
+        DWN_MSG("Exit before re-init\n");
+        store_exit();
     }
 
     if (!_dtb_is_loaded) {
@@ -843,7 +770,7 @@ int optimus_storage_init(int toErase)
     }
     else{
 #ifdef CONFIG_AML_MTD
-        if ( BOOT_NAND_MTD == store_get_type() ) {
+        if ( NAND_BOOT_FLAG == device_boot_flag ) {
             extern int check_valid_dts(unsigned char *buffer);
             ret =  check_valid_dts(dtbLoadedAddr);
         } else
@@ -856,17 +783,10 @@ int optimus_storage_init(int toErase)
         }
     }
 
-    ret = store_init(1);
-    if (ret <= 0) {
-        DWN_MSG("Fail in init storage,ret %d\n", ret);
-        return -__LINE__;
-    }
-
     switch (toErase)
     {
         case 0://NO erase
-        case 1:
-        case 2:
+            ret = store_init(1);
             break;
 
         case 3://erase all(with key)
@@ -878,7 +798,10 @@ int optimus_storage_init(int toErase)
                     DWN_ERR("Fail when run cmd[%s], ret %d\n", cmd, ret);
                     break;
                 }
-            } break;
+            }
+        case 1://normal erase, store init 3
+            ret = store_init(3);
+            break;
 
         case 4://force erase all
             {
@@ -889,45 +812,68 @@ int optimus_storage_init(int toErase)
                     DWN_ERR("Fail when run cmd[%s], ret %d\n", cmd, ret);
                     break;
                 }
-            } break;
+            }
+        case 2:
+            ret = store_init(4);
+            break;
 
         default:
             DWN_ERR("Unsupported erase flag %d\n", toErase); ret = -__LINE__;
             break;
     }
 
-    if (toErase > 0) {
-        ret = store_erase(NULL, 0, 0, 0);
+    if (!ret)
+    {
+        _disk_intialed_ok  = 1;
+        _disk_intialed_ok += toErase <<16;
+
+#if 0
+        ret = optimus_save_loaded_dtb_to_flash();
         if (ret) {
-            DWN_ERR("Fail in erase flash,ret %d\n", ret);
-            return -__LINE__;
+                DWN_ERR("FAiled in dtb wr\n");
+                return __LINE__;
         }
-    }
+#endif
 
-    _disk_intialed_ok += toErase <<16;
-    if (OPTIMUS_WORK_MODE_USB_PRODUCE == optimus_work_mode_get()) //env not relocated in this case
-    {
-        DWN_MSG("usb producing env_relocate\n");
-        env_relocate();
-    }
+        if (OPTIMUS_WORK_MODE_USB_PRODUCE == optimus_work_mode_get()) //env not relocated in this case
+        {
+            DWN_MSG("usb producing env_relocate\n");
+            env_relocate();
+        }
 
-    if (_dtb_is_loaded)//for key init, or fail when get /unifykey
-    {
-        unsigned long fdtAddr = (unsigned long)dtbLoadedAddr;
+        if (_dtb_is_loaded)//for key init, or fail when get /unifykey
+        {
+                unsigned long fdtAddr = (unsigned long)dtbLoadedAddr;
 #ifdef CONFIG_MULTI_DTB
-        fdtAddr = get_multi_dt_entry(fdtAddr);
+                fdtAddr = get_multi_dt_entry(fdtAddr);
 #endif// #ifdef CONFIG_MULTI_DTB
-        ret = fdt_check_header((char*)fdtAddr);
-        unsigned fdtsz    = fdt_totalsize((char*)fdtAddr);
-        if (ret || !fdtsz ) {
-            DWN_ERR("Fail in fdt check header\n");
-            return __LINE__;
+                ret = fdt_check_header((char*)fdtAddr);
+                unsigned fdtsz    = fdt_totalsize((char*)fdtAddr);
+                if (ret || !fdtsz ) {
+                        DWN_ERR("Fail in fdt check header\n");
+                        return __LINE__;
+                }
+               // if (fdtsz < _dtb_is_loaded)
+                        memmove((char*)dtbLoadedAddr, (char*)fdtAddr, fdtsz);
         }
-        // if (fdtsz < _dtb_is_loaded)
-        memmove((char*)dtbLoadedAddr, (char*)fdtAddr, fdtsz);
+        if (toErase > 0) {
+            extern int store_ddr_parameter_erase(void);
+            DWN_MSG("to erase ddr parameters\n");
+            if (store_ddr_parameter_erase()) {
+                DWN_ERR("Fail in erase ddr parameters\n");
+                return -__LINE__;
+            }
+        }
     }
 
-    return 0;
+    return ret;
+}
+
+int optimus_storage_exit(void)
+{
+    _disk_intialed_ok = 0;
+    DWN_MSG("store_exit yet!!\n");
+    return store_exit();
 }
 
 int is_optimus_on_burn(void)//is now transfering image
@@ -1093,11 +1039,11 @@ int optimus_media_download_verify(const int argc, char * const argv[], char *inf
     u64 verifyLen = OptimusImgBurnInfo.imgPktSz;
     int ret = 0;
 
-    if (argc != 3) {
-        strcpy(info, "failed:need 3 args\n");
+	if (argc != 3) {
+		strcpy(info, "failed:need 3 args\n");
         printf(info);
-        return -1;
-    }
+		return -1;
+	}
 
     if (strcmp(verifyType, "sha1sum")) {
         ret = __LINE__;
@@ -1278,7 +1224,7 @@ int optimus_set_burn_complete_flag(void)
     if (IsTplLoadedFromBurningPackage)
     {
         /*rc = run_command("defenv", 0);//use new env directly if uboot is new !!!*/
-        set_default_env("## save_setting ##\n", 0);//use new env directly if uboot is new !!!
+        set_default_env("## save_setting ##\n");//use new env directly if uboot is new !!!
 #if 0
         const char* def_env_initargs = getenv("initargs");
         const char* def_env_bootargs = getenv("bootargs");
@@ -1344,22 +1290,10 @@ void optimus_reset(const int cfgFlag)
     //set reboot mode
     _optimus_set_reboot_mode(cfgFlag);
     printf("Burn Reboot...\n");//Add printf to delay to save env
-    while (--i > 0) {;}
+    while (--i) ;
 
     /*disable_interrupts();*/
-	reset_cpu(0);
-
-    while (i++)
-    {
-        unsigned ret = i;
-        unsigned mask = 1U<<20;
-
-        mask -= 1;
-        ret &= mask;
-        if (!ret) {
-            printf("To reseting...\n");
-        }
-    }
+    reset_cpu(0);
 }
 
 void optimus_poweroff(void)
@@ -1396,7 +1330,8 @@ int optimus_burn_complete(const int choice)
                     {
                             rc = run_command("getkey", 0);
                     }while(rc);
-            }
+                    optimus_poweroff();
+            }break;
         case OPTIMUS_BURN_COMPLETE__POWEROFF_DIRECT:
             optimus_poweroff();
             break;
@@ -1409,10 +1344,10 @@ int optimus_burn_complete(const int choice)
             return (0xefe == _isBurnComplete);
 
         case OPTIMUS_BURN_COMPLETE__REBOOT_UPDATE:
+            optimus_reset(choice);
+            break;
         case OPTIMUS_BURN_COMPLETE__REBOOT_NORMAL:
-            {
-                optimus_reset(choice);
-            }
+            optimus_reset(choice);
             break;
 
 
@@ -1422,5 +1357,67 @@ int optimus_burn_complete(const int choice)
     }
 
     return rc;
+}
+
+static int optimus_enable_romboot_skip_boot(const char* extBootDev)
+{
+    if (!strcmp("usb", extBootDev))
+    {
+#if ROM_BOOT_SKIP_BOOT_ENABLED_4_USB
+#if SCPI_CMD_USB_UNBOOT
+        set_boot_first_timeout(SCPI_CMD_USB_UNBOOT);
+#else
+        set_usb_boot_function(FORCE_USB_BOOT);
+#endif// #if SCPI_CMD_USB_UNBOOT
+#endif// #if ROM_BOOT_SKIP_BOOT_ENABLED_4_USB
+    }
+
+    if (!strcmp("sdc", extBootDev))
+    {
+#if ROM_BOOT_SKIP_BOOT_ENABLED_4_SDC
+        set_boot_first_timeout(SCPI_CMD_SDCARD_BOOT);
+#endif// #if ROM_BOOT_SKIP_BOOT_ENABLED_4_SDC
+    }
+
+    return 0;
+}
+
+//I assume that store_inited yet when "bootloader_is_old"!!!!
+int optimus_erase_bootloader(const char* extBootDev)
+{
+    if (!strcmp("usb", extBootDev))
+    {
+#if ROM_BOOT_SKIP_BOOT_ENABLED_4_USB
+    return optimus_enable_romboot_skip_boot("usb");
+#endif// #if ROM_BOOT_SKIP_BOOT_ENABLED_4_USB
+    }
+
+    if (!strcmp("sdc", extBootDev))
+    {
+#if ROM_BOOT_SKIP_BOOT_ENABLED_4_SDC
+    return optimus_enable_romboot_skip_boot("sdc");
+#endif// #if ROM_BOOT_SKIP_BOOT_ENABLED_4_SDC
+    }
+
+    return store_erase_ops((u8*)"boot", 0, 0, 0);
+}
+
+//getenv wrapper to avoid coverity tained string error
+const char* getenv_optimus(const char* name)
+{
+    char* envBuf = OPTIMUS_GETENV_BUF;
+    const char* envVal = getenv(name);
+    if (!envVal) {envBuf[0] = '\0'; return envBuf;}
+
+    int i = 0;
+    int len = OPTIMUS_ENV_MAXLEN;
+    for (; i < OPTIMUS_ENV_MAXLEN; ++i) {
+        if ('\0' == envVal[i]) {
+            len = i + 1;
+            break;
+        }
+    }
+    memcpy(envBuf, envVal, len);
+    return envBuf;
 }
 
