@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2014 Freescale Semiconductor, Inc.
  *
- * SPDX-License-Identifier:     GPL-2.0+
+ * Shengzhou Liu <Shengzhou.Liu@freescale.com>
  */
 
 #include <common.h>
@@ -19,8 +20,9 @@
 #include <fsl_mdio.h>
 #include <miiphy.h>
 #include <phy.h>
-#include <asm/fsl_dtsec.h>
+#include <fsl_dtsec.h>
 #include <asm/fsl_serdes.h>
+#include "../common/fman.h"
 
 int board_eth_init(bd_t *bis)
 {
@@ -51,14 +53,29 @@ int board_eth_init(bd_t *bis)
 	/* Register the 10G MDIO bus */
 	fm_memac_mdio_init(bis, &tgec_mdio_info);
 
-	/* Set the two on-board RGMII PHY address */
-	fm_info_set_phy_address(FM1_DTSEC3, RGMII_PHY2_ADDR);
+	/* Set the on-board RGMII PHY address */
 	fm_info_set_phy_address(FM1_DTSEC4, RGMII_PHY1_ADDR);
 
 	switch (srds_s1) {
+#ifdef CONFIG_TARGET_T1024RDB
 	case 0x95:
-		/* 10G XFI with Aquantia PHY */
+		/* set the on-board RGMII2  PHY */
+		fm_info_set_phy_address(FM1_DTSEC3, RGMII_PHY2_ADDR);
+
+		/* set 10G XFI with Aquantia AQR105 PHY */
 		fm_info_set_phy_address(FM1_10GEC1, FM1_10GEC1_PHY_ADDR);
+		break;
+#endif
+	case 0x6a:
+	case 0x6b:
+	case 0x77:
+	case 0x135:
+		/* set the on-board 2.5G SGMII AQR105 PHY */
+		fm_info_set_phy_address(FM1_DTSEC3, SGMII_AQR_PHY_ADDR);
+#ifdef CONFIG_TARGET_T1023RDB
+		/* set the on-board 1G SGMII RTL8211F PHY */
+		fm_info_set_phy_address(FM1_DTSEC1, SGMII_RTK_PHY_ADDR);
+#endif
 		break;
 	default:
 		printf("SerDes protocol 0x%x is not supported on T102xRDB\n",
@@ -71,6 +88,18 @@ int board_eth_init(bd_t *bis)
 		switch (interface) {
 		case PHY_INTERFACE_MODE_RGMII:
 			dev = miiphy_get_dev_by_name(DEFAULT_FM_MDIO_NAME);
+			fm_info_set_mdio(i, dev);
+			break;
+		case PHY_INTERFACE_MODE_SGMII:
+#if defined(CONFIG_TARGET_T1023RDB)
+			dev = miiphy_get_dev_by_name(DEFAULT_FM_MDIO_NAME);
+#elif defined(CONFIG_TARGET_T1024RDB)
+			dev = miiphy_get_dev_by_name(DEFAULT_FM_TGEC_MDIO_NAME);
+#endif
+			fm_info_set_mdio(i, dev);
+			break;
+		case PHY_INTERFACE_MODE_SGMII_2500:
+			dev = miiphy_get_dev_by_name(DEFAULT_FM_TGEC_MDIO_NAME);
 			fm_info_set_mdio(i, dev);
 			break;
 		default:
@@ -93,6 +122,21 @@ int board_eth_init(bd_t *bis)
 #endif /* CONFIG_FMAN_ENET */
 
 	return pci_eth_init(bis);
+}
+
+void board_ft_fman_fixup_port(void *fdt, char *compat, phys_addr_t addr,
+			      enum fm_port port, int offset)
+{
+#if defined(CONFIG_TARGET_T1024RDB)
+	if (((fm_info_get_enet_if(port) == PHY_INTERFACE_MODE_SGMII_2500) ||
+	     (fm_info_get_enet_if(port) == PHY_INTERFACE_MODE_SGMII)) &&
+			(port == FM1_DTSEC3)) {
+		fdt_set_phy_handle(fdt, compat, addr, "sg_2500_aqr105_phy4");
+		fdt_setprop_string(fdt, offset, "phy-connection-type",
+				   "sgmii-2500");
+		fdt_status_disabled_by_alias(fdt, "xg_aqr105_phy3");
+	}
+#endif
 }
 
 void fdt_fixup_board_enet(void *fdt)

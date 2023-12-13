@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Amlogic gerrit code auto-fix script
@@ -47,10 +47,10 @@ class fixer(object):
 	def fix(self):
 		self.verified = self.info_labels.get("Verified")
 		if(1 == self.verified):
-			print "Verified +1, Quit..."
+			print("Verified +1, Quit...")
 			return
 		for file_info in self.info_comment:
-			print file_info
+			print(file_info)
 			#print self.cur_file_content
 			#for line in self.cur_file_content:
 			#	print line,
@@ -238,9 +238,9 @@ class fixer(object):
 		#print "comment: ", self.info_comment
 		#print "labels: ", self.info_labels
 		for file_info in self.info_comment:
-			print file_info
+			print(file_info)
 			for message_info in self.info_comment[file_info]:
-				print "		", message_info
+				print("		", message_info)
 
 	def run(self):
 		self.read_log()
@@ -249,7 +249,7 @@ class fixer(object):
 
 if __name__=='__main__':
 	if len(sys.argv) != 2:
-		print 'auto_fix.py [review_log_file]'
+		print('auto_fix.py [review_log_file]')
 		exit(1)
 	fixer = fixer(sys.argv[1])
 	fixer.run()

@@ -1,0 +1,10 @@
+menuconfig TYPEC
+	tristate "USB Type-C Support"
+	help
+	  TypeC support.
+
+if TYPEC
+
+source "drivers/usb/typec/tcpm/Kconfig"
+
+endif # TYPEC
