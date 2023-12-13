@@ -1,9 +1,6 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/usb/gadget/v2_burning/v2_common/optimus_simg2img.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include "../v2_burning_i.h"
@@ -214,14 +211,13 @@ int optimus_simg_to_media(char* simgPktHead, const u32 pktLen, u32* unParsedData
                             sperr("error FILL chunk\n");
                             return -__LINE__;
                     }
-                    switch (device_boot_flag) {
-                            case EMMC_BOOT_FLAG:
-                            case SPI_EMMC_FLAG:
+                    switch (store_get_type()) {
+                            case BOOT_EMMC:
+                            case BOOT_SD:
                                     _NeedFillAsNotErasedYet = (fillVal != 0);
                                     break;
 
-                            case NAND_BOOT_FLAG:
-                            case SPI_NAND_FLAG:
+                            case BOOT_NAND_NFTL:
                                     _NeedFillAsNotErasedYet = (fillVal != 0XFFFFFFFFU);
                                     break;
                             default:

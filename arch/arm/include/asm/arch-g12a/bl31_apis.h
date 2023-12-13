@@ -1,11 +1,16 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/include/asm/arch-g12a/bl31_apis.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
+/*
+ * Trustzone API
+ *
+ * Copyright (C) 2012 Amlogic, Inc.
+ *
+ * Author: Platform-SH@amlogic.com
+ *
+ */
 
 #ifndef __GXBB_BL31_APIS_H
 #define __GXBB_BL31_APIS_H
@@ -106,6 +111,7 @@ struct sram_hal_api_arg {
 #define JTAG_A53_EE 3
 #define CLUSTER_BIT 2
 
+#define GET_AVBKEY_FROM_FIP              0x820000b0
 
 /////////////////////////////////////////////////////////////////////////////////
 #define AML_DATA_PROCESS                 (0x820000FF)
@@ -140,4 +146,5 @@ void bl31_get_chipid(unsigned int *, unsigned int *,
 	unsigned int *, unsigned int *);
 void set_viu_probe_enable(void);
 int32_t set_boot_params(const keymaster_boot_params*);
+int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen);
 #endif

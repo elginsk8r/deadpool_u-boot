@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2013 Google, Inc
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* Decode and dump U-Boot profiling information */
@@ -16,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/param.h>
+#include <sys/types.h>
 
 #include <compiler.h>
 #include <trace.h>
@@ -431,9 +431,10 @@ static int read_trace_config(FILE *fin)
 
 		err = regcomp(&line->regex, tok, REG_NOSUB);
 		if (err) {
+			int r = regex_report_error(&line->regex, err,
+						   "compile", tok);
 			free(line);
-			return regex_report_error(&line->regex, err, "compile",
-						  tok);
+			return r;
 		}
 
 		/* link this new one to the end of the list */

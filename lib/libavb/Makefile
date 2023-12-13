@@ -1,20 +1,14 @@
-obj-y += avb_chain_partition_descriptor.o
-obj-y += avb_cmdline.o
-obj-y += avb_crc32.o
-obj-y += avb_crypto.o
-obj-y += avb_descriptor.o
-obj-y += avb_footer.o
-obj-y += avb_hash_descriptor.o
-obj-y += avb_hashtree_descriptor.o
-obj-y += avb_kernel_cmdline_descriptor.o
-obj-y += avb_property_descriptor.o
-obj-y += avb_rsa.o
-obj-y += avb_sha256.o
-obj-y += avb_sha512.o
-obj-y += avb_slot_verify.o
-obj-y += avb_sysdeps_posix.o
-obj-y += avb_util.o
-obj-y += avb_vbmeta_image.o
-obj-y += avb_version.o
-obj-y += testkey.o
-ccflags-y += -DAVB_COMPILATION -DAVB_ENABLE_DEBUG
+# SPDX-License-Identifier: GPL-2.0+
+#
+# (C) Copyright 2017 Linaro Limited
+
+obj-$(CONFIG_LIBAVB) += avb_chain_partition_descriptor.o avb_cmdline.o
+obj-$(CONFIG_LIBAVB) += avb_crypto.o avb_footer.o avb_hashtree_descriptor.o
+obj-$(CONFIG_LIBAVB) += avb_property_descriptor.o avb_sha256.o
+obj-$(CONFIG_LIBAVB) += avb_slot_verify.o avb_util.o avb_version.o
+obj-$(CONFIG_LIBAVB) += avb_descriptor.o avb_hash_descriptor.o
+obj-$(CONFIG_LIBAVB) += avb_kernel_cmdline_descriptor.o avb_rsa.o avb_sha512.o
+obj-$(CONFIG_LIBAVB) += avb_sysdeps_posix.o avb_vbmeta_image.o avb_crc32.o
+obj-$(CONFIG_LIBAVB) += testkey.o
+
+ccflags-y = -DAVB_COMPILATION

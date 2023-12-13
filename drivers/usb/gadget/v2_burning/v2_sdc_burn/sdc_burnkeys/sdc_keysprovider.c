@@ -1,9 +1,6 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/usb/gadget/v2_burning/v2_sdc_burn/sdc_burnkeys/sdc_keysprovider.c
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #include "../optimus_sdc_burn_i.h"
@@ -397,7 +394,10 @@ static int get_key_val_for_fmt_onlyone(const char* licenseName, u8* keyVal, unsi
 
         optimus_sdc_burn_switch_to_extmmc();
 
-        sprintf(_cmd, "fatload mmc 0:1 0x%p %s", keyVal, licenseName);
+        if (strcmp("1", getenv("usb_update")))
+            sprintf(_cmd, "fatload mmc 0:1 0x%p %s", keyVal, licenseName);
+        else
+            sprintf(_cmd, "fatload usb 0:1 0x%p %s", keyVal, licenseName);
         rc = run_command(_cmd, 0);
         if (rc) {
                 errorP("failed in cmd[%s]\n", _cmd);

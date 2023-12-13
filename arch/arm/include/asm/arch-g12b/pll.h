@@ -1,9 +1,6 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/include/asm/arch-g12b/pll.h
- *
- * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
- *
+ * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
 #ifndef __PLL_H
@@ -65,13 +62,6 @@ typedef struct gpll_rate_table_s {
 	unsigned int od;
 }gpll_rate_table_t;
 
-typedef struct hifipll_rate_table_s {
-	unsigned int rate;
-	unsigned int m;
-	unsigned int n;
-	unsigned int od;
-}hifipll_rate_table_t;
-
 typedef struct gp0_pll_set_s {
 	unsigned int pll_clk;
 	unsigned int pll_cntl0;
@@ -82,64 +72,6 @@ typedef struct gp0_pll_set_s {
 	unsigned int pll_cntl5;
 	unsigned int pll_cntl6;
 }gp0_pll_set_t;
-
-typedef struct hifi_pll_set_s {
-	unsigned int pll_clk;
-	unsigned int pll_cntl0;
-	unsigned int pll_cntl1;
-	unsigned int pll_cntl2;
-	unsigned int pll_cntl3;
-	unsigned int pll_cntl4;
-	unsigned int pll_cntl5;
-	unsigned int pll_cntl6;
-}hifi_pll_set_t;
-
-typedef struct pcie_pll_set_s {
-	unsigned int pll_clk;
-	unsigned int pll_cntl0;
-	unsigned int pll_cntl1;
-	unsigned int pll_cntl2;
-	unsigned int pll_cntl3;
-	unsigned int pll_cntl4;
-	unsigned int pll_cntl5;
-}pcie_pll_set_t;
-
-typedef struct ethphy_pll_set_s {
-	unsigned int pll_clk;
-	unsigned int pll_cntl0;
-	unsigned int pll_cntl1;
-	unsigned int pll_cntl2;
-	unsigned int pll_cntl3;
-}ethphy_pll_set_t;
-
-typedef struct usbphy_pll_set_s {
-	unsigned int pll_clk;
-	unsigned int pll_cntl0;
-	unsigned int pll_cntl1;
-	unsigned int pll_cntl2;
-	unsigned int pll_cntl3;
-	unsigned int pll_cntl4;
-	unsigned int pll_cntl5;
-	unsigned int pll_cntl6;
-	unsigned int pll_cntl7;
-}usbphy_pll_set_t;
-
-struct pciepll_rate_table {
-	u16		rate;
-	u16		m;
-	u16		n;
-	u16		od;
-	u16		od2;
-	u16		frac;
-};
-
-#define PLL_RATE(_r, _m, _n, _od)					\
-	{								\
-		.rate		= (_r),					\
-		.m		= (_m),					\
-		.n		= (_n),					\
-		.od		= (_od),				\
-	}								\
 
 #if 0
 unsigned int hdmi_pll_cfg[][7] = {
@@ -162,12 +94,7 @@ enum pll_enum {
 	PLL_DDR,
 	PLL_HDMI,
 	PLL_GP0,
-	PLL_HIFI,
-	PLL_PCIE,
-	PLL_ETHPHY,
-	PLL_USBPHY,
 	PLL_ENUM,
-
 };
 
 int pll_test(int argc, char * const argv[]);

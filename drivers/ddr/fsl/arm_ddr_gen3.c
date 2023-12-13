@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2013 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  *
  * Derived from mpc85xx_ddr_gen3.c, removed all workarounds
  */
@@ -12,6 +11,7 @@
 #include <asm/processor.h>
 #include <fsl_immap.h>
 #include <fsl_ddr.h>
+#include <asm/arch/clock.h>
 
 #if (CONFIG_CHIP_SELECTS_PER_CTRL > 4)
 #error Invalid setting for CONFIG_CHIP_SELECTS_PER_CTRL
@@ -40,17 +40,17 @@ void fsl_ddr_set_memctl_regs(const fsl_ddr_cfg_regs_t *regs,
 	case 0:
 		ddr = (void *)CONFIG_SYS_FSL_DDR_ADDR;
 		break;
-#if defined(CONFIG_SYS_FSL_DDR2_ADDR) && (CONFIG_NUM_DDR_CONTROLLERS > 1)
+#if defined(CONFIG_SYS_FSL_DDR2_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 1)
 	case 1:
 		ddr = (void *)CONFIG_SYS_FSL_DDR2_ADDR;
 		break;
 #endif
-#if defined(CONFIG_SYS_FSL_DDR3_ADDR) && (CONFIG_NUM_DDR_CONTROLLERS > 2)
+#if defined(CONFIG_SYS_FSL_DDR3_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 2)
 	case 2:
 		ddr = (void *)CONFIG_SYS_FSL_DDR3_ADDR;
 		break;
 #endif
-#if defined(CONFIG_SYS_FSL_DDR4_ADDR) && (CONFIG_NUM_DDR_CONTROLLERS > 3)
+#if defined(CONFIG_SYS_FSL_DDR4_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 3)
 	case 3:
 		ddr = (void *)CONFIG_SYS_FSL_DDR4_ADDR;
 		break;
@@ -222,7 +222,7 @@ step2:
 	bus_width = 3 - ((ddr_in32(&ddr->sdram_cfg) & SDRAM_CFG_DBW_MASK)
 			>> SDRAM_CFG_DBW_SHIFT);
 	timeout = ((total_gb_size_per_controller << (6 - bus_width)) * 100 /
-		(get_ddr_freq(0) >> 20)) << 1;
+		(get_ddr_freq(ctrl_num) >> 20)) << 1;
 	total_gb_size_per_controller >>= 4;	/* shift down to gb size */
 	debug("total %d GB\n", total_gb_size_per_controller);
 	debug("Need to wait up to %d * 10ms\n", timeout);
