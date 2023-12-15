@@ -61,6 +61,8 @@
 #define CPLD_DONE_ADR	((vu_char *)0xA4050132)
 #define CPLD_DONE_DAT	0x20
 
+#define	HIZCRB			((vu_short *)0xA405015A)
+
 /* data */
 #define CPLD_NOMAL_START	0xA0A80000
 #define CPLD_SAFE_START		0xA0AC0000
@@ -189,7 +191,7 @@ void init_cpld(void)
 	if (*CPLD_DONE_ADR & CPLD_DONE_DAT)	/* Already DONE */
 		return;
 
-	*((vu_short *)HIZCRB) = 0x0000;
+	*HIZCRB = 0x0000;
 	*CPLD_PFC_ADR = 0x7c00;			/* FPGA PROG = OUTPUT */
 
 	/* write CPLD data from NOR flash to device */

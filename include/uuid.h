@@ -1,11 +1,12 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2014 Samsung Electronics
  * Przemyslaw Marczak <p.marczak@samsung.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef __UUID_H__
 #define __UUID_H__
-
+#define CONFIG_PARTITION_TYPE_GUID
 /* This is structure is in big-endian */
 struct uuid {
 	unsigned int time_low;
@@ -14,7 +15,7 @@ struct uuid {
 	unsigned char clock_seq_hi_and_reserved;
 	unsigned char clock_seq_low;
 	unsigned char node[6];
-} __packed;
+};
 
 enum {
 	UUID_STR_FORMAT_STD,

@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_led.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../v2_burning_i.h"

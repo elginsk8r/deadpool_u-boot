@@ -1,11 +1,14 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/phy/chip.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../include/phynand.h"
 
-int get_flash_type(struct amlnand_chip *aml_chip)
+static int get_flash_type(struct amlnand_chip *aml_chip)
 {
 	struct hw_controller *controller = &(aml_chip->controller);
 	struct chip_operation *operation = &(aml_chip->operation);
@@ -14,7 +17,6 @@ int get_flash_type(struct amlnand_chip *aml_chip)
 	int ret = 0, i, extid;
 	u8 flash_id0 = 0xff;
 	u8 onfi_param_data[512] = {0};
-
 
 	ret = operation->read_id(aml_chip,
 		0,
@@ -77,6 +79,8 @@ int get_flash_type(struct amlnand_chip *aml_chip)
 		aml_chip->flash.T_REA,
 		aml_chip->flash.T_RHOH);
 
+	aml_nand_msg("detect NAND device: %s", type->name);
+
 #ifdef AML_SLC_NAND_SUPPORT
 	type = &aml_chip->flash;
 
@@ -134,10 +138,10 @@ int get_flash_type(struct amlnand_chip *aml_chip)
 				aml_nand_dbg("read retry option[181~182]: %x, %x",onfi_param_data[181],onfi_param_data[182]);
 				if ((onfi_param_data[32] == 0x4D) && (onfi_param_data[33] == 0x49) && (onfi_param_data[34] == 0x43)
 					&& (onfi_param_data[35] == 0x52) && (onfi_param_data[36] == 0x4F) && (onfi_param_data[37] == 0x4E)) {
-					aml_nand_msg("nand Manufacturer: micron");
+					aml_nand_msg("nand Manufacturer: micron\n");
 				} else if ((onfi_param_data[32] == 0x53) && (onfi_param_data[33] == 0x50) && (onfi_param_data[34] == 0x45)
 					&& (onfi_param_data[35] == 0x43) && (onfi_param_data[36] == 0x54) && (onfi_param_data[37] == 0x45)) {
-					aml_nand_msg("nand Manufacturer: specteck");
+					aml_nand_msg("nand Manufacturer: specteck\n");
 				} else {
 					aml_nand_msg("unknown Manufacturer ");
 				}
@@ -591,6 +595,7 @@ int amlchip_opstest(struct amlnand_chip *aml_chip)
 	if (!page_buf) {
 	    aml_nand_msg("no memory for data buf, and need %x", buf_size);
 		printf( "%s: line:%d\n", __func__, __LINE__);
+        while (1) ;
 	    return 0;
 	}
 

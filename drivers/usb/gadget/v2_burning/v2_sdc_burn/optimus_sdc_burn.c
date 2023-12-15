@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_sdc_burn.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "optimus_sdc_burn_i.h"
@@ -12,14 +15,9 @@
 
 static int is_bootloader_old(void)
 {
-    const int sdc_boot = is_tpl_loaded_from_ext_sdmmc();
-    const int usbDiskNewBoot = env_get_hex("usbDiskNewBoot", 0);//default old
+    int sdc_boot = is_tpl_loaded_from_ext_sdmmc();
 
-    switch (optimus_work_mode_get()) {
-        case OPTIMUS_WORK_MODE_SDC_PRODUCE: return !sdc_boot;
-        case OPTIMUS_WORK_MODE_UDISK_PRODUCE: return !usbDiskNewBoot;
-        default: return 1;//default old
-    }
+    return !sdc_boot;
 }
 
 int get_burn_parts_from_img(HIMAGE hImg, ConfigPara_t* pcfgPara)
@@ -130,7 +128,7 @@ static int optimus_burn_one_partition(const char* partName, HIMAGE hImg, __hdle 
     u32 thisReadLen     = 0;
     __hdle hImgItem     = NULL;
     char* downTransBuf  = NULL;//get buffer from optimus_buffer_manager
-    const unsigned ItemReadBufSz = OPTIMUS_LOCAL_UPGRADE_SLOT_SZ;//read this size from image item each time
+    const unsigned ItemReadBufSz = OPTIMUS_DOWNLOAD_SLOT_SZ;//read this size from image item each time
     unsigned sequenceNo = 0;
     const char* fileFmt = NULL;
     /*static */char _errInfo[512];
@@ -179,7 +177,7 @@ static int optimus_burn_one_partition(const char* partName, HIMAGE hImg, __hdle 
             goto _finish;
         }
 
-        //If the item head is not alinged to FAT cluster, Read it firstly to speed up mmc read
+		//If the item head is not alinged to FAT cluster, Read it firstly to speed up mmc read
         if (itemSizeNotAligned && !sequenceNo)
         {
             if ( itemSizeNotAligned >= imgItemSz ) {
@@ -234,11 +232,11 @@ _finish:
     rcode = optimus_verify_partition(partName, hImg, _errInfo);
     if (ITEM_NOT_EXIST == rcode)
     {
-        DWN_WRN("WRN:part(%s) NOT verified\n", partName);
+        printf("WRN:part(%s) NOT verified\n", partName);
         return 0;
     }
     if (rcode) {
-        DWN_ERR("Fail in verify part(%s)\n", partName);
+        printf("Fail in verify part(%s)\n", partName);
         optimus_progress_ui_printf("Failed at VERIFY part[%s]\n", partName);
         return __LINE__;
     }
@@ -266,8 +264,8 @@ int optimus_sdc_burn_partitions(ConfigPara_t* pCfgPara, HIMAGE hImg, __hdle hUiP
         DWN_DBG("Data part num %d\n", burnNum);
     }
     if (!burnNum) {
-        DWN_WRN("Data part num is 0!!\n");
-        /*return __LINE__;*/
+        DWN_ERR("Data part num is 0!!\n");
+        return __LINE__;
     }
 
     for (i = 0; i < burnNum; i++)
@@ -336,14 +334,11 @@ int optimus_sdc_burn_dtb_load(HIMAGE hImg)
     unsigned char* dtbTransferBuf     = (unsigned char*)partBaseOffset;
 
     //meson1.dtb but not meson.dtb for m8 compatible
-#ifdef CONFIG_CMD_EFUSE
     if (IS_FEAT_BOOT_VERIFY()) {
         DWN_MSG("SecureEnabled, use meson1_ENC\n");
         hImgItem = image_item_open(hImg, partName, "meson1_ENC");
     }
-#endif//#ifdef CONFIG_CMD_EFUSE
-    if (!hImgItem)
-    {
+    else {
         hImgItem = image_item_open(hImg, partName, "meson1");
     }
     if (!hImgItem) {
@@ -474,13 +469,19 @@ static int sdc_check_key_need_to_burn(const char* keyName, const int keyOverWrit
 }
 
 //burn the amlogic keys like USB_Burning_Tool
-int sdc_burn_aml_keys(HIMAGE hImg, const int keyOverWrite, int licenseKey, int imgKey)
+static int sdc_burn_aml_keys(HIMAGE hImg, const int keyOverWrite)
 {
         int rc = 0;
         const char* *keysName = NULL;
         unsigned keysNum = 0;
         const char** pCurKeysName = NULL;
         unsigned index = 0;
+
+        rc = run_command("aml_key_burn probe vfat sdc", 0);
+        if (rc) {
+                DWN_ERR("Fail in probe for aml_key_burn\n");
+                return __LINE__;
+        }
 
         {
                 unsigned random32 = 0;
@@ -504,17 +505,7 @@ int sdc_burn_aml_keys(HIMAGE hImg, const int keyOverWrite, int licenseKey, int i
                 DWN_ERR("Fail to parse keys.conf, rc =%d\n", rc);
                 return __LINE__;
         }
-        if (keysNum > 0) {
-            if (strcmp("1", getenv("usb_update")))
-                rc = run_command("aml_key_burn probe vfat sdc", 0);
-            else
-                rc = run_command("aml_key_burn probe vfat udisk", 0);
-            if (rc) {
-                DWN_ERR("Fail in probe for aml_key_burn\n");
-                return __LINE__;
-            }
-            DWN_MSG("keys.conf:\n");
-        }
+        DWN_MSG("keys.conf:\n");
         for (index = 0; index < keysNum; ++index)printf("\tkey[%d]\t%s\n", index, keysName[index]) ;
 
         rc =  optimus_sdc_keysprovider_init();
@@ -570,40 +561,6 @@ int sdc_burn_aml_keys(HIMAGE hImg, const int keyOverWrite, int licenseKey, int i
                 }
         }
 
-        const char* mainTypeKey = "AML_KEY";
-        const int nrItems = get_subtype_nr(hImg, mainTypeKey);
-        for (index = 0; index < nrItems; ++index)
-        {
-            const char* keyName = NULL;
-            if (get_subtype_nm_by_index(hImg, mainTypeKey, &keyName, index)) {
-                DWN_ERR("fail in get key[%d] subtype\n", index);
-                return -__LINE__;
-            }
-            DWN_MSG("Now burn IMG key <---- [%s] ----> %d \n", keyName, index);
-            rc = sdc_check_key_need_to_burn(keyName, keyOverWrite);
-            if (rc < 0) {
-                DWN_ERR("Fail when when check stauts for key(%s)\n", keyName);
-                /*return __LINE__;*/
-            }
-            if (!rc) continue;//not need to burn this key
-
-            //1,using cmd_keysprovider to read a key to memory
-            char* keyValue = (char*)OPTIMUS_DOWNLOAD_TRANSFER_BUF_ADDR;
-            int keySz = OPTIMUS_DOWNLOAD_SLOT_SZ;//buffer size
-            rc = optimus_img_item2buf(hImg, mainTypeKey, keyName, keyValue, &keySz);
-            if (rc) {
-                DWN_ERR("Fail to get value for key[%s]\n", keyName);
-                return __LINE__;
-            }
-
-            //3, burn the key
-            rc = optimus_keysburn_onekey(keyName, (u8*)keyValue, keySz);
-            if (rc) {
-                DWN_ERR("Fail in burn the key[%s] at addr=%p, sz=%d\n", keyName, keyValue, keySz);
-                return __LINE__;
-            }
-        }
-
         rc = optimus_sdc_keysprovider_exit();
         if (rc) {
                 DWN_ERR("Fail in optimus_sdc_keysprovider_exit\n");
@@ -635,7 +592,6 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
     u64 datapartsSz = 0;
     int eraseFlag = pSdcCfgPara->custom.eraseFlash;
 
-    optimus_buf_manager_init(16*1024);
     hImg = image_open("mmc", "0", "1", cfgFile);
     if (!hImg) {
         DWN_MSG("cfg[%s] not valid aml pkg, parse it as ini\n", cfgFile);
@@ -646,48 +602,26 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
         }
     } else {//cfg path is valid aml pkg
         DWN_MSG("cfg %s is valid aml pkg\n", cfgFile);
-
-        ret = parse_ini_cfg_from_item(hImg);
-        if (ITEM_NOT_EXIST == ret) {
-            ret = check_cfg_burn_parts(pSdcCfgPara);
-            if (ret) {
-                DWN_ERR("Fail in check burn parts.\n");
-                ret = __LINE__; goto _finish;
-            }
-            extern int print_sdc_burn_para(const ConfigPara_t* pCfgPara);
-            print_sdc_burn_para(pSdcCfgPara);
+        ret = check_cfg_burn_parts(pSdcCfgPara);
+        if (ret) {
+            DWN_ERR("Fail in check burn parts.\n");
+            ret = __LINE__; goto _finish;
         }
+        extern int print_sdc_burn_para(const ConfigPara_t* pCfgPara);
+        print_sdc_burn_para(pSdcCfgPara);
         memcpy((void*)pkgPath, cfgFile, strnlen(cfgFile, 128));
     }
 
-    hImg = hImg ? hImg : image_open("mmc", "0", "1", pkgPath);
-    if (!hImg) {
-        DWN_ERR("Fail to open image %s\n", pkgPath);
-        ret = __LINE__; goto _finish;
-    }
-    const int eraseBootloader = pSdcCfgPara->custom.eraseBootloader;
-    const int usbDiskUpgrade = (OPTIMUS_WORK_MODE_UDISK_PRODUCE == optimus_work_mode_get());
-    if (eraseBootloader && is_bootloader_old())
+    if (pSdcCfgPara->custom.eraseBootloader && strcmp("1", getenv("usb_update")))
     {
-        if (usbDiskUpgrade) {//upgrade new bootloader
-            if (optimus_burn_bootlader(hImg)) {
-                DWN_ERR("Fail in burn new bootloader from usb disk\n");
-                goto _finish;
-            }
-            setenv("usbDiskNewBoot", "1");
-            setenv("sdcburncfg", cfgFile);
-            setenv("usbDiskUpgrade", "run init_display; usb_burn $sdcburncfg");
-            setenv("preboot", "printenv usbDiskUpgrade; run usbDiskUpgrade");
-            run_command("saveenv", 0);
-        } else
-        {//sdc_burn
+        if (is_bootloader_old())
+        {
             DWN_MSG("To erase OLD bootloader !\n");
             ret = optimus_erase_bootloader("sdc");
             if (ret) {
                 DWN_ERR("Fail to erase bootloader\n");
                 ret = __LINE__; goto _finish;
             }
-        }
 
 #if defined(CONFIG_VIDEO_AMLLCD)
             //axp to low power off LCD, no-charging
@@ -702,6 +636,7 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
             DWN_MSG("Reset to load NEW uboot from ext-mmc!\n");
             optimus_reset(OPTIMUS_BURN_COMPLETE__REBOOT_SDC_BURN);
             return __LINE__;//should never reach here!!
+        }
     }
 
     if (OPTIMUS_WORK_MODE_SDC_PRODUCE == optimus_work_mode_get()) //led not depend on image res, can init early
@@ -713,6 +648,13 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
         optimus_led_show_in_process_of_burning();
     }
 
+    if (!hImg) {
+        hImg = image_open("mmc", "0", "1", pkgPath);
+        if (!hImg) {
+            DWN_ERR("Fail to open image %s\n", pkgPath);
+            ret = __LINE__; goto _finish;
+        }
+    }
     //update dtb for burning drivers
     ret = optimus_sdc_burn_dtb_load(hImg);
     if (ITEM_NOT_EXIST != ret && ret) {
@@ -739,34 +681,11 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
             eraseFlag = 0;
             DWN_MSG("Disable erase as data parts size is 0\n");
     }
-    if (eraseFlag && !strcmp("1", getenv("usb_update"))) {
-        ret = optimus_storage_init(0);
-        if (ret) {
-            DWN_ERR("FAil in init flash for usb upgrade\n");
-            return __LINE__;
-        }
-
-        DWN_MSG("store_get_type %d\n", store_get_type());
-        //erase after bootloader for usb disk
-        if (BOOT_EMMC == store_get_type()) ret = run_command("echo amlmmc erase non_loader;amlmmc erase non_loader", 0);
-        else ret = run_command("echo store erase.chip; store erase.chip", 0);
-    }
-    else
-        ret = optimus_storage_init(eraseFlag);
+    ret = optimus_storage_init(eraseFlag);
     if (ret) {
         DWN_ERR("Fail to init stoarge for sdc burn\n");
         ret = __LINE__; goto _finish;
     }
-#if 0
-    if (pSdcCfgPara->custom.eraseDdrPara) {
-        extern int store_ddr_parameter_erase(void);
-        DWN_MSG("to erase ddr parameters\n");
-        if (store_ddr_parameter_erase()) {
-            DWN_ERR("Fail in erase ddr parameters\n");
-            return -__LINE__;
-        }
-    }
-#endif
 
     optimus_progress_ui_direct_update_progress(hUiProgress, UPGRADE_STEPS_AFTER_DISK_INIT_OK);
 
@@ -793,37 +712,37 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
         ret = optimus_sdc_burn_media_partition(mediaPath, NULL);//no progress bar info if have partition image not in package
         if (ret) {
             DWN_ERR("Fail to burn media partition with image %s\n", mediaPath);
-            /*optimus_storage_exit();*/
+            optimus_storage_exit();
             ret = __LINE__;goto _finish;
         }
     }
     optimus_progress_ui_direct_update_progress(hUiProgress, UPGRADE_STPES_AFTER_BURN_DATA_PARTS_OK);
 
     //TO burn nandkey/securekey/efusekey
-    ret = sdc_burn_aml_keys(hImg, pSdcCfgPara->custom.keyOverwrite, 1, 1);
+    ret = sdc_burn_aml_keys(hImg, pSdcCfgPara->custom.keyOverwrite);
     if (ret) {
             DWN_ERR("Fail in sdc_burn_aml_keys\n");
             ret = __LINE__;goto _finish;
     }
 
+#if 1
     if (hasBootloader)
     {//burn bootloader
-        if (usbDiskUpgrade && env_get_hex("usbDiskNewBoot", 0)) {//already upgrade bootloader from pkg
-            ;
-        } else {
             ret = optimus_burn_bootlader(hImg);
             if (ret) {
-                DWN_ERR("Fail in burn bootloader\n");
-                goto _finish;
+                    DWN_ERR("Fail in burn bootloader\n");
+                    goto _finish;
             }
-        }
-        //update bootloader ENV only when bootloader image is burned
-        ret = optimus_set_burn_complete_flag();
-        if (ret) {
-            DWN_ERR("Fail in set_burn_complete_flag\n");
-            ret = __LINE__; goto _finish;
-        }
+            else
+            {//update bootloader ENV only when bootloader image is burned
+                    ret = optimus_set_burn_complete_flag();
+                    if (ret) {
+                            DWN_ERR("Fail in set_burn_complete_flag\n");
+                            ret = __LINE__; goto _finish;
+                    }
+            }
     }
+#endif
     optimus_progress_ui_direct_update_progress(hUiProgress, UPGRADE_STEPS_AFTER_BURN_BOOTLOADER_OK);
 
 _finish:
@@ -869,7 +788,7 @@ int do_sdc_burn(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
     }
 
     if ( !aml_check_is_ready_for_sdc_produce() ) {
-        DWN_DBG("sdcard Not ready for sdc_burn\n");
+        DWN_DBG("Not ready\n");
         return __LINE__;
     }
 
@@ -896,3 +815,4 @@ U_BOOT_CMD(
    "argv: [sdc_burn_cfg_file]\n"//usage
    "    -aml_sdc_burn.ini is usually used configure file\n"
 );
+

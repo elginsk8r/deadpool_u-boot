@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2012 SAMSUNG Electronics
  * Padmavathi Venna <padma.v@samsung.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -15,7 +16,7 @@
 #include <asm/arch/cpu.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/pinmux.h>
-#include <asm/arch/spi.h>
+#include <asm/arch-exynos/spi.h>
 #include <asm/io.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -189,9 +190,9 @@ static int spi_rx_tx(struct exynos_spi_priv *priv, int todo,
 			spi_request_bytes(regs, toread, step);
 		}
 		if (priv->skip_preamble && get_timer(start) > 100) {
-			debug("SPI timeout: in_bytes=%d, out_bytes=%d, ",
-			      in_bytes, out_bytes);
-			return -ETIMEDOUT;
+			printf("SPI timeout: in_bytes=%d, out_bytes=%d, ",
+			       in_bytes, out_bytes);
+			return -1;
 		}
 	}
 
@@ -252,9 +253,9 @@ static int exynos_spi_ofdata_to_platdata(struct udevice *bus)
 {
 	struct exynos_spi_platdata *plat = bus->platdata;
 	const void *blob = gd->fdt_blob;
-	int node = dev_of_offset(bus);
+	int node = bus->of_offset;
 
-	plat->regs = (struct exynos_spi *)devfdt_get_addr(bus);
+	plat->regs = (struct exynos_spi *)fdtdec_get_addr(blob, node, "reg");
 	plat->periph_id = pinmux_decode_periph_id(blob, node);
 
 	if (plat->periph_id == PERIPH_ID_NONE) {
@@ -295,9 +296,8 @@ static int exynos_spi_probe(struct udevice *bus)
 	return 0;
 }
 
-static int exynos_spi_claim_bus(struct udevice *dev)
+static int exynos_spi_claim_bus(struct udevice *bus)
 {
-	struct udevice *bus = dev->parent;
 	struct exynos_spi_priv *priv = dev_get_priv(bus);
 
 	exynos_pinmux_config(priv->periph_id, PINMUX_FLAG_NONE);
@@ -308,9 +308,8 @@ static int exynos_spi_claim_bus(struct udevice *dev)
 	return 0;
 }
 
-static int exynos_spi_release_bus(struct udevice *dev)
+static int exynos_spi_release_bus(struct udevice *bus)
 {
-	struct udevice *bus = dev->parent;
 	struct exynos_spi_priv *priv = dev_get_priv(bus);
 
 	spi_flush_fifo(priv->regs);
@@ -426,5 +425,6 @@ U_BOOT_DRIVER(exynos_spi) = {
 	.ofdata_to_platdata = exynos_spi_ofdata_to_platdata,
 	.platdata_auto_alloc_size = sizeof(struct exynos_spi_platdata),
 	.priv_auto_alloc_size = sizeof(struct exynos_spi_priv),
+	.per_child_auto_alloc_size	= sizeof(struct spi_slave),
 	.probe	= exynos_spi_probe,
 };

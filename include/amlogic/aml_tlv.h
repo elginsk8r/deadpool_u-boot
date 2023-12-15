@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/amlogic/aml_tlv.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __AMLOGIC_TLV_H_

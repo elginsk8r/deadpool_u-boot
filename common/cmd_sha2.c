@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * common/cmd_sha2.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 /*
@@ -23,21 +26,18 @@
 #include <malloc.h>
 #include <asm/arch/regs.h>
 #include <u-boot/sha256.h>
-#include <asm/arch-c1/timer.h>
 
 #define DATA_MAX_LEN    (1 << 31) //max length of SHA2 is 2 GB
-
 static int do_sha2(cmd_tbl_t *cmdtp, int flag, int argc,
 			char * const argv[])
 {
 	int nReturn=CMD_RET_USAGE;
-	ulong addr_in,nLength,addr_out = 0;
+	ulong addr_in,nLength,addr_out=0;
 	unsigned char szSHA2[32];
 	unsigned char *pSHA2 = szSHA2;
 	int nSHA2Type = 256;
 	char *endp;
-	int i = 0;
-	unsigned int ntime1,ntime2,ntime;
+	int i;
 
 	/* need at least three arguments */
 	if (argc < 3)
@@ -78,6 +78,7 @@ static int do_sha2(cmd_tbl_t *cmdtp, int flag, int argc,
 	nReturn = __LINE__;
 
 
+
 	if (argc > 3)
 	{
 		if ( 0 == *argv[3] )
@@ -94,17 +95,11 @@ static int do_sha2(cmd_tbl_t *cmdtp, int flag, int argc,
 		pSHA2=(unsigned char *)addr_out;
 	}
 
-	ntime1 = get_time();
-	sha256_csum_wd((unsigned char *)addr_in,(unsigned int)nLength,pSHA2,0);
-	ntime2 = get_time();
-	ntime = ntime2 - ntime1;
-	printf("\n cost time: %d us, bandwidth: %d M/s",ntime, (unsigned int)((float)nLength/1024/ntime*1000000/1024));
-
+	sha256_csum_wd((unsigned char *)addr_in, nLength,pSHA2,0);
+	printf("\nSHA%d of addr_in: 0x%08x, len: 0x%08x ", nSHA2Type, (unsigned int)addr_in, (unsigned int)nLength);
 	if (argc > 3)
-	printf("\nSHA%d of addr_in: 0x%08x, len: 0x%08x, addr_out: 0x%08x \n", nSHA2Type, (unsigned int)addr_in, (unsigned int)nLength,(unsigned int)addr_out);
-	else
-	printf("\nSHA%d of addr_in: 0x%08x, len: 0x%08x \n", nSHA2Type, (unsigned int)addr_in, (unsigned int)nLength);
-
+		printf(", addr_out: 0x%08x \n", (unsigned int)addr_out);
+	printf("\n");
 
 	for (i=0; i<SHA256_SUM_LEN; i++)
 		printf("%02x%s", pSHA2[i], ((i+1) % 16==0) ? "\n" :" ");
@@ -115,7 +110,6 @@ exit:
 
 	return nReturn;
 }
-
 
 #undef DATA_MAX_LEN
 
@@ -233,9 +227,7 @@ static int do_sha2test(cmd_tbl_t *cmdtp, int flag, int argc,
 	do
 	{
 		ntime1=readl(P_ISA_TIMERE);
-
-		sha256_csum_wd(pBuffer,nLength,szSHA2,0);
-
+		sha256_csum_wd(pBuffer, nLength,szSHA2,0 );
 		ntime2=readl(P_ISA_TIMERE);
 
 		ntime = ntime2 - ntime1;

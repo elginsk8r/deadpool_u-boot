@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * board/amlogic/g12a_u200_v1/eth_setup.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <common.h>
@@ -8,7 +11,7 @@
 #include <errno.h>
 #include <environment.h>
 #include <fdt_support.h>
-#include <linux/libfdt.h>
+#include <libfdt.h>
 #include <asm/arch/eth_setup.h>
 /*
  *
