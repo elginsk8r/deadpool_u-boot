@@ -513,54 +513,6 @@ config C2_VENUS_BX
 	help
 	  Select C2 VENUS BX config
 
-config C2_BLA4_P0
-	bool "C2_BLA4_P0"
-	select TARGET_C2_BLA4_P0
-	help
-	  Select C2 BLA4 P0 config
-
-config C2_BLA4_P1
-	bool "C2_BLA4_P1"
-	select TARGET_C2_BLA4_P1
-	help
-	  Select C2 BLA4 P1 config
-
-config C2_BLA4_P2
-	bool "C2_BLA4_P2"
-	select TARGET_C2_BLA4_P2
-	help
-	  Select C2 BLA4 P2 config
-
-config C2_BLA4_BX
-	bool "C2_BLA4_BX"
-	select TARGET_C2_BLA4_BX
-	help
-	  Select C2 BLA4 BX config
-
-config C2_2RS4_P1
-	bool "C2_2RS4_P1"
-	select TARGET_C2_2RS4_P1
-	help
-	  Select C2 2RS4 P1 config
-
-config C2_2RS4_P2
-	bool "C2_2RS4_P2"
-	select TARGET_C2_2RS4_P2
-	help
-	  Select C2 2RS4 P2 config
-
-config C2_XUA4_P1
-	bool "C2_XUA4_P1"
-	select TARGET_C2_XUA4_P1
-	help
-	  Select C2 XUA4 P1 config
-
-config C2_XUA4_BX
-	bool "C2_XUA4_BX"
-	select TARGET_C2_XUA4_BX
-	help
-	  Select C2 XUA4 BX config
-
 endchoice
 
 config TARGET_C2_SKT
@@ -615,38 +567,6 @@ config TARGET_C2_VENUS_P2
 config TARGET_C2_VENUS_BX
 	bool "C2 VENUS BX board"
 	depends on C2_VENUS_BX
-
-config TARGET_C2_BLA4_P0
-	bool "C2 BLA4 P0 board"
-	depends on C2_BLA4_P0
-
-config TARGET_C2_BLA4_P1
-	bool "C2 BLA4 P1 board"
-	depends on C2_BLA4_P1
-
-config TARGET_C2_BLA4_P2
-	bool "C2 BLA4 P2 board"
-	depends on C2_BLA4_P2
-
-config TARGET_C2_BLA4_BX
-	bool "C2 BLA4 BX board"
-	depends on C2_BLA4_BX
-
-config TARGET_C2_2RS4_P1
-	bool "C2 2RS4 P1 board"
-	depends on C2_2RS4_P1
-
-config TARGET_C2_2RS4_P2
-	bool "C2 2RS4 P2 board"
-	depends on C2_2RS4_P2
-
-config TARGET_C2_XUA4_P1
-	bool "C2 XUA4 P1 board"
-	depends on C2_XUA4_P1
-
-config TARGET_C2_XUA4_BX
-	bool "C2 XUA4 BX board"
-	depends on C2_XUA4_BX
 
 endif
 
@@ -737,22 +657,6 @@ source "board/amlogic/c2_venus_p1/Kconfig"
 source "board/amlogic/c2_venus_p2/Kconfig"
 
 source "board/amlogic/c2_venus_bx/Kconfig"
-
-source "board/amlogic/c2_bla4_p0/Kconfig"
-
-source "board/amlogic/c2_bla4_p1/Kconfig"
-
-source "board/amlogic/c2_bla4_p2/Kconfig"
-
-source "board/amlogic/c2_bla4_bx/Kconfig"
-
-source "board/amlogic/c2_2rs4_p1/Kconfig"
-
-source "board/amlogic/c2_2rs4_p2/Kconfig"
-
-source "board/amlogic/c2_xua4_p1/Kconfig"
-
-source "board/amlogic/c2_xua4_bx/Kconfig"
 
 source "board/amlogic/g12a_u200_v1/Kconfig"
 

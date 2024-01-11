@@ -140,7 +140,6 @@ static void write_raw_image(struct blk_desc *dev_desc, disk_partition_t *info,
  *
  * @return Boot image header sectors count or 0 on error
  */
-typedef struct andr_img_hdr boot_img_hdr_t;
 static lbaint_t fb_mmc_get_boot_header(struct blk_desc *dev_desc,
 				       disk_partition_t *info,
 				       boot_img_hdr_t *hdr,

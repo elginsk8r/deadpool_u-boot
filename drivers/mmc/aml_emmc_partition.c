@@ -32,12 +32,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #endif
 /* debug info*/
 #define CONFIG_MPT_DEBUG 	(0)
-
-#ifdef AML_ENABLE_PRODUCTION_MODE
 #define GPT_PRIORITY             (1)
-#else
-#define GPT_PRIORITY             (0)
-#endif
 
 #ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
 #define FALSE 0

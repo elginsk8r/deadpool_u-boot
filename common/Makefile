@@ -140,11 +140,5 @@ obj-$(CONFIG_$(SPL_TPL_)YMODEM_SUPPORT) += xyzModem.o
 obj-$(CONFIG_AVB_VERIFY) += avb_verify.o
 obj-$(CONFIG_MDUMP_COMPRESS) += ramdump.o
 
-ifeq ($(CONFIG_LED_AW2026), y)
-obj-y += leds-aw2026.o
-else ifeq ($(CONFIG_LED_AW210XX), y)
-obj-y += leds-aw210xx.o
-else
 obj-y += led.o
-endif
 obj-${CONFIG_SCHUMACHER_SSR} += ssr.o

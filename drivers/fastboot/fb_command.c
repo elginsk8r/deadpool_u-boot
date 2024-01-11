@@ -724,7 +724,7 @@ static void flashing(char *cmd_parameter, char *response)
 	sprintf(lock_d, "%d%d%d0%d%d%d0", info->version_major, info->version_minor, info->unlock_ability, info->lock_state, info->lock_critical_state, info->lock_bootloader);
 	printf("lock_d state: %s\n", lock_d);
 	env_set("lock", lock_d);
-	run_command("saveenv;", 0);
+	run_command("defenv_reserv; saveenv;", 0);
 	free(info);
 	return;
 }
