@@ -73,7 +73,7 @@
 #endif
 
 /* please config __psram_setting[] if board use psram */
-ddr_set_t __ddr_setting[] __attribute__ ((section(".ddr_settings"))) = {
+ddr_set_t __ddr_setting[] = {
 {
 	/* ddr3 */
 	.board_id				= CONFIG_BOARD_ID_MASK,

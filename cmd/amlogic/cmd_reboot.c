@@ -5,12 +5,12 @@
 
 #include <common.h>
 #include <command.h>
+#include <amlogic/flash_ts.h>
 #include <asm/arch/reboot.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/io.h>
 #include <asm/arch/bl31_apis.h>
-#include <partition_table.h>
-#include <amlogic/storage.h>
+
 /*
 run get_rebootmode  //set reboot_mode env with current mode
 */
@@ -18,9 +18,34 @@ run get_rebootmode  //set reboot_mode env with current mode
 int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	uint32_t reboot_mode_val;
+#ifdef CONFIG_MESON_C1
+	reboot_mode_val = ((readl(SYSCTRL_SEC_STATUS_REG2 ) >> 12) & 0xf);
+	debug("reboot_mode(0x%x)=0x%x\n", SYSCTRL_SEC_STATUS_REG2, reboot_mode_val);
+#else
 	reboot_mode_val = ((readl(AO_SEC_SD_CFG15) >> 12) & 0xf);
-
 	debug("reboot_mode(0x%x)=0x%x\n", AO_SEC_SD_CFG15, reboot_mode_val);
+#endif
+
+	if(is_flash_inited()) {
+		flash_ts_init();
+
+		const char *fts_key = "bootloader.command";
+		char fts_value[256] = { 0 };
+
+		flash_ts_get(fts_key, fts_value, sizeof(fts_value));
+		pr_info("FTS read: bootloader.command -> %s\n", fts_value);
+
+		if (strncmp(fts_value, "boot-recovery", sizeof(fts_value)) == 0) {
+#ifndef CONFIG_G_AB_SYSTEM
+			/* Disable the recovery mode support in A/B system */
+			reboot_mode_val = AMLOGIC_FACTORY_RESET_REBOOT;
+			pr_info("overwriting reboot_mode_val to: %d\n", reboot_mode_val);
+#endif
+		} else if (strncmp(fts_value, "boot-factory", sizeof(fts_value)) == 0) {
+			reboot_mode_val = AMLOGIC_QUIESCENT_REBOOT;
+			pr_info("overwriting reboot_mode_val to: %d\n", reboot_mode_val);
+		}
+	}
 
 	switch (reboot_mode_val)
 	{
@@ -32,6 +57,11 @@ int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		case AMLOGIC_NORMAL_BOOT:
 		{
 			env_set("reboot_mode","normal");
+			break;
+		}
+		case AMLOGIC_QUIESCENT_REBOOT:
+		{
+			env_set("reboot_mode","factory_boot");
 			break;
 		}
 		case AMLOGIC_FACTORY_RESET_REBOOT:
@@ -69,9 +99,9 @@ int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 			env_set("reboot_mode","shutdown_reboot");
 			break;
 		}
-		case AMLOGIC_RESCUEPARTY_REBOOT:
+		case AMLOGIC_CRASH_REBOOT:
 		{
-			env_set("reboot_mode", "rescueparty");
+			env_set("reboot_mode","crash_dump");
 			break;
 		}
 		case AMLOGIC_KERNEL_PANIC:
@@ -89,16 +119,6 @@ int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 			env_set("reboot_mode","rpmbp");
 			break;
 		}
-		case AMLOGIC_QUIESCENT_REBOOT:
-		{
-			env_set("reboot_mode","quiescent");
-			break;
-		}
-		case AMLOGIC_RECOVERY_QUIESCENT_REBOOT:
-		{
-			env_set("reboot_mode","recovery_quiescent");
-			break;
-		}
 		default:
 		{
 			env_set("reboot_mode","charging");
@@ -113,14 +133,13 @@ int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 			break;
 		}
 		case AMLOGIC_BOOTLOADER_REBOOT: {
-			if (dynamic_partition)
-				env_set("reboot_mode","fastboot");
+			env_set("bootdelay","-1");
 			break;
 		}
 	}
 #endif
 
-#if defined(CONFIG_AML_RPMB)
+#if !defined(CONFIG_AML_RPMB_DISABLE)
 	run_command("rpmb_state",0);
 #endif
 
@@ -130,45 +149,38 @@ int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 int do_reboot (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	uint32_t reboot_mode_val = AMLOGIC_NORMAL_BOOT;
-	if (argc <= 1) {
-		printf("reboot use default mode: normal\n");
-	}
+	if (argc <= 1)
+		pr_info("reboot use default mode: normal\n");
 	else {
-		printf("reboot mode: %s\n", argv[1]);
+		pr_info("reboot mode: %s\n", argv[1]);
 		char * mode = argv[1];
 
-		if (strcmp(mode, "next") == 0) {
-			store_restore_bootidx();
-			reboot_mode_val = AMLOGIC_COLD_BOOT;
-		} else if (strcmp(mode, "cold_boot") == 0)
+		if (strcmp(mode, "cold_boot") == 0)
 			reboot_mode_val = AMLOGIC_COLD_BOOT;
 		else if (strcmp(mode, "normal") == 0)
 			reboot_mode_val = AMLOGIC_NORMAL_BOOT;
 		else if (strcmp(mode, "recovery") == 0 || strcmp(mode, "factory_reset") == 0)
 			reboot_mode_val = AMLOGIC_FACTORY_RESET_REBOOT;
+		else if (strcmp(mode, "factory_boot") == 0)
+			reboot_mode_val = AMLOGIC_QUIESCENT_REBOOT;
 		else if (strcmp(mode, "update") == 0)
 			reboot_mode_val = AMLOGIC_UPDATE_REBOOT;
-		else if (strcmp(mode, "fastboot") == 0) {
-			if (dynamic_partition) {
-				printf("dynamic partition, enter fastbootd");
-				reboot_mode_val = AMLOGIC_FACTORY_RESET_REBOOT;
-				run_command("bcb fastbootd",0);
-			} else
-				reboot_mode_val = AMLOGIC_FASTBOOT_REBOOT;
-		} else if (strcmp(mode, "bootloader") == 0)
+		else if (strcmp(mode, "fastboot") == 0)
+			reboot_mode_val = AMLOGIC_FASTBOOT_REBOOT;
+		else if (strcmp(mode, "bootloader") == 0)
 			reboot_mode_val = AMLOGIC_BOOTLOADER_REBOOT;
 		else if (strcmp(mode, "suspend_off") == 0)
 			reboot_mode_val = AMLOGIC_SUSPEND_REBOOT;
 		else if (strcmp(mode, "hibernate") == 0)
 			reboot_mode_val = AMLOGIC_HIBERNATE_REBOOT;
-		else if (strcmp(mode, "rescueparty") == 0)
-			reboot_mode_val = AMLOGIC_RESCUEPARTY_REBOOT;
+		else if (strcmp(mode, "crash_dump") == 0)
+			reboot_mode_val = AMLOGIC_CRASH_REBOOT;
 		else if (strcmp(mode, "kernel_panic") == 0)
 			reboot_mode_val = AMLOGIC_KERNEL_PANIC;
 		else if (strcmp(mode, "rpmbp") == 0)
 			reboot_mode_val = AMLOGIC_RPMBP_REBOOT;
 		else {
-			printf("Can not find match reboot mode, use normal by default\n");
+			pr_info("Can not find match reboot mode, use normal by default\n");
 			reboot_mode_val = AMLOGIC_NORMAL_BOOT;
 		}
 	}
@@ -194,12 +206,12 @@ int do_set_usb_boot(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	unsigned int usb_mode = 0;
 	if (argc <= 1) {
-		printf("usb flag default 0\n");
+		pr_info("usb flag default 0\n");
 	}
 	else {
 		usb_mode = simple_strtoul(argv[1], NULL, 16);
 	}
-	printf("usb flag: %d\n", usb_mode);
+	pr_info("usb flag: %d\n", usb_mode);
 	set_usb_boot_function(usb_mode);
 
 	return 0;
@@ -223,12 +235,12 @@ U_BOOT_CMD(
 	"    cold_boot\n"
 	"    normal[default]\n"
 	"    factory_reset/recovery\n"
+	"    factory_boot\n"
 	"    update\n"
 	"    fastboot\n"
 	"    bootloader\n"
 	"    suspend_off\n"
 	"    hibernate\n"
-	"    next <ONLY work for SC2>\n"
 	"    crash_dump\n"
 );
 
@@ -248,7 +260,6 @@ int do_systemoff(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	aml_system_off();
 	return 0;
 }
-
 
 U_BOOT_CMD(
 	systemoff,	2,	1,	do_systemoff,

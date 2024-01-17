@@ -654,8 +654,6 @@ static int xhci_enable_device(struct usb_device *udev, int port)
 	ctrl_ctx->add_flags = cpu_to_le32(SLOT_FLAG | EP0_FLAG);
 	ctrl_ctx->drop_flags = 0;
 
-	xhci_flush_cache((uintptr_t)ctrl_ctx, sizeof(struct xhci_input_control_ctx));
-
 	xhci_queue_command(ctrl, (void *)ctrl_ctx, slot_id, 0, TRB_ADDR_DEV | TRB_BSR);
 	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
 	if (!event)
@@ -665,12 +663,12 @@ static int xhci_enable_device(struct usb_device *udev, int port)
 	switch (GET_COMP_CODE(le32_to_cpu(event->event_cmd.status))) {
 	case COMP_CTX_STATE:
 	case COMP_EBADSLT:
-		debug("Setup ERROR: address device command for slot %d.\n",
+		printf("Setup ERROR: address device command for slot %d.\n",
 								slot_id);
 		ret = -EINVAL;
 		break;
 	case COMP_TX_ERR:
-		debug("Device not responding to set address.\n");
+		puts("Device not responding to set address.\n");
 		ret = -EPROTO;
 		break;
 	case COMP_DEV_ERR:
@@ -739,8 +737,6 @@ static int xhci_address_device(struct usb_device *udev, int root_portnr)
 	ctrl_ctx->add_flags = cpu_to_le32(SLOT_FLAG | EP0_FLAG);
 	ctrl_ctx->drop_flags = 0;
 
-	xhci_flush_cache((uintptr_t)ctrl_ctx, sizeof(struct xhci_input_control_ctx));
-
 	xhci_queue_command(ctrl, (void *)ctrl_ctx, slot_id, 0, TRB_ADDR_DEV);
 	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
 	BUG_ON(TRB_TO_SLOT_ID(le32_to_cpu(event->event_cmd.flags)) != slot_id);
@@ -748,12 +744,12 @@ static int xhci_address_device(struct usb_device *udev, int root_portnr)
 	switch (GET_COMP_CODE(le32_to_cpu(event->event_cmd.status))) {
 	case COMP_CTX_STATE:
 	case COMP_EBADSLT:
-		debug("Setup ERROR: address device command for slot %d.\n",
+		printf("Setup ERROR: address device command for slot %d.\n",
 								slot_id);
 		ret = -EINVAL;
 		break;
 	case COMP_TX_ERR:
-		debug("Device not responding to set address.\n");
+		puts("Device not responding to set address.\n");
 		ret = -EPROTO;
 		break;
 	case COMP_DEV_ERR:
@@ -967,8 +963,6 @@ static u32 xhci_port_state_to_neutral(u32 state)
 	return (state & XHCI_PORT_RO) | (state & XHCI_PORT_RWS);
 }
 
-#define CONFIG_SYS_USB_XHCI_MAX_ROOT_PORTS 12
-
 /**
  * Submits the Requests to the XHCI Host Controller
  *
@@ -987,12 +981,12 @@ static int xhci_submit_root(struct usb_device *udev, unsigned long pipe,
 	uint32_t reg;
 	volatile uint32_t *status_reg;
 	struct xhci_ctrl *ctrl = xhci_get_ctrl(udev);
-	//struct xhci_hccr *hccr = ctrl->hccr;
+	struct xhci_hccr *hccr = ctrl->hccr;
 	struct xhci_hcor *hcor = ctrl->hcor;
-	//int max_ports = HCS_MAX_PORTS(xhci_readl(&hccr->cr_hcsparams1));
+	int max_ports = HCS_MAX_PORTS(xhci_readl(&hccr->cr_hcsparams1));
 
 	if ((req->requesttype & USB_RT_PORT) &&
-	    le16_to_cpu(req->index) > CONFIG_SYS_USB_XHCI_MAX_ROOT_PORTS) {
+	    le16_to_cpu(req->index) > max_ports) {
 		printf("The request port(%d) exceeds maximum port number\n",
 		       le16_to_cpu(req->index) - 1);
 		return -EINVAL;
@@ -1317,7 +1311,7 @@ static int xhci_lowlevel_init(struct xhci_ctrl *ctrl)
 		return -ENOMEM;
 
 	reg = xhci_readl(&hccr->cr_hcsparams1);
-#ifdef CONFIG_AML_USB2_PHY
+#ifdef CONFIG_AML_USB
 	descriptor.hub.bNbrPorts = usb2portnum;
 #else
 	descriptor.hub.bNbrPorts = ((reg & HCS_MAX_PORTS_MASK) >>
@@ -1597,11 +1591,7 @@ static int xhci_phy_tuning_1(struct usb_device *dev, int port)
 	     device_get_uclass_id(udev) != UCLASS_USB;
 	     udev = udev->parent)
 	     ;
-
-#ifdef CONFIG_USB_XHCI_DWC3
 	xhci_dwc3_phy_tuning_1(udev, port);
-#endif
-
 	return 0;
 }
 

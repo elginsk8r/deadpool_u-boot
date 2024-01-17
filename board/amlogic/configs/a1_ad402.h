@@ -11,15 +11,9 @@
 /*
  * platform power init config
  */
-#define AML_VDDCORE_INIT_VOLTAGE    840     // VCCK power up voltage
-	/* If AML_VDDCORE_INIT_VOLTAGE_SEL is 1, the voltage of vddee
-	 * will be controlled by efuse. if 0, it is controlled by
-	 * AML_VDDCORE_INIT_VOLTAGE
-	 */
-#define AML_VDDCORE_INIT_VOLTAGE_SEL 			1
-#define AML_VDDCORE_INIT_EFUSE_MARGIN			30
-#define AML_VDDCORE_INIT_EFUSE_OFFSET			0xc8
-#define AML_VDDCORE_INIT_EFUSE_BASE_V0LT		680
+#define AML_VCCK_INIT_VOLTAGE    800     // VCCK power up voltage
+#define AML_VDDEE_INIT_VOLTAGE   800     // VDDEE power up voltage
+#define AML_VDDEE_SLEEP_VOLTAGE  731     // VDDEE suspend voltage
 
 /* configs for CEC */
 /* SMP Definitinos */
@@ -107,14 +101,13 @@
             "if itest ${upgrade_step} == 3; then run storeargs; run update; fi;"\
             "\0"\
         "storeargs="\
-            "get_bootloaderversion;" \
             "setenv bootargs ${initargs} ${fs_type} otg_device=${otg_device} "\
         "logo=${display_layer},loaded,${fb_addr} vout=${outputmode},enable panel_type=${panel_type} "\
                 "hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} "\
                 "frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} cvbsmode=${cvbsmode} "\
                 "osd_reverse=${osd_reverse} video_reverse=${video_reverse} irq_check_en=${Irq_check_en}  "\
                 "androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
-            "setenv bootargs ${bootargs} androidboot.bootloader=${bootloader_version} androidboot.hardware=amlogic;"\
+            "setenv bootargs ${bootargs} androidboot.hardware=amlogic;"\
             "run cmdline_keys;"\
             "\0"\
         "switch_bootmode="\
@@ -217,7 +210,7 @@
 
 /* running in sram */
 #define UBOOT_RUN_IN_SRAM
-#ifdef CONFIG_UBOOT_RUN_IN_SRAM
+#ifdef UBOOT_RUN_IN_SRAM
 #define CONFIG_SYS_INIT_SP_ADDR				(0x00200000)
 /* Size of malloc() pool */
 #define CONFIG_SYS_MALLOC_LEN				(256*1024)
@@ -260,8 +253,8 @@
 #error CONFIG_AML_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
-#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MTD_SPI_NAND) && defined(CONFIG_MESON_NFC)
-#error CONFIG_SPI_NAND/CONFIG_MTD_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
+#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MESON_NFC)
+#error CONFIG_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
 /* #define		CONFIG_AML_SD_EMMC 1 */
@@ -275,8 +268,15 @@
 #endif
 #define		CONFIG_PARTITIONS 1
 
-#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND || defined CONFIG_MTD_SPI_NAND
+#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND
+	#define CONFIG_CMD_NAND 1
+	#define CONFIG_MTD_DEVICE 1
+	/* #define CONFIG_RBTREE */
+	#define CONFIG_CMD_NAND_TORTURE 1
+	#define CONFIG_CMD_MTDPARTS   1
+	#define CONFIG_MTD_PARTITIONS 1
 	#define CONFIG_SYS_MAX_NAND_DEVICE  2
+	#define CONFIG_SYS_NAND_BASE_LIST   {0}
 #endif
 
 /* vpu */
@@ -372,7 +372,5 @@
 #endif /* CONFIG_AML_SECURE_UBOOT */
 
 #define CONFIG_FIP_IMG_SUPPORT  1
-
-#define BL32_SHARE_MEM_SIZE  0x100000
 
 #endif

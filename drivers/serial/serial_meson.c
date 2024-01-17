@@ -75,13 +75,12 @@ static int meson_serial_getc(struct udevice *dev)
 
 	return readl(&uart->rfifo) & 0xff;
 #else
-    return 0;
+	return 0;
 #endif
 }
 
 static int meson_serial_putc(struct udevice *dev, const char ch)
 {
-#ifndef CONFIG_DISABLE_AML_SERIAL
 	struct meson_serial_platdata *plat = dev->platdata;
 	struct meson_uart *const uart = plat->reg;
 
@@ -90,7 +89,6 @@ static int meson_serial_putc(struct udevice *dev, const char ch)
 
 	writel(ch, &uart->wfifo);
 
-#endif
 	return 0;
 }
 

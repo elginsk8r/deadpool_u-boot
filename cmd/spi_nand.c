@@ -28,7 +28,7 @@ static int do_spinand(cmd_tbl_t *cmdtp,
 		if (store_device_valid(BOOT_SNAND)) {
 			ret = store_set_device(BOOT_SNAND);
 			if (!ret) {
-			if (store_get_device_bootloader_mode() == DISCRETE_BOOTLOADER) {
+#ifdef CONFIG_DISCRETE_BOOTLOADER
 				ret = store_boot_erase(BOOT_BL2, BOOT_OPS_ALL);
 				if (ret) {
 					pr_info("%s %d erase failed in %s",
@@ -51,7 +51,7 @@ static int do_spinand(cmd_tbl_t *cmdtp,
 				return store_boot_write(BOOT_TPL, BOOT_OPS_ALL,
 						size - BL2_SIZE,
 						(void *)(addr + BL2_SIZE));
-				} else {
+#else
 				ret = store_boot_erase(BOOT_LOADER,
 						       BOOT_OPS_ALL);
 				if (ret) {
@@ -64,7 +64,7 @@ static int do_spinand(cmd_tbl_t *cmdtp,
 				return store_boot_write(BOOT_LOADER,
 					    BOOT_OPS_ALL,
 						size, (void *)addr);
-			}
+#endif
 			}
 		} else {
 			pr_info("%s %d no valid spi nand\n",

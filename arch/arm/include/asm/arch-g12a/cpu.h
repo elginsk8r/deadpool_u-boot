@@ -21,7 +21,7 @@
 #endif
 
 /* Size of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN		(96*1024*1024)
+#define CONFIG_SYS_MALLOC_LEN		(64*1024*1024)
 
 /* for uboot envrionment use */
 /* #define CONFIG_DDR_SIZE					1024 */
@@ -73,9 +73,5 @@
 
 #define CPU_ID_REG		P_AO_SEC_SD_CFG8
 #define PACKAGE_ID_MASK 	0xFF
-
-#define MIPI_DSI_REGISTER  1
-#define MIPI_DSI_BASE        0xffd07000L
-#define MIPI_DSI_PHY_BASE    0xff644000L
 
 #endif /* _CPU_H */

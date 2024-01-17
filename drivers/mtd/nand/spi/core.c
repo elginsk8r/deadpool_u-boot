@@ -25,21 +25,10 @@
 #include <spi.h>
 #include <spi-mem.h>
 #include <linux/mtd/spinand.h>
-#include <linux/mtd/partitions.h>
-#include <spi.h>
-#include <amlogic/aml_rsv.h>
-#include <amlogic/aml_mtd.h>
-#include <linux/log2.h>
-#include <asm/arch/cpu_config.h>
-#include <amlogic/storage.h>
-#include <amlogic/cpu_id.h>
 #endif
 
 /* SPI NAND index visible in MTD names */
 static int spi_nand_idx;
-#ifdef CONFIG_AML_STORAGE
-extern int spinand_fit_storage(struct mtd_info *info, char *name, u8 *id);
-#endif
 
 static void spinand_cache_op_adjust_colum(struct spinand_device *spinand,
 					  const struct nand_page_io_req *req,
@@ -218,7 +207,6 @@ static int spinand_init_quad_enable(struct spinand_device *spinand)
 	    spinand->op_templates.update_cache->data.buswidth == 4)
 		enable = true;
 
-	printf("spinand qe is %s\n",enable ? "enable" : "disabled");
 	return spinand_upd_cfg(spinand, CFG_QUAD_ENABLE,
 			       enable ? CFG_QUAD_ENABLE : 0);
 }
@@ -462,16 +450,11 @@ static int spinand_read_id_op(struct spinand_device *spinand, u8 *buf)
 {
 	struct spi_mem_op op = SPINAND_READID_OP(0, spinand->scratchbuf,
 						 SPINAND_MAX_ID_LEN);
-	int ret, i;
+	int ret;
 
 	ret = spi_mem_exec_op(spinand->slave, &op);
 	if (!ret)
 		memcpy(buf, spinand->scratchbuf, SPINAND_MAX_ID_LEN);
-
-	/* Success or failure print id */
-	printf("spinand id detect\n");
-	for (i = 0; i < SPINAND_MAX_ID_LEN; i++)
-		printf("id[%d] = 0x%x\n",i,spinand->id.data[i]);
 
 	return ret;
 }
@@ -625,72 +608,6 @@ static int spinand_mtd_read(struct mtd_info *mtd, loff_t from,
 	return ret ? ret : max_bitflips;
 }
 
-/* add for meson info_page */
-#if SPINAND_MESON_INFO_PAGE
-bool spinand_is_info_page(struct nand_device *nand, int page)
-{
-	return unlikely((page % 128) == ((BL2_SIZE / 2048) - 1) &&
-			page < BOOT_TOTAL_PAGES);
-}
-
-int spinand_set_info_page(struct mtd_info *mtd, void *buf)
-{
-	u32 page_per_blk;
-	struct mtd_oob_region region;
-	struct nand_device* dev = mtd_to_nanddev(mtd);
-	struct info_page *info_page = (struct info_page *)buf;
-
-	page_per_blk = mtd->erasesize / mtd->writesize;
-	memcpy(info_page->magic, SPINAND_MAGIC, strlen(SPINAND_MAGIC));
-	info_page->version = SPINAND_INFO_VER;
-	/* DISCRETE only */
-	info_page->mode = 1;
-	info_page->bl2_num = CONFIG_BL2_COPY_NUM;
-	info_page->fip_num = CONFIG_NAND_TPL_COPY_NUM;
-	info_page->dev.s.rd_max = 2;
-	info_page->dev.s.fip_start =
-		BOOT_TOTAL_PAGES + NAND_RSV_BLOCK_NUM * page_per_blk;
-	info_page->dev.s.fip_pages = CONFIG_TPL_SIZE_PER_COPY / mtd->writesize;
-	info_page->dev.s.page_size = mtd->writesize;
-	info_page->dev.s.page_per_blk = page_per_blk;
-	info_page->dev.s.oob_size = mtd->oobsize;
-	mtd->ooblayout->free(mtd, 0, &region);
-	info_page->dev.s.oob_offset = region.offset;
-	info_page->dev.s.bbt_start = 0;
-	info_page->dev.s.bbt_valid = 0;
-	info_page->dev.s.bbt_size = 0;
-	info_page->dev.s.planes_per_lun = dev->memorg.planes_per_lun;
-
-	return 0;
-}
-
-static int spinand_append_info_page(struct mtd_info *mtd,
-				    struct nand_page_io_req *last_req)
-{
-	struct spinand_device *spinand = mtd_to_spinand(mtd);
-	struct nand_device *nand = mtd_to_nanddev(mtd);
-	struct nand_page_io_req req;
-	int page;
-	u8 *buf;
-	int ret = 0;
-
-	page = nanddev_pos_to_row(nand, &last_req->pos);
-	if (spinand_is_info_page(nand, page)) {
-		req = *last_req;
-		req.datalen = mtd->writesize;
-		req.dataoffs = 0;
-		req.ooblen = 0;
-		buf = kzalloc(mtd->writesize, GFP_KERNEL);
-		req.databuf.in = buf;
-		spinand_set_info_page(mtd, buf);
-		nanddev_pos_next_page(nand, &req.pos);
-		ret = spinand_write_page(spinand, &req);
-		kfree(buf);
-		pr_info("%s: %d\n", __func__, page);
-	}
-	return ret;
-}
-#endif
 static int spinand_mtd_write(struct mtd_info *mtd, loff_t to,
 			     struct mtd_oob_ops *ops)
 {
@@ -720,12 +637,6 @@ static int spinand_mtd_write(struct mtd_info *mtd, loff_t to,
 		if (ret)
 			break;
 
-		/* add for meson info page */
-		#if SPINAND_MESON_INFO_PAGE
-		ret = spinand_append_info_page(mtd, &iter.req);
-		if (ret)
-			break;
-		#endif
 		ops->retlen += iter.req.datalen;
 		ops->oobretlen += iter.req.ooblen;
 	}
@@ -836,18 +747,8 @@ static int spinand_erase(struct nand_device *nand, const struct nand_pos *pos)
 {
 	struct spinand_device *spinand = nand_to_spinand(nand);
 	u8 status;
-	int ret = 0;
+	int ret;
 
-#if SPINAND_MESON_RSV
-	unsigned int block = nanddev_pos_to_offs(nand, pos) /
-			(nand->memorg.pages_per_eraseblock * nand->memorg.pagesize);
-
-	/* meson rsv protect */
-	if (meson_rsv_erase_protect(spinand->rsv, block)) {
-		pr_err("blk 0x%x is protected\n", block);
-		return ret;
-	}
-#endif
 	ret = spinand_select_target(spinand, pos->target);
 	if (ret)
 		return ret;
@@ -930,12 +831,9 @@ static const struct nand_ops spinand_ops = {
 
 static const struct spinand_manufacturer *spinand_manufacturers[] = {
 	&gigadevice_spinand_manufacturer,
-	&toshiba_spinand_manufacturer,
 	&macronix_spinand_manufacturer,
 	&micron_spinand_manufacturer,
 	&winbond_spinand_manufacturer,
-	&zetta_spinand_manufacturer,
-	&xtx_spinand_manufacturer,
 };
 
 static int spinand_manufacturer_detect(struct spinand_device *spinand)
@@ -1039,8 +937,6 @@ int spinand_match_and_init(struct spinand_device *spinand,
 		spinand->eccinfo = table[i].eccinfo;
 		spinand->flags = table[i].flags;
 		spinand->select_target = table[i].select_target;
-		/* Record the current spinand */
-		spinand->model = table[i].model;
 
 		op = spinand_select_op_variant(spinand,
 					       info->op_variants.read_cache);
@@ -1094,12 +990,12 @@ static int spinand_detect(struct spinand_device *spinand)
 		return -EINVAL;
 	}
 
-	printf("%s  %s SPI NAND was found.\n", spinand->manufacturer->name, spinand->model);
-	printf("%llu MiB, block size: %zu KiB, page size: %zu, OOB size: %u\n",
+	dev_info(spinand->slave->dev,
+		 "%s SPI NAND was found.\n", spinand->manufacturer->name);
+	dev_info(spinand->slave->dev,
+		 "%llu MiB, block size: %zu KiB, page size: %zu, OOB size: %u\n",
 		 nanddev_size(nand) >> 20, nanddev_eraseblock_size(nand) >> 10,
 		 nanddev_page_size(nand), nanddev_per_page_oobsize(nand));
-	printf("read cmd: 0x%x write cmd: 0x%x\n",spinand->op_templates.read_cache->cmd.opcode,
-		 spinand->op_templates.write_cache->cmd.opcode);
 
 	return 0;
 }
@@ -1242,148 +1138,6 @@ static void spinand_cleanup(struct spinand_device *spinand)
 	kfree(spinand->scratchbuf);
 }
 
-#ifdef CONFIG_AML_MTDPART
-/* The size of the partition must be block aligned */
-int spinand_add_partitions(struct mtd_info *mtd,
-				  const struct mtd_partition *parts,
-				  int nbparts)
-{
-	int part_num = 0, i = 0;
-	struct mtd_partition *temp, *parts_nm;
-	loff_t off;
-	cpu_id_t cpu_id = get_cpu_id();
-
-	if (store_get_device_bootloader_mode() == DISCRETE_BOOTLOADER) {
-	if (cpu_id.family_id == MESON_CPU_MAJOR_ID_SC2)
-		part_num = nbparts + 5;
-	else
-		part_num = nbparts + 2;
-	} else
-		part_num = nbparts + 1;
-
-	temp = kzalloc(sizeof(*temp) * part_num, GFP_KERNEL);
-	memset(temp, 0, sizeof(*temp) * part_num);
-	temp[0].name = BOOT_LOADER;
-	temp[0].offset = 0;
-	temp[0].size = BOOT_TOTAL_PAGES * mtd->writesize;
-	if (temp[0].size % mtd->erasesize)
-		WARN_ON(1);
-	off = temp[0].size + NAND_RSV_BLOCK_NUM * mtd->erasesize;
-
-	if (store_get_device_bootloader_mode() == DISCRETE_BOOTLOADER) {
-		if (cpu_id.family_id == MESON_CPU_MAJOR_ID_SC2) {
-			extern struct storage_startup_parameter g_ssp;
-			temp[BOOT_AREA_BL2E].name = BOOT_BL2E;
-			temp[BOOT_AREA_BL2E].offset =
-				g_ssp.boot_entry[BOOT_AREA_BL2E].offset;
-			temp[BOOT_AREA_BL2E].size =
-				g_ssp.boot_entry[BOOT_AREA_BL2E].size * g_ssp.boot_bakups;
-			if (temp[0].size % mtd->erasesize)
-				WARN_ON(1);
-
-			temp[BOOT_AREA_BL2X].name = BOOT_BL2X;
-			temp[BOOT_AREA_BL2X].offset =
-				g_ssp.boot_entry[BOOT_AREA_BL2X].offset;
-			temp[BOOT_AREA_BL2X].size =
-				g_ssp.boot_entry[BOOT_AREA_BL2X].size * g_ssp.boot_bakups;
-			if (temp[0].size % mtd->erasesize)
-				WARN_ON(1);
-
-			temp[BOOT_AREA_DDRFIP].name = BOOT_DDRFIP;
-			temp[BOOT_AREA_DDRFIP].offset =
-				g_ssp.boot_entry[BOOT_AREA_DDRFIP].offset;
-			temp[BOOT_AREA_DDRFIP].size =
-				g_ssp.boot_entry[BOOT_AREA_DDRFIP].size * g_ssp.boot_bakups;
-			if (temp[0].size % mtd->erasesize)
-				WARN_ON(1);
-
-			temp[BOOT_AREA_DEVFIP].name = BOOT_DEVFIP;
-			temp[BOOT_AREA_DEVFIP].offset =
-				g_ssp.boot_entry[BOOT_AREA_DEVFIP].offset;
-			temp[BOOT_AREA_DEVFIP].size =
-				g_ssp.boot_entry[BOOT_AREA_DEVFIP].size * CONFIG_NAND_TPL_COPY_NUM;
-			if (temp[0].size % mtd->erasesize)
-				WARN_ON(1);
-			off = temp[BOOT_AREA_DEVFIP].offset + temp[BOOT_AREA_DEVFIP].size;
-			parts_nm = &temp[5];
-		} else {
-			temp[1].name = BOOT_TPL;
-			temp[1].offset = off;
-			temp[1].size = CONFIG_TPL_SIZE_PER_COPY * CONFIG_NAND_TPL_COPY_NUM;
-			if (temp[1].size % mtd->erasesize)
-				WARN_ON(1);
-			parts_nm = &temp[2];
-			off += temp[1].size;
-		}
-	} else
-		parts_nm = &temp[1];
-
-	for (; i < nbparts; i++) {
-		//printf("add_partitions ==== name = %s\n",parts[i].name);
-		if (!parts[i].name) {
-			pr_err("name can't be null! ");
-			pr_err("please check your %d th partition name!\n",
-				 i + 1);
-			return 1;
-		}
-		if ((off + parts[i].size) > mtd->size) {
-			pr_err("%s %d over nand size!\n",
-				__func__, __LINE__);
-			return 1;
-		}
-		parts_nm[i].name = parts[i].name;
-#ifndef CONFIG_NOT_SKIP_BAD_BLOCK
-		loff_t offset = off, end = off + parts[i].size;
-
-		do {
-			if (mtd->_block_isbad(mtd, offset)) {
-				pr_err("%s %d found bad block in 0x%llx\n",
-					__func__, __LINE__, offset);
-				end += mtd->erasesize;
-			}
-			offset += mtd->erasesize;
-		} while (offset < end && offset < mtd->size);
-		parts_nm[i].size = end - off - parts[i].size;
-#endif/* CONFIG_NOT_SKIP_BAD_BLOCK */
-		parts_nm[i].offset = off;
-		if (parts[i].size % mtd->erasesize) {
-			pr_err("%s %d \"%s\" size auto align to block size\n",
-				__func__, __LINE__, parts[i].name);
-			parts_nm[i].size += parts[i].size % mtd->erasesize;
-		}
-		/* it's ok "+=" here because size has been set to 0 */
-		parts_nm[i].size += parts[i].size;
-		off += parts_nm[i].size;
-		if (i == (nbparts - 1))
-			parts_nm[i].size = mtd->size - off;
-	}
-	return add_mtd_partitions(mtd, temp, part_num);
-}
-#endif
-
-#if SPINAND_MESON_RSV /* add for meson rsv */
-static int spinand_scan_bbt(struct spinand_device *spinand, struct mtd_info *mtd)
-{
-	loff_t offset = 0;
-	u64 block_cnt = mtd->size >> mtd->erasesize_shift;
-	int i = 0, ret = 0;
-
-	spinand->bbt_scan = 1;
-	memset(spinand->bbt, 0, block_cnt);
-	for (i = 0; i < block_cnt; i++) {
-		offset = i * mtd->erasesize;
-		ret = mtd->_block_isbad(mtd, offset);
-		if (ret) {
-			pr_err("%s %d detected a bad block at 0x%llx\n",
-				 __func__, __LINE__, offset);
-			spinand->bbt[i] = NAND_FACTORY_BAD;
-		}
-	}
-	spinand->bbt_scan = 0;
-	return 0;
-}
-#endif
-
 static int spinand_probe(struct udevice *dev)
 {
 	struct spinand_device *spinand = dev_get_priv(dev);
@@ -1423,45 +1177,13 @@ static int spinand_probe(struct udevice *dev)
 
 #ifndef __UBOOT__
 	ret = mtd_device_register(mtd, NULL, 0);
-/*#else
-	ret = add_mtd_device(mtd);*/
+#else
+	ret = add_mtd_device(mtd);
 #endif
 	if (ret)
 		goto err_spinand_cleanup;
 
-#ifdef CONFIG_AML_STORAGE
-	ret = spinand_fit_storage(mtd, mtd->name, spinand->id.data);
-#endif
-
-#if SPINAND_MESON_RSV /* add for meson rsv management */
-	if (is_power_of_2(mtd->erasesize))
-		mtd->erasesize_shift = ffs(mtd->erasesize) - 1;
-	else
-		mtd->erasesize_shift = 0;
-
-	if (is_power_of_2(mtd->writesize))
-		mtd->writesize_shift = ffs(mtd->writesize) - 1;
-	else
-		mtd->writesize_shift = 0;
-
-	spinand->rsv = kzalloc(sizeof(*spinand->rsv), GFP_KERNEL);
-	meson_rsv_init(mtd, spinand->rsv);
-	spinand->bbt = kzalloc(mtd->size >> mtd->erasesize_shift, GFP_KERNEL);
-	if (meson_rsv_check(spinand->rsv->bbt)) {
-		pr_err("no valid bbt info, scanning!\n");
-		spinand_scan_bbt(spinand, mtd);
-		meson_rsv_save(spinand->rsv->bbt, spinand->bbt);
-	} else {
-		pr_err("reading bbt info from %s!\n", mtd->name);
-		meson_rsv_read(spinand->rsv->bbt, spinand->bbt);
-	}
-
-	meson_rsv_check(spinand->rsv->env);
-	meson_rsv_check(spinand->rsv->key);
-	meson_rsv_check(spinand->rsv->dtb);
-#endif
-
-	return ret;
+	return 0;
 
 err_spinand_cleanup:
 	spinand_cleanup(spinand);

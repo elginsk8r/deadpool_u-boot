@@ -12,15 +12,11 @@
 #ifndef _FASTBOOT_H_
 #define _FASTBOOT_H_
 
-#include <android_vab.h>
-
 #define FASTBOOT_VERSION	"0.4"
 
 /* The 64 defined bytes plus \0 */
 #define FASTBOOT_COMMAND_LEN	(64 + 1)
 #define FASTBOOT_RESPONSE_LEN	(64 + 1)
-
-extern int busy_flag;
 
 /**
  * All known commands to fastboot
@@ -28,24 +24,19 @@ extern int busy_flag;
 enum {
 	FASTBOOT_COMMAND_GETVAR = 0,
 	FASTBOOT_COMMAND_DOWNLOAD,
-#if !CONFIG_IS_ENABLED(NO_FASTBOOT_FLASHING)
-	FASTBOOT_COMMAND_FLASHING,
-#endif// #if !CONFIG_IS_ENABLED(NO_FASTBOOT_FLASHING)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	FASTBOOT_COMMAND_FLASH,
 	FASTBOOT_COMMAND_ERASE,
 #endif
 	FASTBOOT_COMMAND_BOOT,
 	FASTBOOT_COMMAND_CONTINUE,
-	FASTBOOT_COMMAND_REBOOT_BOOTLOADER,
-	FASTBOOT_COMMAND_REBOOT_FASTBOOT,
 	FASTBOOT_COMMAND_REBOOT,
+	FASTBOOT_COMMAND_REBOOT_BOOTLOADER,
 	FASTBOOT_COMMAND_SET_ACTIVE,
-	FASTBOOT_COMMAND_SNAOSHOT_UPDATE,
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_FORMAT)
 	FASTBOOT_COMMAND_OEM_FORMAT,
 #endif
-	FASTBOOT_COMMAND_OEM,
+
 	FASTBOOT_COMMAND_COUNT
 };
 
@@ -69,37 +60,12 @@ void fastboot_response(const char *tag, char *response,
 void fastboot_fail(const char *reason, char *response);
 
 /**
- * fastboot_busy() - Write a INFO response of the form "INFO$reason".
- *
- * @reason: Pointer to returned reason string
- * @response: Pointer to fastboot response buffer
- */
-void fastboot_busy(const char *reason, char *response);
-
-/**
  * fastboot_okay() - Write an OKAY response of the form "OKAY$reason".
  *
  * @reason: Pointer to returned reason string, or NULL to send a bare "OKAY"
  * @response: Pointer to fastboot response buffer
  */
 void fastboot_okay(const char *reason, char *response);
-
-/**
- *check lock state
- *return 1 if locked
- *return 0 if unlocked
- */
-int check_lock(void);
-
-/**
- *get merge status
-*/
-int get_mergestatus(struct misc_virtual_ab_message *message);
-
-/**
- *set merge status
-*/
-int set_mergestatus_cancel(struct misc_virtual_ab_message *message);
 
 /**
  * fastboot_set_reboot_flag() - Set flag to indicate reboot-bootloader

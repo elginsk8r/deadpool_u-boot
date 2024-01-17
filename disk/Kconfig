@@ -75,6 +75,7 @@ config EFI_PARTITION
 	depends on PARTITIONS
 	default y if DISTRO_DEFAULTS
 	default y if TEGRA
+	default y if AML_GPT
 	select LIB_UUID
 	help
 	  Say Y here if you would like to use device under U-Boot which
@@ -132,6 +133,7 @@ config PARTITION_TYPE_GUID
 	bool "Enable support of GUID for partition type"
 	depends on PARTITIONS
 	depends on EFI_PARTITION
+	default y if AML_GPT
 	help
 	  Activate the configuration of GUID type
 	  for EFI partition
@@ -146,10 +148,7 @@ config AML_PARTITION
 config AML_GPT
 	bool "Enable AML GPT partition table"
 	depends on PARTITIONS
-	default y if AML_PARTITION
 	select RANDOM_UUID
-	select EFI_PARTITION
-	select PARTITION_TYPE_GUID
 	help
 	   "AML_GPT_HELP"
 

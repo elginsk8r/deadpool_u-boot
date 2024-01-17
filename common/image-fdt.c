@@ -179,7 +179,7 @@ int boot_relocate_fdt(struct lmb *lmb, char **of_flat_tree, ulong *of_size)
 		debug("## device tree at %p ... %p (len=%ld [0x%lX])\n",
 		      fdt_blob, fdt_blob + *of_size - 1, of_len, of_len);
 
-		printf("   Loading Device Tree to %p, end %p ... ",
+		pr_info("   Loading Device Tree to %p, end %p ... ",
 		       of_start, of_start + of_len - 1);
 
 		err = fdt_open_into(fdt_blob, of_start, of_len);
@@ -187,7 +187,7 @@ int boot_relocate_fdt(struct lmb *lmb, char **of_flat_tree, ulong *of_size)
 			fdt_error("fdt move failed");
 			goto error;
 		}
-		puts("OK\n");
+		pr_info("OK\n");
 	}
 
 	*of_flat_tree = of_start;
@@ -241,13 +241,14 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 #endif
 	const char *select = NULL;
 	int		ok_no_fdt = 0;
-
+#ifndef CONFIG_ANDROID_BOOT_IMAGE
 	*of_flat_tree = NULL;
 	*of_size = 0;
-
+#endif
 	if (argc > 2)
 		select = argv[2];
-
+	/* find flattened device tree */
+	#ifdef CONFIG_DTB_MEM_ADDR
 	if (!select) {
 		if (env_get("dtb_mem_addr")) {
 			select = env_get("dtb_mem_addr");
@@ -257,6 +258,7 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 			select = "0x01000000";
 		}
 	}
+	#endif
 
 	if (select || genimg_has_config(images)) {
 #if CONFIG_IS_ENABLED(FIT)
@@ -363,7 +365,7 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 			 */
 #if CONFIG_IS_ENABLED(FIT)
 			/* check FDT blob vs FIT blob */
-			if (fit_check_format(buf)) {
+			if (!fit_check_format(buf, IMAGE_SIZE_INVAL)) {
 				ulong load, len;
 
 				fdt_noffset = boot_get_fdt_fit(images,
@@ -417,20 +419,39 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 				fdt_error("image is not a fdt");
 				goto error;
 			}
-
+			/*
 			if (fdt_totalsize(fdt_blob) != fdt_len) {
 				fdt_error("fdt size != image size");
 				goto error;
 			}
+			*/
 		} else {
 			debug("## No Flattened Device Tree\n");
 			goto no_fdt;
 		}
 	} else {
+		#if defined(CONFIG_ANDROID_BOOT_IMAGE)
+		if (images->ft_len) {
+			fdt_blob = (char *)images->ft_addr;
+
+			if (fdt_check_header(fdt_blob) != 0) {
+				fdt_error("image is not a fdt");
+				goto error;
+			}
+			/*
+			if (fdt_totalsize(fdt_blob) != images->ft_len) {
+				fdt_error("fdt size != image size");
+				goto error;
+			}*/
+		} else {
+			printf("## No Flattened Device Tree\n");
+			goto error;
+		}
+		#else
 		debug("## No Flattened Device Tree\n");
 		goto no_fdt;
+		#endif
 	}
-
 	*of_flat_tree = fdt_blob;
 	*of_size = fdt_totalsize(fdt_blob);
 	debug("   of_flat_tree at 0x%08lx size 0x%08lx\n",

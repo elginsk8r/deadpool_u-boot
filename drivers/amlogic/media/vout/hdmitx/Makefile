@@ -1,4 +1,11 @@
-# SPDX-License-Identifier: GPL-2.0+
+#
+# (C) Copyright 2018
+#
 
-obj-$(CONFIG_AML_HDMITX20) += hdmitx20/
-obj-$(CONFIG_AML_HDMITX20) += sound.o
+#EXTRA_CFLAGS = -Idrivers/video/include/
+
+obj-y += hdmitx.o
+
+hdmitx-y := hdmitx_set.o hdmitx_tvenc.o enc_clk_config.o hdmi_edid_parsing.o hdmi_parameters.o
+#aml_hdmitx20-$(CONFIG_AML_HDMITX20_HDCP) += hdmitx_hdcp.o
+

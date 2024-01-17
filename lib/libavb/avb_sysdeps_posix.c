@@ -5,7 +5,7 @@
 
 #include <stdarg.h>
 #include <stdlib.h>
-#include "avb_sysdeps.h"
+#include <libavb/avb_sysdeps.h>
 
 int avb_memcmp(const void* src1, const void* src2, size_t n) {
   return memcmp(src1, src2, n);
@@ -21,10 +21,6 @@ void* avb_memset(void* dest, const int c, size_t n) {
 
 int avb_strcmp(const char* s1, const char* s2) {
   return strcmp(s1, s2);
-}
-
-int avb_strncmp(const char* s1, const char* s2, size_t n) {
-  return strncmp(s1, s2, n);
 }
 
 size_t avb_strlen(const char* str) {

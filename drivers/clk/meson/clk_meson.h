@@ -53,7 +53,6 @@ struct parm {
 struct meson_clk {
 	void __iomem *addr;
 	struct clk clkin;
-	u32 actual_rate;
 };
 
 /* MPLL Parameters */

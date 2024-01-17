@@ -16,7 +16,6 @@
 #include <linux/log2.h>
 #include <dm/pinctrl.h>
 #include "mmc_private.h"
-#include <asm/arch/register.h>
 
 static inline void *get_regbase(const struct mmc *mmc)
 {
@@ -107,35 +106,25 @@ static void meson_mmc_config_clock(struct meson_host *host)
 	struct mmc *mmc = host->mmc;
 	uint32_t clk = 0, clk_src = 0, clk_div = 0;
 	uint32_t co_phase = 0, tx_phase = 0;
-	uint32_t meson_mmc_clk = 0, cfg = 0;
+	uint32_t meson_mmc_clk = 0;
 
 	if (!mmc->clock)
 		return;
 
 	if (mmc->clock > 12000000) {
-		clk = 1000000000;
-		clk_src = 1;
-		if (host->src_clk != 0) {
-			clk = host->src_clk;
-			clk_src = 0;
-		}
-		clk_disable(&host->xtal);
-		clk_set_parent(&host->mux, &host->div2);
-		clk_set_rate(&host->div, clk);
-		cfg = meson_read(mmc, MESON_SD_EMMC_CFG);
-		cfg |= CFG_AUTO_CLK;
-		meson_write(mmc, cfg, MESON_SD_EMMC_CFG);
+		clk = 1200000000;
+		clk_src = 0;
+		/*config emmc clk tree use gp_pll(1.2G)*/
+		writel(0x900, ((0x0048<<2) + 0xfe000800));
 	} else {
 		clk = 24000000;
 		clk_src = 0;
-		clk_enable(&host->xtal);
-		clk_set_rate(&host->div, clk);
+		writel(0x8100, ((0x0048<<2) + 0xfe000800));
 	}
 
 	clk_div = clk / mmc->clock;
 	if (clk % mmc->clock)
 		clk_div++;
-	mmc->clock = clk / clk_div;
 	if (mmc->ddr_mode) {
 		clk_div /= 2;
 		pr_info("DDR: \n");
@@ -154,8 +143,6 @@ static void meson_mmc_config_clock(struct meson_host *host)
 			dev_read_u32(mmc->dev, "hs_tx_phase", &tx_phase);
 			break;
 		case SD_HS:
-			dev_read_u32(mmc->dev, "sd_hs_co_phase", &co_phase);
-			dev_read_u32(mmc->dev, "sd_hs_tx_phase", &tx_phase);
 			break;
 		case MMC_HS_200:
 			dev_read_u32(mmc->dev, "hs2_co_phase", &co_phase);
@@ -176,7 +163,6 @@ static void meson_mmc_config_clock(struct meson_host *host)
 			tx_phase = dev_read_u32_default(mmc->dev, "init_tx_phase", 0);
 			break;
 	}
-
 	meson_mmc_clk =((0 << Cfg_irq_sdio_sleep_ds) |
 					(0 << Cfg_irq_sdio_sleep) |
 					(1 << Cfg_always_on) |
@@ -189,7 +175,7 @@ static void meson_mmc_config_clock(struct meson_host *host)
 					(clk_src << Cfg_src) |
 					(clk_div << Cfg_div));
 
-	meson_write(mmc, meson_mmc_clk, MESON_SD_EMMC_CLOCK);
+	writel(meson_mmc_clk, 0xfe012000);
 }
 
 static int meson_dm_mmc_set_ios(struct udevice *dev)
@@ -215,6 +201,18 @@ static int meson_dm_mmc_set_ios(struct udevice *dev)
 		meson_mmc_cfg |= CFG_BUS_WIDTH_8;
 	else
 		return -EINVAL;
+
+	/* 512 bytes block length */
+	meson_mmc_cfg &= ~CFG_BL_LEN_MASK;
+	meson_mmc_cfg |= CFG_BL_LEN_512;
+
+	/* Response timeout 256 clk */
+	meson_mmc_cfg &= ~CFG_RESP_TIMEOUT_MASK;
+	meson_mmc_cfg |= CFG_RESP_TIMEOUT_256;
+
+	/* Command-command gap 16 clk */
+	meson_mmc_cfg &= ~CFG_RC_CC_MASK;
+	meson_mmc_cfg |= CFG_RC_CC_16;
 
 	meson_write(mmc, meson_mmc_cfg, MESON_SD_EMMC_CFG);
 
@@ -456,9 +454,7 @@ static void mmc_setup_desc(struct udevice *dev, struct mmc_cmd *cmd,
 	}
 
 	meson_mmc_cmd = &(desc_cur->cmd_info);
-	/* It takes longer to erase large amounts of data */
-	if (cmd->cmdidx != MMC_CMD_ERASE)
-		*meson_mmc_cmd |= CMD_CFG_TIMEOUT_4S;
+	*meson_mmc_cmd |= CMD_CFG_TIMEOUT_4S;
 	*meson_mmc_cmd |= CMD_CFG_END_OF_CHAIN;
 }
 
@@ -522,11 +518,11 @@ static int meson_dm_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	ret = meson_mmc_desc_transfer(dev, cmd, data);
 #endif
 
-	/* use 30s timeout */
+	/* use 10s timeout */
 	start = get_timer(0);
 	do {
 		status = meson_read(mmc, MESON_SD_EMMC_STATUS);
-	} while(!(status & STATUS_END_OF_CHAIN) && get_timer(start) < 30000);
+	} while(!(status & STATUS_END_OF_CHAIN) && get_timer(start) < 10000);
 
 	meson_mmc_read_response(mmc, cmd);
 
@@ -546,12 +542,6 @@ static int meson_dm_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 void meson_hw_reset(struct udevice *dev)
 {
 	struct meson_host *host = dev_get_priv(dev);
-	u32 cfg = 0;
-
-	/* send the initialization stream: 74 clock cycles */
-	cfg = meson_read(host->mmc, MESON_SD_EMMC_CFG);
-	cfg &= ~CFG_AUTO_CLK;
-	meson_write(host->mmc, cfg, MESON_SD_EMMC_CFG);
 
 	if (aml_card_type_mmc(host)) {
 		dm_gpio_set_value(&host->gpio_reset, 0);
@@ -742,15 +732,10 @@ int meson_execute_tuning(struct udevice *dev, uint opcode)
 	int curr_win_start = -1, curr_win_size = 0;
 	u8 rx_tuning_result[25] = { 0 };
 
-	if (opcode == MMC_SD_HS_TUNING) {
-		meson_write(mmc, 0x2000, MESON_SD_EMMC_ADJUST);
-		return 0;
-	}
-
 	if (host->blk_test == NULL)
 		return -EINVAL;
 
-	printf("%s: tuning start:\n", mmc->cfg->name);
+	pr_info("%s: tuning start:\n", mmc->cfg->name);
 	meson_write(mmc, 0, MESON_SD_EMMC_ADJUST);
 	old_dly = meson_read(mmc, MESON_SD_EMMC_DELAY1);
 	d1_dly = (old_dly & DLY_D1_MASK) >> Dly_d1;
@@ -867,7 +852,7 @@ tuning:
 		meson_write(mmc, dly, MESON_SD_EMMC_DELAY1);
 		goto tuning;
 	} else
-		printf("%s: best_win_start =%d, best_win_size =%d\n",
+		pr_info("%s: best_win_start =%d, best_win_size =%d\n",
 				mmc->cfg->name, best_win_start, best_win_size);
 
 	adj_delay = best_win_start + (best_win_size - 1) / 2
@@ -958,8 +943,6 @@ static int meson_mmc_ofdata_to_platdata(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	host->src_clk = dev_read_u32_default(dev, "source-clock", 0);
-
 	dev->name = dev_read_string(dev, "pinname");
 	if (dev_read_bool(dev, "non-removable"))
 		host->is_in = 1;
@@ -981,30 +964,25 @@ static int meson_mmc_ofdata_to_platdata(struct udevice *dev)
 
 	uclass_get_device_by_name(UCLASS_CLK, "amlogic,g12a-clkc", &clk_udevice);
 
-	clk_get_by_name(dev, "clkin", &host->div2);
-	clk_get_by_name(dev, "xtal", &host->xtal);
+	clk_get_by_name(dev, "core", &host->core);
+	clk_get_by_name(dev, "clkin0", &host->xtal);
+	clk_get_by_name(dev, "clkin1", &host->div2);
 	clk_get_by_name(dev, "mux", &host->mux);
 	clk_get_by_name(dev, "div", &host->div);
 	clk_get_by_name(dev, "gate", &host->gate);
 
 	//clk_enable(&host->core);
-	clk_enable(&host->gate);
+	//clk_enable(&host->gate);
 
 	return 0;
 }
 
-/*void mmc_set_source_clock(struct udevice *dev)
+void mmc_set_source_clock(void)
 {
-	struct meson_host *host = dev_get_priv(dev);
-	unsigned long rate;
-
-	clk_set_rate(&host->div, 1000000000);
-	clk_disable(&host->xtal);
-	clk_enable(&host->gate);
-
-	printf("sd_emmc_clk_ctrl:0x%x\n", readl(((0x0038<<2) + 0xfe000800)));
-	printf("sd_emmc_clk_ctrl1:0x%x\n", readl(((0x0048<<2) + 0xfe000800)));
-}*/
+	writel(0x81008100, ((0x0038<<2) + 0xfe000800));
+	writel(0x8100, ((0x0048<<2) + 0xfe000800));
+	pr_debug("===========0x%x\n", readl(((0x0038<<2) + 0xfe000800)));
+}
 
 static int meson_mmc_probe(struct udevice *dev)
 {
@@ -1039,7 +1017,7 @@ static int meson_mmc_probe(struct udevice *dev)
 	mmc->priv = pdata;
 	upriv->mmc = mmc;
 
-	//mmc_set_source_clock(dev);
+	mmc_set_source_clock();
 
 	mmc_set_clock(mmc, cfg->f_min, false);
 
@@ -1053,24 +1031,12 @@ static int meson_mmc_probe(struct udevice *dev)
 	val = meson_read(mmc, MESON_SD_EMMC_CFG);
 	val &= ~CFG_SDCLK_ALWAYS_ON;
 	val |= CFG_AUTO_CLK;
-
-	/* 512 bytes block length */
-	val &= ~CFG_BL_LEN_MASK;
-	val |= CFG_BL_LEN_512;
-
-	/* Response timeout 256 clk */
-	val &= ~CFG_RESP_TIMEOUT_MASK;
-	val |= CFG_RESP_TIMEOUT_256;
-
-	/* Command-command gap 16 clk */
-	val &= ~CFG_RC_CC_MASK;
-	val |= CFG_RC_CC_16;
 	meson_write(mmc, val, MESON_SD_EMMC_CFG);
-	printf("[%s]%s: Controller probe success!\n", __func__, mmc->cfg->name);
+	pr_info("%s: probe success!\n", mmc->cfg->name);
 
 	return 0;
 err:
-	pr_err("[%s]%s: probe fail, ret = %d!\n", __func__, mmc->cfg->name, ret);
+	pr_err("%s: probe fail, ret = %d!\n", mmc->cfg->name, ret);
 	if (host->blk_test)
 		free(host->blk_test);
 	if (host->desc_buf)

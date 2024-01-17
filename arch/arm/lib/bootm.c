@@ -31,6 +31,7 @@
 #include <asm/armv7.h>
 #endif
 #include <asm/setup.h>
+#include <time_logging.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -86,7 +87,7 @@ __weak void board_quiesce_devices(void)
  */
 static void announce_and_cleanup(int fake)
 {
-	printf("\nStarting kernel ...%s\n\n", fake ?
+	pr_notice("\nStarting kernel ...%s\n\n", fake ?
 		"(fake run for tracing)" : "");
 	bootstage_mark_name(BOOTSTAGE_ID_BOOTM_HANDOFF, "start_kernel");
 #ifdef CONFIG_BOOTSTAGE_FDT
@@ -333,7 +334,61 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 		(ulong) kernel_entry);
 	bootstage_mark(BOOTSTAGE_ID_RUN_OS);
 
+#ifdef CONFIG_AML_KASLR_SEED
+	int node, ret, len;
+	char *prop, *bootargs;
+	uint64_t seed;
+
+	node = fdt_path_offset(images->ft_addr, "/chosen");
+	if (node < 0)
+		printf("Can't find /chosen node from DTB\n");
+
+	bootargs = (char *)fdt_getprop(images->ft_addr, node, "bootargs", &len);
+	if (!bootargs)
+		printf("Can't find bootargs property in chosen\n");
+
+	char *env = env_get("ramdump_enable");
+
+	if ((bootargs && strstr(bootargs, "ramoops_io_en=1")) || (env && (env[0] == '1'))) {
+		ret = fdt_appendprop_string(images->ft_addr, node, "bootargs", " nokaslr");
+		if (!ret)
+			printf("Not enable kaslr for debug purpose\n");
+		else
+			printf("Fail to set nokaslr %s\n", fdt_strerror(ret));
+	} else {
+		prop = (char *)fdt_getprop(images->ft_addr, node, "kaslr-seed", NULL);
+		if (!prop) {
+			printf("Can't find kaslr-seed property in chosen\n");
+		} else {
+			srand(timer_get_us());
+			/*
+			 * random() function use hardware RNG, not software, ignore
+			 * coverity weak cryptor report.
+			 */
+			/* coverity[dont_call] */
+			seed = (uint64_t)rand();
+
+			ret = fdt_setprop(images->ft_addr, node, "kaslr-seed", &seed, sizeof(seed));
+			if (!ret)
+				printf("Enable kaslr\n");
+			else
+				printf("Can't set kaslr-seed value in chosen\n");
+		}
+	}
+#endif
+
 	announce_and_cleanup(fake);
+
+	/*
+	 * log boot time, format: go/freertos-gnq
+	 * Byte offset (starting from 0xfff62800): Data description
+	 * 0x0 Number of TE entries for bl2
+	 * 0x4 Up to 15 TE timestamp entries, 4B each
+	 * ...
+	 * 0x40 Number of TE entries for uboot
+	 * 0x44 Up to 15 TE timestamp entries, 4B each
+	 */
+	logging_set_entry(LOG_KERN_JUMP);
 
 	if (!fake) {
 #ifdef CONFIG_ARMV8_PSCI
@@ -366,14 +421,12 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 		}
 #endif
 #endif
-		extern uint32_t get_time(void);
-		printf("uboot time: %u us\n", get_time());
 		if (images->os.arch == IH_ARCH_ARM) {
 			printf("boot 32bit kernel\n");
 			jump_to_a32_kernel(images->ep, machid, (unsigned long)images->ft_addr);
 		}
 		else {
-			printf("boot 64bit kernel\n");
+			pr_notice("boot 64bit kernel\n");
 			kernel_entry(images->ft_addr, NULL, NULL, NULL);
 		}
 	}

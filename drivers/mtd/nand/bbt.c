@@ -10,7 +10,6 @@
 #define pr_fmt(fmt)	"nand-bbt: " fmt
 
 #include <linux/mtd/nand.h>
-#include <linux/bitops.h>
 #ifndef __UBOOT__
 #include <linux/slab.h>
 #endif

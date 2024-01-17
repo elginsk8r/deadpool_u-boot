@@ -19,7 +19,7 @@ static int env_storage_save(void)
 	}
 	ALLOC_CACHE_ALIGN_BUFFER(char, buf, CONFIG_ENV_SIZE);
 
-	if (env_export((env_t *)buf)) {
+	if (env_export(buf)) {
 		printf("env_storage: export failed\n");
 		return -EINVAL;
 	}

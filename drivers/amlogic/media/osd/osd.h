@@ -42,7 +42,7 @@
 #define KEYCOLOR_FLAG_ONHOLD  2
 #define KEYCOLOR_FLAG_CURRENT 4
 
-#define HW_OSD_COUNT 3
+#define HW_OSD_COUNT 2
 /* OSD block definition */
 #define HW_OSD_BLOCK_COUNT 4
 #define HW_OSD_BLOCK_REG_COUNT (HW_OSD_BLOCK_COUNT*2)
@@ -71,6 +71,11 @@
 extern int int_rdma;
 
 #define OSD_MAX_BUF_NUM 3  /* fence relative */
+
+enum osd_index_e {
+	OSD1 = 0,
+	OSD2
+};
 
 enum osd_enable_e {
 	DISABLE = 0,
@@ -251,8 +256,6 @@ struct hw_para_s {
 	u32 clone[HW_OSD_COUNT];
 	u32 bot_type;
 	u32 osd_ver;
-	u32 shift_line;
-	u32 mif_linear;
 };
 
 #endif /* _OSD_H_ */

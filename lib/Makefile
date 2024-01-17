@@ -26,9 +26,9 @@ obj-y += charset.o
 endif
 endif
 obj-$(CONFIG_USB_TTY) += circbuf.o
-obj-y += crc7.o
+#obj-y += crc7.o
 obj-y += crc8.o
-obj-y += crc16.o
+#obj-y += crc16.o
 obj-$(CONFIG_ERRNO_STR) += errno_str.o
 obj-$(CONFIG_FIT) += fdtdec_common.o
 obj-$(CONFIG_TEST_FDTDEC) += fdtdec_test.o
@@ -39,10 +39,10 @@ obj-y += initcall.o
 obj-$(CONFIG_LMB) += lmb.o
 obj-y += ldiv.o
 obj-$(CONFIG_MD5) += md5.o
-obj-y += net_utils.o
+#obj-y += net_utils.o
 obj-$(CONFIG_PHYSMEM) += physmem.o
 obj-y += qsort.o
-obj-y += rc4.o
+#obj-y += rc4.o
 obj-$(CONFIG_SUPPORT_EMMC_RPMB) += sha256.o
 obj-$(CONFIG_RBTREE)	+= rbtree.o
 obj-$(CONFIG_BITREVERSE) += bitrev.o
@@ -97,7 +97,7 @@ obj-$(CONFIG_REGEX) += slre.o
 obj-y += string.o
 obj-y += tables_csum.o
 obj-y += time.o
-obj-y += hexdump.o
+#obj-y += hexdump.o
 obj-$(CONFIG_TRACE) += trace.o
 obj-$(CONFIG_LIB_UUID) += uuid.o
 obj-$(CONFIG_LIB_RAND) += rand.o
@@ -117,7 +117,5 @@ obj-y += vsprintf.o strto.o strmhz.o
 endif
 
 obj-y += libavb/
-
-obj-$(CONFIG_CHROMECAST) += chromecast/
 
 subdir-ccflags-$(CONFIG_CC_OPTIMIZE_LIBS_FOR_SPEED) += -O2

@@ -32,7 +32,12 @@
 # Default values for build configurations
 #
 
-export CROSS_COMPILE=/opt/gcc-linaro-aarch64-none-elf-4.8-2013.11_linux/bin/aarch64-none-elf-
+#export CROSS_COMPILE=/opt/gcc-linaro-aarch64-none-elf-4.8-2013.11_linux/bin/aarch64-none-elf-
+pes_parent_dir:=$(shell pwd)/$(lastword $(MAKEFILE_LIST))
+pes_parent_dir:=$(shell dirname $(pes_parent_dir))
+sdk_dir=${pes_parent_dir}/../../../../../../../
+#export CROSS_COMPILE=${sdk_dir}amlogic/linaro/gcc-linaro-aarch64-none-elf-4.8-2013.11_linux/bin/aarch64-none-elf-
+export CROSS_COMPILE=${sdk_dir}amlogic/linaro/gcc-linaro-7.3.1-2018.05-i686_aarch64-elf/bin/aarch64-elf-
 
 include $(buildsrc)/config.mk
 include $(buildtree)/include/autoconf.mk
@@ -360,7 +365,7 @@ $(BUILD_DIR) :
 
 $(ELF) : $(OBJS) $(LINKERFILE)
 	@echo "  LD      $$@"
-	@echo 'const char build_message[] = "Built : "__TIME__", "__DATE__". \\nver:${GIT_VERSION} - ${BUILDER}";' | \
+	@echo 'const char build_message[] = "Built : ${U_BOOT_TIME_GIT}, ${U_BOOT_DATE_GIT}. \\nver:${GIT_VERSION} - ${BUILDER}";' | \
 		$$(CC) $$(CFLAGS) -xc - -o $(BUILD_DIR)/build_message.o
 	$$(Q)$$(LD) -o $$@ $$(LDFLAGS) -Map=$(MAPFILE) --script $(LINKERFILE) \
 					$(BUILD_DIR)/build_message.o $(OBJS)

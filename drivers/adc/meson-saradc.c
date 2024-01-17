@@ -56,6 +56,8 @@
 #define SARADC_REG3					0x0c
 	#define SARADC_REG3_CTRL_CONT_RING_COUNTER_EN	BIT(27)
 	#define SARADC_REG3_CTRL_SAMPLING_CLOCK_PHASE	BIT(26)
+	#define SARADC_REG3_CTRL_CHAN7_MUX_SEL_MASK	GENMASK(25, 23)
+	#define SARADC_REG3_CTRL_CHAN7_MUX_SEL_SHIFT	(23)
 	#define SARADC_REG3_ADC_EN			BIT(21)
 	#define SARADC_REG3_BLOCK_DLY_SEL_MASK		GENMASK(9, 8)
 	#define SARADC_REG3_BLOCK_DLY_MASK		GENMASK(7, 0)
@@ -71,6 +73,9 @@
 #define SARADC_LAST_RD					0x14
 
 #define SARADC_FIFO_RD					0x18
+	#define SARADC_FIFO_RD_CHAN_ID_SHIFT		(12)
+	#define SARADC_FIFO_RD_CHAN_ID_MASK		GENMASK(14, 12)
+	#define SARADC_FIFO_RD_SAMPLE_VALUE_MASK	GENMASK(11, 0)
 
 #define SARADC_AUX_SW					0x1c
 #define SARADC_AUX_SW_MUX_SEL_CHAN_MASK(_chan)		\
@@ -86,6 +91,73 @@
 	#define SARADC_DETECT_IDLE_SW_IDLE_MUX_SEL_MASK GENMASK(9, 7)
 
 #define SARADC_DELTA_10				0x28
+
+#define SARADC_REG11					0x2c
+	#define SARADC_REG11_VREF_SEL			BIT(0)
+	#define SARADC_REG11_EOC			BIT(1)
+	#define SARADC_REG11_VREF_EN			BIT(5)
+	#define SARADC_REG11_CMV_SEL			BIT(6)
+	#define SARADC_REG11_BANDGAP_EN			BIT(13)
+
+#define SARADC_REG13					0x34
+	#define SARADC_REG13_CALIB_FACTOR_MASK		GENMASK(13, 8)
+
+enum MESON_SARADC_AVG_MODE {
+	NO_AVERAGING = 0x0,
+	MEAN_AVERAGING = 0x1,
+	MEDIAN_AVERAGING = 0x2,
+};
+
+enum MESON_SARADC_NUM_SAMPLES {
+	ONE_SAMPLE = 0x0,
+	TWO_SAMPLES = 0x1,
+	FOUR_SAMPLES = 0x2,
+	EIGHT_SAMPLES = 0x3,
+};
+
+enum MESON_SARADC_RESOLUTION {
+	SARADC_10BIT = 10,
+	SARADC_12BIT = 12,
+};
+
+enum MESON_SARADC_BIT_STATE {
+	BIT_LOW = 0,
+	BIT_HIGH = 1,
+};
+
+/*
+ * struct meson_saradc_data - describe the differences of different platform
+ *
+ * @reg3_ring_counter_disable: to disable continuous ring counter.
+ * gxl and later: 1; others(gxtvbb etc): 0
+ * @reg11_vref_en: g12a and later: 0; others(axg etc): 1
+ * @reg11_cmv_sel: g12a and later: 0; others(axg etc): 1
+ * @reg11_eoc:     g12a and later: 1; others(axg etc): 0
+ * @has_bl30_integration:
+ * @num_channels: the number of adc channels
+ * @self_test_channel: channel of self-test
+ * @resolution: gxl and later: 12bit; others(gxtvbb etc): 10bit
+ */
+struct meson_saradc_data {
+	bool reg3_ring_counter_disable;
+	bool reg11_vref_en;
+	bool reg11_cmv_sel;
+	bool reg11_eoc;
+	bool has_bl30_integration;
+	unsigned char self_test_channel;
+	unsigned char num_channels;
+	unsigned int resolution;
+};
+
+struct meson_saradc {
+	phys_addr_t base;
+	int active_channel;
+	struct clk xtal;
+	struct clk adc_mux;
+	struct clk adc_div;
+	struct clk adc_gate;
+	struct meson_saradc_data *data;
+};
 
 static int meson_saradc_clk_init(struct udevice *dev)
 {
@@ -122,9 +194,9 @@ static int meson_saradc_clk_init(struct udevice *dev)
 		return ret;
 	}
 
-	ret = clk_set_rate(&priv->adc_div, priv->data->clock_rate);
+	ret = clk_set_rate(&priv->adc_div, 1200000);
 	if (ret) {
-		pr_err("%s: failed to set rate\n", dev->name);
+		pr_err("%s: failed to set rate to 1.2M\n", dev->name);
 		return ret;
 	}
 
@@ -158,8 +230,18 @@ static void meson_saradc_hw_init(struct meson_saradc *priv)
 
 static void meson_saradc_hw_enable(struct meson_saradc *priv)
 {
-	if (priv->data->dops->extra_init)
-		priv->data->dops->extra_init(priv);
+	clrsetbits_le32(priv->base + SARADC_REG11,
+			SARADC_REG11_CMV_SEL |
+			SARADC_REG11_VREF_EN |
+			SARADC_REG11_EOC |
+			SARADC_REG11_BANDGAP_EN,
+			(priv->data->reg11_cmv_sel ?
+				SARADC_REG11_CMV_SEL : 0) |
+			(priv->data->reg11_vref_en ?
+				SARADC_REG11_VREF_EN : 0) |
+			(priv->data->reg11_eoc ?
+				SARADC_REG11_EOC : 0) |
+			SARADC_REG11_BANDGAP_EN);
 
 	clk_enable(&priv->adc_gate);
 
@@ -258,22 +340,9 @@ static inline void meson_saradc_start_sample(struct meson_saradc *priv)
 			SARADC_REG0_SAMPLING_START);
 }
 
-static int meson_saradc_check_mode(struct meson_saradc *priv, unsigned int mode)
-{
-	if (mode & ~priv->data->capacity)
-		return -EINVAL;
-
-	return 0;
-}
-
 static int meson_saradc_set_mode(struct udevice *dev, int ch, unsigned int mode)
 {
-	int ret;
 	struct meson_saradc *priv = dev_get_priv(dev);
-
-	ret = meson_saradc_check_mode(priv, mode);
-	if (ret < 0)
-		return ret;
 
 	if (mode & ADC_CAPACITY_AVERAGE) {
 		clrsetbits_le32(priv->base + SARADC_AVG_CNTL,
@@ -289,13 +358,32 @@ static int meson_saradc_set_mode(struct udevice *dev, int ch, unsigned int mode)
 			NO_AVERAGING << SARADC_AVG_CNTL_AVG_MODE_SHIFT(ch));
 	}
 
-	priv->data->dops->set_ref_voltage(priv, mode);
+	/*
+	 * the precision of internal voltage is approximately equal to 10mv,
+	 * but the VDDA is approximately equal to 36mv(2% x 1800mv).
+	 */
+	if (mode & ADC_CAPACITY_HIGH_PRECISION_VREF) {
+		if (readl(priv->base + SARADC_REG13) &
+				SARADC_REG13_CALIB_FACTOR_MASK) {
+			/* select the internal voltage as reference voltage */
+			clrsetbits_le32(priv->base + SARADC_REG11,
+					SARADC_REG11_VREF_SEL, 0);
+		} else {
+			/* select the VDDA as reference voltage */
+			clrsetbits_le32(priv->base + SARADC_REG11,
+					SARADC_REG11_VREF_SEL,
+					SARADC_REG11_VREF_SEL);
 
-	priv->current_mode = mode;
-
-	if (priv->data->dops->enable_decim_filter)
-		priv->data->dops->enable_decim_filter(priv, ch,
-							priv->current_mode);
+			pr_notice("%s: calib factor is null, \
+					please set it in bl30 first\n",
+					dev->name);
+		}
+	} else {
+		/* select the VDDA as reference voltage */
+		clrsetbits_le32(priv->base + SARADC_REG11,
+				SARADC_REG11_VREF_SEL,
+				SARADC_REG11_VREF_SEL);
+	}
 
 	return 0;
 }
@@ -351,8 +439,7 @@ static int meson_saradc_channel_data(struct udevice *dev, int channel,
 		return -EBUSY;
 
 	val = readl(priv->base + SARADC_FIFO_RD);
-
-	fifo_ch = priv->data->dops->get_fifo_channel(val);
+	fifo_ch = (val >> SARADC_FIFO_RD_CHAN_ID_SHIFT) & 0x7;
 
 	if (fifo_ch != channel) {
 		pr_err("%s: channel mismatch: exp[%d] - act[%d]\n",
@@ -360,7 +447,11 @@ static int meson_saradc_channel_data(struct udevice *dev, int channel,
 		return -EINVAL;
 	}
 
-	*data = priv->data->dops->get_fifo_data(priv, uc_pdata, val);
+	*data = val & uc_pdata->data_mask;
+
+	/* return the 10-bit sampling value */
+	if (priv->data->resolution == SARADC_12BIT)
+		*data = *data >> 2;
 
 	priv->active_channel = -1;
 
@@ -380,12 +471,14 @@ static int meson_saradc_select_input_voltage(struct udevice *dev, int channel,
 		return -EINVAL;
 	}
 
-	priv->data->dops->set_ch7_mux(priv, channel, mux);
+	clrsetbits_le32(priv->base + SARADC_REG3,
+			SARADC_REG3_CTRL_CHAN7_MUX_SEL_MASK,
+			(mux & 0x7) << SARADC_REG3_CTRL_CHAN7_MUX_SEL_SHIFT);
 
 	return 0;
 }
 
-const struct adc_ops meson_saradc_ops = {
+static const struct adc_ops meson_saradc_ops = {
 	.set_mode		= meson_saradc_set_mode,
 	.start_channel		= meson_saradc_start_channel,
 	.channel_data		= meson_saradc_channel_data,
@@ -393,7 +486,7 @@ const struct adc_ops meson_saradc_ops = {
 	.select_input_voltage	= meson_saradc_select_input_voltage,
 };
 
-int meson_saradc_probe(struct udevice *dev)
+static int meson_saradc_probe(struct udevice *dev)
 {
 	struct meson_saradc *priv = dev_get_priv(dev);
 	int ret;
@@ -417,7 +510,7 @@ int meson_saradc_probe(struct udevice *dev)
 	return 0;
 }
 
-int meson_saradc_remove(struct udevice *dev)
+static int meson_saradc_remove(struct udevice *dev)
 {
 	struct meson_saradc *priv = dev_get_priv(dev);
 
@@ -426,7 +519,7 @@ int meson_saradc_remove(struct udevice *dev)
 	return 0;
 }
 
-int meson_saradc_ofdata_to_platdata(struct udevice *dev)
+static int meson_saradc_ofdata_to_platdata(struct udevice *dev)
 {
 	struct adc_uclass_platdata *uc_pdata = dev_get_uclass_platdata(dev);
 	struct meson_saradc *priv = dev_get_priv(dev);
@@ -441,3 +534,33 @@ int meson_saradc_ofdata_to_platdata(struct udevice *dev)
 
 	return 0;
 }
+
+static struct meson_saradc_data meson_saradc_g12a_data = {
+	.reg3_ring_counter_disable = BIT_HIGH,
+	.reg11_vref_en		   = BIT_LOW,
+	.reg11_cmv_sel		   = BIT_LOW,
+	.reg11_eoc		   = BIT_HIGH,
+	.has_bl30_integration	   = true,
+	.self_test_channel	   = SARADC_CH_SELF_TEST,
+	.num_channels		   = MESON_SARADC_CH_MAX,
+	.resolution		   = SARADC_12BIT,
+};
+
+static const struct udevice_id meson_saradc_ids[] = {
+	{
+		.compatible = "amlogic,meson-g12a-saradc",
+		.data = (ulong)&meson_saradc_g12a_data,
+	},
+	{ }
+};
+
+U_BOOT_DRIVER(meson_saradc) = {
+	.name			= "meson_saradc",
+	.id			= UCLASS_ADC,
+	.of_match		= meson_saradc_ids,
+	.ops			= &meson_saradc_ops,
+	.probe			= meson_saradc_probe,
+	.remove			= meson_saradc_remove,
+	.ofdata_to_platdata	= meson_saradc_ofdata_to_platdata,
+	.priv_auto_alloc_size	= sizeof(struct meson_saradc),
+};

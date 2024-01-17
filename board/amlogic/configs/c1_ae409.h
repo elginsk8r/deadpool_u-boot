@@ -108,14 +108,13 @@
             "if itest ${upgrade_step} == 3; then run storeargs; run update; fi;"\
             "\0"\
         "storeargs="\
-            "get_bootloaderversion;" \
             "setenv bootargs ${initargs} ${fs_type} otg_device=${otg_device} "\
                 "logo=${display_layer},loaded,${fb_addr} vout=${outputmode},enable panel_type=${panel_type} "\
                 "hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} "\
                 "frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} cvbsmode=${cvbsmode} "\
                 "osd_reverse=${osd_reverse} video_reverse=${video_reverse} irq_check_en=${Irq_check_en}  "\
                 "androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
-            "setenv bootargs ${bootargs} androidboot.bootloader=${bootloader_version} androidboot.hardware=amlogic;"\
+            "setenv bootargs ${bootargs} androidboot.hardware=amlogic;"\
             "run cmdline_keys;"\
             "\0"\
         "switch_bootmode="\
@@ -262,24 +261,8 @@
 #error CONFIG_AML_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
-#if (defined(CONFIG_AML_NAND) || defined(CONFIG_MESON_NFC)) && defined(CONFIG_MESON_FBOOT)
-#error CONFIG_AML_NAND/CONFIG_MESON_NFC CONFIG _MESON_FBOOT can not support at the sametime;
-#endif
-
-#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MTD_SPI_NAND) && defined(CONFIG_MESON_NFC)
-#error CONFIG_SPI_NAND/CONFIG_MTD_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
-#endif
-
-#if defined(CONFIG_SPI_NAND) || defined (CONFIG_MTD_SPI_NAND) || defined(CONFIG_MESON_NFC)
-	#define CONFIG_CMD_NAND 1
-	#define CONFIG_MTD_DEVICE 1
-	#define CONFIG_CMD_UBI 1
-	#define CONFIG_CMD_UBIFS 1
-	#define CONFIG_RBTREE 1
-	#define CONFIG_CMD_MTDPARTS   1
-	#define CONFIG_MTD_PARTITIONS 1
-	#define CONFIG_MTD_UBI_WL_THRESHOLD 4096
-	#define CONFIG_MTD_UBI_BEB_LIMIT 20
+#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MESON_NFC)
+#error CONFIG_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
 /* #define		CONFIG_AML_SD_EMMC 1 */
@@ -296,8 +279,15 @@
 #define 	CONFIG_SYS_NO_FLASH  1
 #endif
 
-#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND || defined CONFIG_MTD_SPI_NAND
+#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND
+	#define CONFIG_CMD_NAND 1
+	#define CONFIG_MTD_DEVICE 1
+	/* #define CONFIG_RBTREE */
+	#define CONFIG_CMD_NAND_TORTURE 1
+	#define CONFIG_CMD_MTDPARTS   1
+	#define CONFIG_MTD_PARTITIONS 1
 	#define CONFIG_SYS_MAX_NAND_DEVICE  2
+	#define CONFIG_SYS_NAND_BASE_LIST   {0}
 #endif
 
 /* vpu */
@@ -397,7 +387,7 @@
 
 /* unify build for generate encrypted bootloader "u-boot.bin.encrypt" */
 #define CONFIG_AML_CRYPTO_UBOOT   1
-//#define CONFIG_AML_SIGNED_UBOOT   1
+
 /* unify build for generate encrypted kernel image
    SRC : "board/amlogic/(board)/boot.img"
    DST : "fip/boot.img.encrypt" */
@@ -406,8 +396,6 @@
 #endif /* CONFIG_AML_SECURE_UBOOT */
 
 #define CONFIG_FIP_IMG_SUPPORT  1
-
-#define BL32_SHARE_MEM_SIZE  0x100000
 
 #endif
 

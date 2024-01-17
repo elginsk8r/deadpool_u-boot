@@ -24,13 +24,8 @@
 /* #define CONFIG_DDR_SIZE					256 */
 
 /* dram */
-#ifdef CONFIG_UBOOT_RUN_IN_SRAM
 #define PHYS_SDRAM_1_BASE					0xFFE00000UL
 #define PHYS_SDRAM_1_SIZE					0x00180000UL
-#else
-#define PHYS_SDRAM_1_BASE					0x00000000UL
-#define PHYS_SDRAM_1_SIZE					0x10000000UL
-#endif
 #define CONFIG_SYS_SDRAM_BASE				PHYS_SDRAM_1_BASE
 
 #define CONFIG_SYS_LOAD_ADDR		(PHYS_SDRAM_1_BASE + CONFIG_SYS_TEXT_BASE)
@@ -73,7 +68,7 @@
 #define PACKAGE_ID_MASK 	0xFF
 
 /*A1 SoC has problem to support AES for secure boot, here just disable it*/
-//#define CONFIG_AML_CRYPTO_AES 1
+#define CONFIG_AML_CRYPTO_AES 1
 
 
 /*Flag for enable AES key generate to EFUSE pattern, with this flag only

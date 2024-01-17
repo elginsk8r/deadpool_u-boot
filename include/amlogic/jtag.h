@@ -25,10 +25,6 @@
 #define SP			3 /* m4 */
 #define DSPA			4 /* dsp-a */
 #define	DSPB			5 /* dsp-b */
-#define	DIF			6 /* dif */
-#define	AOCPU			7 /* aocpu */
-#define	AUCPU			8 /* aucpu */
-#define	SOCBRG			9 /* SOC Bridge */
 
 /*
  * bitmap for jtag select ID:

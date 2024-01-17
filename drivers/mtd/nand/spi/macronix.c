@@ -12,9 +12,6 @@
 #include <linux/mtd/spinand.h>
 
 #define SPINAND_MFR_MACRONIX		0xC2
-/* Read ECCSR (7Ch) command for ECC Status Read */
-#define MACRONIX_CURRENT_ECCSR_MASK			0x0F
-#define MACRONIX_ACCUMULATE_ECCSR_MASK		(0x0F << 4);
 
 static SPINAND_OP_VARIANTS(read_cache_variants,
 		SPINAND_PAGE_READ_FROM_CACHE_X4_OP(0, 1, NULL, 0),
@@ -39,67 +36,19 @@ static int mx35lfxge4ab_ooblayout_ecc(struct mtd_info *mtd, int section,
 static int mx35lfxge4ab_ooblayout_free(struct mtd_info *mtd, int section,
 				       struct mtd_oob_region *region)
 {
-	if (section > 3)
+	if (section)
 		return -ERANGE;
 
-	region->offset = (16 * section) + 2;
-	region->length = 14;
+	region->offset = 2;
+	region->length = mtd->oobsize - 2;
 
 	return 0;
 }
 
-static int MX35LF2GE4AD_ooblayout_ecc(struct mtd_info *mtd, int section,
-				      struct mtd_oob_region *region)
-{
-	return -ERANGE;
-}
-
-static int MX35LF2GE4AD_ooblayout_free(struct mtd_info *mtd, int section,
-				       struct mtd_oob_region *region)
-{
-	if (section > 3)
-		return -ERANGE;
-
-	region->offset = (16 * section) + 2;
-	region->length = 14;
-
-	return 0;
-}
-#if 0
-static int MX35LF4GE4AD_ooblayout_ecc(struct mtd_info *mtd, int section,
-				      struct mtd_oob_region *region)
-{
-	return -ERANGE;
-}
-
-static int MX35LF4GE4AD_ooblayout_free(struct mtd_info *mtd, int section,
-				       struct mtd_oob_region *region)
-{
-	if (section > 7)
-		return -ERANGE;
-
-	region->offset = (16 * section) + 2;
-	region->length = 14;
-
-	return 0;
-}
-#endif
 static const struct mtd_ooblayout_ops mx35lfxge4ab_ooblayout = {
 	.ecc = mx35lfxge4ab_ooblayout_ecc,
 	.free = mx35lfxge4ab_ooblayout_free,
 };
-
-static const struct mtd_ooblayout_ops MX35LF2GE4AD_ooblayout = {
-	.ecc = MX35LF2GE4AD_ooblayout_ecc,
-	.free = MX35LF2GE4AD_ooblayout_free,
-};
-
-#if 0
-static const struct mtd_ooblayout_ops MX35LF4GE4AD_ooblayout = {
-	.ecc = MX35LF4GE4AD_ooblayout_ecc,
-	.free = MX35LF4GE4AD_ooblayout_free,
-};
-#endif
 
 static int mx35lf1ge4ab_get_eccsr(struct spinand_device *spinand, u8 *eccsr)
 {
@@ -133,49 +82,6 @@ static int mx35lf1ge4ab_ecc_get_status(struct spinand_device *spinand,
 		if (mx35lf1ge4ab_get_eccsr(spinand, &eccsr))
 			return nand->eccreq.strength;
 
-		eccsr &= MACRONIX_CURRENT_ECCSR_MASK;
-		if (WARN_ON(eccsr > nand->eccreq.strength || !eccsr)) {
-			pr_err("spinand eccsr error!  %d\n", eccsr);
-			return nand->eccreq.strength;
-		}
-
-		return eccsr;
-
-	default:
-		break;
-	}
-
-	return -EINVAL;
-}
-
-static int mx35lf2ge4ad_ecc_get_status(struct spinand_device *spinand,
-				       u8 status)
-{
-	struct nand_device *nand = spinand_to_nand(spinand);
-	u8 eccsr;
-
-	switch (status & STATUS_ECC_MASK) {
-	case STATUS_ECC_NO_BITFLIPS:
-		return 0;
-
-	case STATUS_ECC_UNCOR_ERROR:
-		return -EBADMSG;
-
-	case STATUS_ECC_HAS_BITFLIPS:
-		/*
-		 * Let's try to retrieve the real maximum number of bitflips
-		 * in order to avoid forcing the wear-leveling layer to move
-		 * data around if it's not necessary.
-		 */
-		if (mx35lf1ge4ab_get_eccsr(spinand, &eccsr))
-			return nand->eccreq.strength;
-
-		/*
-		 * note:
-		 * bit0~3 ECC Status for the current page
-		 * bit4~7 ECC Status for the accumulated page
-		 */
-		eccsr &= MACRONIX_CURRENT_ECCSR_MASK;
 		if (WARN_ON(eccsr > nand->eccreq.strength || !eccsr))
 			return nand->eccreq.strength;
 
@@ -189,7 +95,7 @@ static int mx35lf2ge4ad_ecc_get_status(struct spinand_device *spinand,
 }
 
 static const struct spinand_info macronix_spinand_table[] = {
-	SPINAND_INFO("MX35LF1GE4AB 3.3v", 0x12,
+	SPINAND_INFO("MX35LF1GE4AB", 0x12,
 		     NAND_MEMORG(1, 2048, 64, 64, 1024, 1, 1, 1),
 		     NAND_ECCREQ(4, 512),
 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
@@ -198,27 +104,14 @@ static const struct spinand_info macronix_spinand_table[] = {
 		     SPINAND_HAS_QE_BIT,
 		     SPINAND_ECCINFO(&mx35lfxge4ab_ooblayout,
 				     mx35lf1ge4ab_ecc_get_status)),
-
-	SPINAND_INFO("MX35LF2GE4AD", 0x26,
-		     NAND_MEMORG(1, 2048, 64, 64, 2048, 1, 1, 1),
-		     NAND_ECCREQ(8, 512),
+	SPINAND_INFO("MX35LF2GE4AB", 0x22,
+		     NAND_MEMORG(1, 2048, 64, 64, 2048, 2, 1, 1),
+		     NAND_ECCREQ(4, 512),
 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
 					      &write_cache_variants,
 					      &update_cache_variants),
 		     SPINAND_HAS_QE_BIT,
-		     SPINAND_ECCINFO(&MX35LF2GE4AD_ooblayout,
-				     mx35lf2ge4ad_ecc_get_status)),
-
-	SPINAND_INFO("MX35LF4GE4AD", 0x37,
-		     NAND_MEMORG(1, 4096, 128, 64, 2048, 1, 1, 1),
-		     NAND_ECCREQ(8, 512),
-		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
-					      &write_cache_variants,
-					      &update_cache_variants),
-		     SPINAND_HAS_QE_BIT,
-		     SPINAND_ECCINFO(&MX35LF2GE4AD_ooblayout,
-				     mx35lf2ge4ad_ecc_get_status)),
-
+		     SPINAND_ECCINFO(&mx35lfxge4ab_ooblayout, NULL)),
 };
 
 static int macronix_spinand_detect(struct spinand_device *spinand)
@@ -226,12 +119,16 @@ static int macronix_spinand_detect(struct spinand_device *spinand)
 	u8 *id = spinand->id.data;
 	int ret;
 
-	if (id[0] != SPINAND_MFR_MACRONIX)
+	/*
+	 * Macronix SPI NAND read ID needs a dummy byte, so the first byte in
+	 * raw_id is garbage.
+	 */
+	if (id[1] != SPINAND_MFR_MACRONIX)
 		return 0;
 
 	ret = spinand_match_and_init(spinand, macronix_spinand_table,
 				     ARRAY_SIZE(macronix_spinand_table),
-				     id[1]);
+				     id[2]);
 	if (ret)
 		return ret;
 

@@ -87,16 +87,6 @@
 /*set boot first timeout*/
 #define SET_BOOT_FIRST		0x82000087
 
-/* KEYMASTER */
-#define SET_BOOT_PARAMS		0x82000072
-#define SHA256_DIGEST_SIZE  32
-typedef struct {
-	uint32_t device_locked;
-	uint32_t verified_boot_state;
-	uint8_t verified_boot_key[SHA256_DIGEST_SIZE];
-	uint8_t verified_boot_hash[SHA256_DIGEST_SIZE];
-} keymaster_boot_params;
-
 /* Secure HAL APIs */
 #define TRUSTZONE_HAL_API_SRAM                  0x400
 
@@ -132,6 +122,8 @@ struct sram_hal_api_arg {
 	#define AML_D_P_W_EFUSE_AMLOGIC 	 (0x20)
 	#define AML_D_P_IMG_DECRYPT          (0x40)
 	#define AML_D_P_UPGRADE_CHECK        (0x80)
+	#define AML_D_Q_IMG_SIG_HDR_SIZE     (0x100)
+	#define AML_D_P_MRK_CHECK            (0x200)
 
 #define GXB_EFUSE_PATTERN_SIZE      (0x500)
 #define GXB_IMG_SIZE                (24<<20)
@@ -160,5 +152,4 @@ void power_set_dsp(unsigned int id, unsigned int powerflag);
 void init_dsp(unsigned int id,unsigned int addr,unsigned int cfg0);
 void set_boot_first_timeout(uint64_t arg0);
 int bl31_get_cornerinfo(uint8_t *outbuf, int size);
-int32_t set_boot_params(const keymaster_boot_params*);
 #endif

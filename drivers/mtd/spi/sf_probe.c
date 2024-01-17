@@ -49,8 +49,7 @@ static int spi_flash_probe_slave(struct spi_flash *flash)
 		goto err_read_id;
 
 #ifdef CONFIG_SPI_FLASH_MTD
-	/* for advanced support */
-	//ret = spi_flash_mtd_register(flash);
+	ret = spi_flash_mtd_register(flash);
 #ifdef CONFIG_AML_STORAGE
 	if (!ret)
 		ret = spi_flash_fit_storage(flash);

@@ -23,7 +23,6 @@ extern void test_timing(struct mtd_info *mtd, struct nand_chip *chip);
 #endif
 
 int nand_fbb_issue_flag;
-int check_1_2page_sparebyte;
 struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 	{"B revision NAND 8GiB MT29F64G08CBABA",
 		{NAND_MFR_MICRON, 0x64, 0x44, 0x4B, 0xA9},
@@ -443,18 +442,6 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 		0,
 		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE )},
 
-	{"Slc NAND 4Gib MX30LF4G28AD ",
-		{NAND_MFR_MACRONIX, 0xdc, 0x90, 0xA2, 0x57, 0x03},
-		4096,
-		512,
-		0x40000,
-		256,
-		1,
-		16,
-		15,
-		0,
-		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE )},
-
 	{"A revision NAND 128MB TC58NVG0S3HTA00 ",
 		{NAND_MFR_TOSHIBA, 0xf1, 0x80, 0x15, 0x72},
 		2048,
@@ -864,39 +851,6 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 	{NULL,}
 };
 
-/* detects factory bad blocks for the following samsung nand,
- * it needs to detect the first byte of the spare area at
- * the first page and the second page
- */
-u8 samsung_nand_id0[][MAX_ID_LEN] = {
-	{NAND_MFR_SAMSUNG, 0xf1, 0x00, 0x95, 0x42},
-	{NAND_MFR_SAMSUNG, 0xda, 0x10, 0x15, 0x44},
-	{NAND_MFR_SAMSUNG, 0xdc, 0x10, 0x95, 0x54},
-	{NAND_MFR_SAMSUNG, 0xd3, 0x11, 0x95, 0x58},
-	{NAND_MFR_SAMSUNG, 0xdc, 0x10, 0x95, 0x55},
-	{NAND_MFR_SAMSUNG, 0xd3, 0x51, 0x95, 0x59},
-	{NAND_MFR_SAMSUNG, 0xdc, 0x10, 0x95, 0x56},
-	{NAND_MFR_SAMSUNG, 0xd3, 0x51, 0x95, 0x5a},
-};
-
-
-int aml_get_samsung_fbbt_flag(void)
-{
-	return check_1_2page_sparebyte;
-}
-
-void aml_nand_check_samsung_fbbt_flag(u8 *dev_id)
-{
-	int i, k;
-
-	k = ARRAY_SIZE(samsung_nand_id0);
-	for (i = 0; i < k; i++) {
-		if (!strncmp((char *)samsung_nand_id0[i], (char *)dev_id,
-			     strlen((const char *)samsung_nand_id0[i])))
-			check_1_2page_sparebyte = 1;
-	}
-}
-
 int aml_nand_get_fbb_issue(void)
 {
 	return nand_fbb_issue_flag;
@@ -1085,7 +1039,7 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 	struct aml_nand_platform *plat = aml_chip->platform;
 	struct aml_nand_flash_dev *type = NULL;
 	int i, maf_idx;
-	u8 dev_id[MAX_ID_LEN]= {0};
+	u8 dev_id[MAX_ID_LEN];
 
 
 	/* Send the command for reading device ID */
@@ -1099,13 +1053,26 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 	printk("NAND device id: %x %x %x %x %x %x \n",
 	dev_id[0], dev_id[1], dev_id[2], dev_id[3], dev_id[4], dev_id[5]);
 
+#if 0
+	test_timing(mtd, chip);
+#endif
 	/* Lookup the flash id */
 	for (i = 0; aml_nand_flash_ids[i].name != NULL; i++) {
 		if (!strncmp((char*) aml_nand_flash_ids[i].id,
-		(char*)dev_id, 6)) {
+		(char*)dev_id, strlen((const char*)aml_nand_flash_ids[i].id))) {
 			type = &aml_nand_flash_ids[i];
 			break;
 		}
+	}
+
+	if (pre_scan->pre_scan_flag) {
+		if (type) {
+			/*printk(KERN_INFO "NAND device: Manufacturer ID:"
+	       " 0x%02x, Chip ID: 0x%02x (%s %s)\n", *maf_id, dev_id[0],
+	       nand_manuf_ids[maf_idx].name, type->name);*/
+			pre_scan->is_nand = 1;
+		}
+		return type;
 	}
 
 	if (!type) {
@@ -1115,21 +1082,14 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 				type = plat->nand_flash_dev;
 		}
 
-		if (!type) {
-			pre_scan->is_nand = 0;
-			return type;
-		}
+		if (!type)
+			return ERR_PTR(-ENODEV);
 	}
 	aml_nand_check_fbb_issue(dev_id);
-	if (NAND_MFR_SAMSUNG == dev_id[0])
-		aml_nand_check_samsung_fbbt_flag(dev_id);
 
-	plat->nand_flash_dev = type;
-
-	if (pre_scan->pre_scan_flag) {
-		if (type)
-			pre_scan->is_nand = 1;
-		return type;
+	/**fixme**/
+	if (plat->nand_flash_dev) {
+		plat->nand_flash_dev = type;
 	}
 #ifdef CONFIG_MTD_DEVICE
 		mtd->name = type->name;
@@ -1247,8 +1207,8 @@ static int aml_nand_scan_ident(struct mtd_info *mtd, int maxchips)
 	aml_type = aml_nand_get_flash_type(mtd, chip, busw, &nand_maf_id);
 	if (pre_scan->pre_scan_flag) {
 		if (!aml_type) {
-			chip->select_chip(mtd, -1);
-			return -ENODEV;
+		chip->select_chip(mtd, -1);
+		return PTR_ERR(aml_type);
 		}
 		return 0;
 	}

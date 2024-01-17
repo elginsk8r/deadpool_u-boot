@@ -204,7 +204,7 @@ static int spifc_claim_bus(struct udevice *dev)
 	return 0;
 }
 
-static int spifc_release_bus(struct udevice *dev)
+static int spifc_release_bus(struct udevice *bus)
 {
 	return 0;
 }
@@ -284,8 +284,7 @@ static int spifc_xfer(struct udevice *dev,
 		return -EINVAL;
 	}
 
-	/* spi core will call back, No need to call repeatedly */
-	//spifc_claim_bus(dev);
+	spifc_claim_bus(dev);
 	spifc_set_speed(bus, slave->max_hz);
 	spifc_set_mode(bus, slave->mode);
 	if (flags & SPI_XFER_BEGIN) {
@@ -312,7 +311,6 @@ static int spifc_xfer(struct udevice *dev,
 			}
 			else
 				priv->save_addr = 0;
-
 			priv->cmd = buf[0];
 		}
 	} else if (dout && priv->cmd) {
@@ -354,15 +352,6 @@ static int spifc_probe(struct udevice *bus)
 {
 	struct spifc_priv *priv = dev_get_priv(bus);
 	int ret = 0;
-
-	/* In consideration of compatibility with other storage media,
-	 * reset pinmux to spifc here.
-	 */
-	ret = pinctrl_select_state(bus, "default");
-	if (ret) {
-		pr_err("select state %s failed\n", "default");
-		return ret;
-	}
 
 #if defined(CONFIG_CLK) && (CONFIG_CLK)
 	ret = clk_get_by_name(bus, "fclk_source", &priv->spifc_source);
@@ -434,11 +423,15 @@ static int spifc_ofdata_to_platdata(struct udevice *bus)
 	plat->speed = fdtdec_get_uint(blob, node,
 				      "max-frequency",
 				      40000000);
+	plat->io_num = fdtdec_get_uint(blob, node,
+				       "max-io",
+				       2);/* default 2 because some board only have 2 spifc io */
 	plat->max_cs = fdtdec_get_uint(blob, node,
 					       "max-cs",
 					       2);
 	plat->mode = 0;
-	printf("spifc freq %d reg %p\n", plat->speed, (void *)plat->reg);
+	printf("spifc freq %d, max io %d, reg %p\n",
+	       plat->speed, plat->io_num, (void *)plat->reg);
 	return 0;
 }
 

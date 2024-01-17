@@ -36,11 +36,6 @@
 #define POWERKEY_CFG2						2
 #define POWERKEY_CFG3						3
 
-/* Share vddcore parameters with bl2 */
-#define BL2_INIT_STAGE_VDDCORE_TABLE		0x84
-#define BL2_INIT_STAGE_VDDCORE_CONFIG		0x85
-#define BL2_INIT_STAGE_VDDCORE_CONFIG_1		0x86
-
 typedef struct bl2_reg {
 	unsigned	int		reg;
 	unsigned	int		value;
@@ -375,7 +370,7 @@ typedef struct ddr_set{
 	//system reserve,do not modify
 	/* align8 */
     unsigned	char	char_rev1;
-	unsigned	char	training_offset;//char_rev2;
+	unsigned	char	char_rev2;
 	unsigned	int		ddr_dmc_remap[5];
 	unsigned	int		dram_rtt_nom_wr_park[2];
 	//system reserve,do not modify

@@ -12,9 +12,4 @@ if UNIFY_KEY_MANAGE
         select SHA256
         help
             "security key wrapper for APIs bl31"
-    config KEYMAN_PROVISION_KEY
-        bool "Amlogic burn provision key"
-        default y
-        help
-            "provision key wrapper for burn tool"
 endif #if UNIFY_KEY_MANAGE

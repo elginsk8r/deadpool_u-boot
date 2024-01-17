@@ -330,8 +330,7 @@ static int initr_manual_reloc_cmdtable(void)
 #ifdef CONFIG_AML_STORAGE
 static int initr_storage(void)
 {
-	store_init(0);
-	return 0;
+	return !store_init(0);
 }
 #else
 #if defined(CONFIG_MTD_NOR_FLASH)

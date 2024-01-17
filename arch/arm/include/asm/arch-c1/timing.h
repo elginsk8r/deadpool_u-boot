@@ -360,7 +360,7 @@ typedef struct ddr_set{
 	//system reserve,do not modify
 	/* align8 */
     unsigned	char	char_rev1;
-	unsigned	char	training_offset;//char_rev2;
+	unsigned	char	char_rev2;
 	unsigned	int		ddr_dmc_remap[5];
 	unsigned	int		dram_rtt_nom_wr_park[2];
 	//system reserve,do not modify
@@ -396,9 +396,9 @@ typedef struct pll_set{
 	unsigned	int		nCFGTAddr;
 	/* align 8Byte */
 
-	unsigned	int		sys_pll_cntl[8];
+	unsigned	int		sys_pll_cntl[9];
 	unsigned	int		ddr_pll_cntl[8];
-	unsigned	int		fix_pll_cntl[8];
+	unsigned	int		fix_pll_cntl[10];
 }__attribute__ ((packed)) pll_set_t;
 
 typedef struct dmem_cfg {

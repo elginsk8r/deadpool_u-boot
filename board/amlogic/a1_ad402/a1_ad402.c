@@ -135,19 +135,17 @@ phys_size_t get_dram_size(void)
 
 phys_size_t get_effective_memsize(void)
 {
-#ifdef CONFIG_UBOOT_RUN_IN_SRAM
+#ifdef UBOOT_RUN_IN_SRAM
 	return 0x180000; /* SRAM 1.5MB */
 #else
 	return get_dram_size();
-#endif /* CONFIG_UBOOT_RUN_IN_SRAM */
+#endif /* UBOOT_RUN_IN_SRAM */
 }
 
-#ifdef CONFIG_UBOOT_RUN_IN_SRAM
 ulong board_get_usable_ram_top(ulong total_size)
 {
-	return (PHYS_SDRAM_1_BASE + PHYS_SDRAM_1_SIZE);
+	return PHYS_SDRAM_1_BASE+PHYS_SDRAM_1_SIZE;
 }
-#endif
 
 int dram_init_banksize(void)
 {
@@ -197,7 +195,7 @@ int ft_board_setup(void *blob, bd_t *bd)
 
 /* partition table */
 /* partition table for spinand flash */
-#if (defined(CONFIG_SPI_NAND) || defined(CONFIG_MTD_SPI_NAND))
+#ifdef CONFIG_SPI_NAND
 #ifdef CONFIG_SYSTEM_RTOS
 static const struct mtd_partition spinand_partitions[] = {
 	{
@@ -237,12 +235,12 @@ static const struct mtd_partition spinand_partitions[] = {
 	{
 		.name = "recovery",
 		.offset = 0,
-		.size = 13 * SZ_1M,
+		.size = 12 * SZ_1M,
 	},
 	{
 		.name = "boot",
 		.offset = 0,
-		.size = 10 * SZ_1M,
+		.size = 11 * SZ_1M,
 	},
 	{
 		.name = "system",
@@ -257,7 +255,7 @@ static const struct mtd_partition spinand_partitions[] = {
 	}
 };
 #endif /*CONFIG_SYSTEM_RTOS*/
-const struct mtd_partition *get_spinand_partition_table(int *partitions)
+struct mtd_partition *get_partition_table(int *partitions)
 {
 	*partitions = ARRAY_SIZE(spinand_partitions);
 	return spinand_partitions;
@@ -299,16 +297,10 @@ static const struct mtd_partition spiflash_partitions[] = {
 		.size = MTDPART_SIZ_FULL,
 	}
 };
-
-const struct mtd_partition *get_spiflash_partition_table(int *partitions)
+struct mtd_partition *get_partition_table(int *partitions)
 {
 	*partitions = ARRAY_SIZE(spiflash_partitions);
 	return spiflash_partitions;
-}
-
-uint64_t spiflash_bootloader_size(void)
-{
-	return 1 * SZ_1M;
 }
 #endif /* CONFIG_SPI_FLASH */
 

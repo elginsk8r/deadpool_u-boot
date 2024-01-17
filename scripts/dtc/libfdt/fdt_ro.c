@@ -139,7 +139,6 @@ static int nextprop_(const void *fdt, int offset)
 
 	do {
 		tag = fdt_next_tag(fdt, offset, &nextoffset);
-
 		switch (tag) {
 		case FDT_END:
 			if (nextoffset >= 0)

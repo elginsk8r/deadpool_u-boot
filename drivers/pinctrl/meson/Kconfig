@@ -56,37 +56,4 @@ config PINCTRL_MESON_C1
 	select PINCTRL_MESON
 	select PINCTRL_MESON_AXG_PMX
 	select PINCONF_MESON_G12A
-
-config PINCTRL_MESON_S4
-	bool "Amlogic Meson S4 SoC pinctrl driver"
-	depends on PINCTRL_GENERIC
-	depends on PINCONF
-	select PINCTRL_MESON
-	select PINCTRL_MESON_AXG_PMX
-	select PINCONF_MESON_G12A
-
-config PINCTRL_MESON_SC2
-	bool "Amlogic Meson SC2 SoC pinctrl driver"
-	depends on PINCTRL_GENERIC
-	depends on PINCONF
-	select PINCTRL_MESON
-	select PINCTRL_MESON_AXG_PMX
-	select PINCONF_MESON_G12A
-
-config PINCTRL_MESON_C2
-	bool "Amlogic Meson C2 SoC pinctrl driver"
-	depends on PINCTRL_GENERIC
-	depends on PINCONF
-	select PINCTRL_MESON
-	select PINCTRL_MESON_AXG_PMX
-	select PINCONF_MESON_G12A
-
-config PINCTRL_MESON_T7
-	bool "Amlogic Meson T7 SoC pinctrl driver"
-	depends on PINCTRL_GENERIC
-	depends on PINCONF
-	select PINCTRL_MESON
-	select PINCTRL_MESON_AXG_PMX
-	select PINCONF_MESON_G12A
-
 endif

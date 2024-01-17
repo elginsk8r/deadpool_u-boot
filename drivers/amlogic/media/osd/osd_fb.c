@@ -166,9 +166,7 @@ typedef struct pic_info_t {
 }pic_info_t;
 static pic_info_t g_pic_info;
 static int img_video_init = 0;
-#if defined(CONFIG_AML_MINUI)
-extern int in_fastboot_mode;
-#endif
+static int fb_index = -1;
 
 
 static void osd_layer_init(GraphicDevice *gdev, int layer)
@@ -188,26 +186,20 @@ static void osd_layer_init(GraphicDevice *gdev, int layer)
 	const struct color_bit_define_s *color =
 			&default_color_format_array[gdev->gdfIndex];
 
-	if (index >= VIU2_OSD1) {
-		xres = gdev->winSizeX;
-		yres = gdev->winSizeY;
-		xres_virtual = gdev->winSizeX;
-		yres_virtual = gdev->winSizeY * 2;
-		disp_end_x = gdev->winSizeX - 1;
-		disp_end_y = gdev->winSizeY - 1;
-	} else {
-		xres = gdev->fb_width;
-		yres = gdev->fb_height;
-		xres_virtual = gdev->fb_width;
-		yres_virtual = gdev->fb_height * 2;
-		disp_end_x = gdev->fb_width - 1;
-		disp_end_y = gdev->fb_height - 1;
-	}
-
-#ifdef AML_OSD_HIGH_VERSION
-	if (index >= VIU2_OSD1)
-		osd_init_hw_viu2();
-	else
+#ifdef OSD_SCALE_ENABLE
+	xres = gdev->fb_width;
+	yres = gdev->fb_height;
+	xres_virtual = gdev->fb_width;
+	yres_virtual = gdev->fb_height * 2;
+	disp_end_x = gdev->fb_width - 1;
+	disp_end_y = gdev->fb_height - 1;
+#else
+	xres = gdev->winSizeX;
+	yres = gdev->winSizeY;
+	xres_virtual = gdev->winSizeX;
+	yres_virtual = gdev->winSizeY * 2;
+	disp_end_x = gdev->winSizeX - 1;
+	disp_end_y = gdev->winSizeY - 1;
 #endif
 	osd_init_hw();
 	osd_setup_hw(index,
@@ -272,73 +264,35 @@ static int get_dts_node(const void *dt_addr, char *dtb_node)
 
 unsigned long get_fb_addr(void)
 {
-	char *dt_addr = NULL;
 	unsigned long fb_addr = 0;
 	static int initrd_set = 0;
 	char str_fb_addr[32];
-	char fdt_node[32];
-	int dt_loaded = 0;
 #ifdef CONFIG_OF_LIBFDT
+	const void *dt_addr = NULL;
+	char fdt_node[32];
 	int parent_offset = 0;
 	char *propdata = NULL;
 #endif
 
 	fb_addr = env_strtoul("fb_addr", 16);
-#ifdef CONFIG_OF_LIBFDT
 
-#if defined(CONFIG_AML_MINUI)
-	if (in_fastboot_mode == 1) {
-		osd_logi("in fastboot mode, load default fb_addr parameters \n");
-	} else
-#endif
-	{
-		dt_addr = (char *) env_get_ulong("dtb_mem_addr",  16, 0x1000000);
-		if (dt_addr == NULL) {
-			osd_logi("dt_addr is null, load default parameters\n");
-		}
-		if (fdt_check_header(dt_addr) < 0) {
-			dt_addr = (char *)gd->fdt_blob;
-			if (fdt_check_header(dt_addr) < 0) {
-				dt_loaded = -1;
-				osd_logi("check dts: %s, load default fb_addr parameters\n",
-				fdt_strerror(fdt_check_header(dt_addr)));
-			}
-		}
-		if (dt_loaded < 0) {
-			osd_logi("check dts: %s, load default fb_addr parameters\n",
-				fdt_strerror(fdt_check_header(dt_addr)));
-		} else {
-			strcpy(fdt_node, "/fb");
+#ifdef CONFIG_OF_LIBFDT
+	dt_addr = gd->fdt_blob;
+
+	if ((dt_addr == NULL) || (fdt_check_header(dt_addr) < 0)) {
+		osd_logi("check dts: %s, load default fb_addr parameters\n",
+			fdt_strerror(fdt_check_header(dt_addr)));
+	} else {
+		strcpy(fdt_node, "/meson-fb");
+		osd_logi("load fb addr from dts:%s\n", fdt_node);
+		parent_offset = get_dts_node(dt_addr, fdt_node);
+		if (parent_offset < 0) {
+			strcpy(fdt_node, "/drm-vpu");
 			osd_logi("load fb addr from dts:%s\n", fdt_node);
 			parent_offset = get_dts_node(dt_addr, fdt_node);
 			if (parent_offset < 0) {
-				if (parent_offset < 0) {
-					strcpy(fdt_node, "/drm-vpu");
-					osd_logi("load fb addr from dts:%s\n", fdt_node);
-					parent_offset = get_dts_node(dt_addr, fdt_node);
-					if (parent_offset < 0) {
-						osd_logi("not find node: %s\n",fdt_strerror(parent_offset));
-						osd_logi("use default fb_addr parameters\n");
-					} else {
-						/* check fb_addr */
-						propdata = (char *)fdt_getprop(dt_addr, parent_offset, "logo_addr", NULL);
-						if (propdata == NULL) {
-							osd_logi("failed to get fb addr for logo\n");
-							osd_logi("use default fb_addr parameters\n");
-						} else {
-							fb_addr = simple_strtoul(propdata, NULL, 16);
-						}
-					}
-				} else {
-					/* check fb_addr */
-					propdata = (char *)fdt_getprop(dt_addr, parent_offset, "logo_addr", NULL);
-					if (propdata == NULL) {
-						osd_logi("failed to get fb addr for logo\n");
-						osd_logi("use default fb_addr parameters\n");
-					} else {
-						fb_addr = simple_strtoul(propdata, NULL, 16);
-					}
-				}
+				osd_logi("not find node: %s\n",fdt_strerror(parent_offset));
+				osd_logi("use default fb_addr parameters\n");
 			} else {
 				/* check fb_addr */
 				propdata = (char *)fdt_getprop(dt_addr, parent_offset, "logo_addr", NULL);
@@ -349,11 +303,19 @@ unsigned long get_fb_addr(void)
 					fb_addr = simple_strtoul(propdata, NULL, 16);
 				}
 			}
+		} else {
+			/* check fb_addr */
+			propdata = (char *)fdt_getprop(dt_addr, parent_offset, "logo_addr", NULL);
+			if (propdata == NULL) {
+				osd_logi("failed to get fb addr for logo\n");
+				osd_logi("use default fb_addr parameters\n");
+			} else {
+				fb_addr = simple_strtoul(propdata, NULL, 16);
+			}
 		}
 	}
 #endif
-
-	if ((!initrd_set) && (osd_get_chip_type() >= MESON_CPU_MAJOR_ID_AXG)) {
+	if ((!initrd_set) && (get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_AXG)) {
 		sprintf(str_fb_addr,"%lx",fb_addr);
 		env_set("initrd_high", str_fb_addr);
 		initrd_set = 1;
@@ -366,7 +328,7 @@ unsigned long get_fb_addr(void)
 
 static void get_osd_version(void)
 {
-	u32 family_id = osd_get_chip_type();
+	u32 family_id = get_cpu_id().family_id;
 
 	if (family_id == MESON_CPU_MAJOR_ID_AXG)
 		osd_hw.osd_ver = OSD_SIMPLE;
@@ -376,34 +338,21 @@ static void get_osd_version(void)
 		osd_hw.osd_ver = OSD_HIGH_ONE;
 }
 
-int get_osd_layer(void)
+static int get_osd_layer(void)
 {
 	char *layer_str;
 	int osd_index = -1;
 
-	layer_str = env_get("display_layer");
-	if (strcmp(layer_str, "osd0") == 0)
-		osd_index = OSD1;
-	else if (strcmp(layer_str, "osd1") == 0)
-		osd_index = OSD2;
-	else if (strcmp(layer_str, "viu2_osd0") == 0)
-		osd_index = VIU2_OSD1;
-	else
-		osd_loge("%s, error found\n", __func__);
-
-	return osd_index;
+	if (fb_index < 0) {
+		layer_str = env_get("display_layer");
+		if (strcmp(layer_str, "osd0") == 0)
+			osd_index = OSD1;
+		else if (strcmp(layer_str, "osd1") == 0)
+			osd_index = OSD2;
+		fb_index = osd_index;
+	}
+	return fb_index;
 }
-
-static bool is_osd_supported(int chip_id)
-{
-	if ((chip_id == MESON_CPU_MAJOR_ID_A1) ||
-		(chip_id == MESON_CPU_MAJOR_ID_C1) ||
-		(chip_id == MESON_CPU_MAJOR_ID_C2))
-		return false;
-	else
-		return true;
-}
-
 static void *osd_hw_init(void)
 {
 	int osd_index = -1;
@@ -433,13 +382,8 @@ static void *osd_hw_init(void)
 			return NULL;
 		}
 		osd_layer_init(&fb_gdev, OSD2);
-	} else if (osd_index == VIU2_OSD1) {
-		if (osd_hw.osd_ver == OSD_SIMPLE) {
-			osd_loge("AXG not support viu2 osd0\n");
-			return NULL;
-		}
-		osd_layer_init(&fb_gdev, VIU2_OSD1);
-	} else {
+	}
+	else {
 		osd_loge("display_layer(%d) invalid\n", osd_index);
 		return NULL;
 	}
@@ -455,14 +399,10 @@ void *video_hw_init(int display_mode)
 	u32 fg = 0;
 	u32 bg = 0;
 	u32 fb_width = 0;
-	u32 fb_height = 0;
+	u32 fb_height = 0;;
 
-	if (!is_osd_supported(osd_get_chip_type()))
-		return NULL;
 	get_osd_version();
-#ifdef CONFIG_AML_VOUT
 	vout_init();
-#endif
 	fb_addr = get_fb_addr();
 	switch (display_mode) {
 	case MIDDLE_MODE:
@@ -614,14 +554,18 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 	uchar *fb;
 	bmp_image_t *bmp = (bmp_image_t *)bmp_image;
 	uchar *bmap;
+	ushort padded_line;
 	unsigned long width, height;
-	unsigned long pheight;
-	unsigned long pwidth;
+#ifdef OSD_SCALE_ENABLE
+	unsigned long pheight = fb_gdev.fb_height;
+	unsigned long pwidth = fb_gdev.fb_width;
+#else
+	unsigned long pheight = info->width;
+	unsigned long pwidth = info->height;
+#endif
 	unsigned colors, bpix, bmp_bpix;
-	uint lcd_line_length;
+	int lcd_line_length = (pwidth * NBITS(info->vl_bpix)) / 8;
 	int osd_index = -1;
-	int bmp_line_bytes;
-	int bmp_line_align_offset;
 
 	osd_index = get_osd_layer();
 	if (osd_index < 0) {
@@ -629,16 +573,6 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 		return (-1);
 	}
 
-	/* viu1 has scaler, viu2 has no scaler */
-	if (osd_index >= VIU2_OSD1) {
-		pwidth = info->width;
-		pheight = info->height;
-	} else {
-		pheight = fb_gdev.fb_height;
-		pwidth = fb_gdev.fb_width;
-	}
-
-	lcd_line_length = CANVAS_ALIGNED((pwidth * NBITS(info->vl_bpix)) / 8);
 	if (fb_gdev.mode != FULL_SCREEN_MODE)
 		if (parse_bmp_info(bmp_image))
 			return -1;
@@ -703,24 +637,21 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 	 * their own ways, so make the converting to be MCC200
 	 * specific.
 	 */
-	bmp_line_bytes = width * bmp_bpix / 8;
-	bmp_line_bytes = (bmp_line_bytes & 0x3) ?
-		((bmp_line_bytes & ~0x3) + 4) : (bmp_line_bytes);
-
-	bmp_line_align_offset = bmp_line_bytes - width * bmp_bpix / 8;
+	padded_line = (width & 0x3) ? ((width & ~0x3) + 4) : (width);
 
 	if ((x + width) > pwidth)
 		width = pwidth - x;
 	if ((y + height) > pheight)
 		height = pheight - y;
 
+	osd_enable_hw(osd_index, 1);
+
 	bmap = (uchar *)bmp + le32_to_cpu(bmp->header.data_offset);
-	fb   = (uchar *)(osd_hw.fb_gem[osd_index].addr +
+	fb   = (uchar *)(info->vd_base +
 			 (y + height - 1) * lcd_line_length + x * fb_gdev.gdfBytesPP);
 
-	osd_logd("fb=0x%p; bmap=0x%p, width=%ld, height= %ld, lcd_line_length=%d, bmp_line_bytes=%d, fb_gdev.fb_width=%d, fb_gdev.fb_height=%d \n",
-		 fb, bmap, width, height, lcd_line_length, bmp_line_bytes,
-		 fb_gdev.fb_width, fb_gdev.fb_height);
+	osd_logd("fb=0x%p; bmap=0x%p, width=%ld, height= %ld, lcd_line_length=%d, padded_line=%d, fb_gdev.fb_width=%d, fb_gdev.fb_height=%d \n",
+		 fb, bmap, width, height, lcd_line_length, padded_line,fb_gdev.fb_width,fb_gdev.fb_height);
 
 	if (bmp_bpix == 8) {
 		/* decode of RLE8 */
@@ -757,7 +688,7 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 				}
 				*/
 			}
-			buffer_rgb += bmp_line_align_offset;
+			buffer_rgb += (padded_line - width);
 			fb -= (byte_width * 4 + lcd_line_length);
 		}
 		buffer_rgb -= width*height*4;
@@ -770,7 +701,7 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 				*(fb++) = *(bmap++);
 				*(fb++) = *(bmap++);
 			}
-			bmap += bmp_line_align_offset;
+			bmap += (padded_line - width) * 2;
 			fb   -= (width * 2 + lcd_line_length);
 		}
 		break;
@@ -784,7 +715,7 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 					*(fb++) = *(bmap++);
 					*(fb++) = 0xff;
 				}
-				bmap += bmp_line_align_offset;
+				bmap += (padded_line - width);
 				fb   -= (width * 4 + lcd_line_length);
 			}
 		} else {
@@ -795,7 +726,7 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 					*(fb++) = *(bmap++);
 					*(fb++) = *(bmap++);
 				}
-				bmap += bmp_line_align_offset;
+				bmap += (padded_line - width);
 				fb   -= (width * 3 + lcd_line_length);
 			}
 		}
@@ -809,7 +740,7 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 				*(fb++) = *(bmap++);
 				*(fb++) = *(bmap++);
 			}
-			bmap += bmp_line_align_offset;
+			bmap += (padded_line - width);
 			fb   -= (width * 4 + lcd_line_length);
 		}
 		break;
@@ -820,8 +751,8 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 	buffer_rgb = NULL;
 	ptr_rgb = NULL;
 
-	flush_cache((unsigned long)osd_hw.fb_gem[osd_index].addr,
-		    pheight * CANVAS_ALIGNED(pwidth * info->vl_bpix / 8));
+	flush_cache((unsigned long)info->vd_base,
+		    pheight * pwidth * info->vl_bpix / 8);
 	return (0);
 }
 
@@ -1004,20 +935,16 @@ int video_scale_bitmap(void)
 	osd_logd2("video_scale_bitmap src w=%d, h=%d, dst w=%d, dst h=%d\n",
 		fb_gdev.fb_width, fb_gdev.fb_height, fb_gdev.winSizeX, fb_gdev.winSizeY);
 
-	vout_get_current_axis(axis);
 	layer_str = env_get("display_layer");
+	vout_get_current_axis(axis);
 	if (strcmp(layer_str, "osd0") == 0)
-		osd_index = OSD1;
+		osd_index = 0;
 	else if (strcmp(layer_str, "osd1") == 0)
-		osd_index = OSD2;
-	else if (strcmp(layer_str, "viu2_osd0") == 0) {
-		osd_index = VIU2_OSD1;
-		goto no_scale;
-	} else {
+		osd_index = 1;
+	else {
 		osd_logd2("video_scale_bitmap: invalid display_layer\n");
 		return (-1);
 	}
-
 #ifdef OSD_SUPERSCALE_ENABLE
 	if ((fb_gdev.fb_width * 2 != fb_gdev.winSizeX) ||
 	    (fb_gdev.fb_height * 2 != fb_gdev.winSizeY)) {
@@ -1033,14 +960,12 @@ int video_scale_bitmap(void)
 	osd_set_window_axis_hw(osd_index, axis[0], axis[1], axis[0] + axis[2] - 1,
 			       axis[1] + axis[3] - 1);
 	osd_set_free_scale_enable_hw(osd_index, 0x10001);
-
-no_scale:
 #ifdef AML_OSD_HIGH_VERSION
 	disp_data.x_start = axis[0];
 	disp_data.y_start = axis[1];
 	disp_data.x_end = axis[0] + axis[2] - 1;
 	disp_data.y_end = axis[1] + axis[3] - 1;
-	if (osd_hw.osd_ver == OSD_HIGH_ONE && osd_index < VIU2_OSD1)
+	if (osd_hw.osd_ver == OSD_HIGH_ONE)
 		osd_update_blend(&disp_data);
 #endif
 	osd_enable_hw(osd_index, 1);
@@ -1205,12 +1130,11 @@ static int _osd_hw_init(void)
 	u32 fg = 0;
 	u32 bg = 0;
 	u32 fb_width = 0;
-	u32 fb_height = 0;
+	u32 fb_height = 0;;
 
 	get_osd_version();
-#ifdef CONFIG_AML_VOUT
+
 	vout_init();
-#endif
 	fb_addr = get_fb_addr();
 #ifdef OSD_SCALE_ENABLE
 	fb_width = env_strtoul("fb_width", 10);
@@ -1264,6 +1188,10 @@ static int osd_hw_init_by_index(u32 osd_index)
 	return 0;
 }
 
+
+
+
+
 static int video_display_osd(u32 osd_index)
 {
 	struct vinfo_s *info = NULL;
@@ -1315,7 +1243,7 @@ u32 hist_max_min[3][100], hist_spl_val[3][100],
 void hist_set_golden_data(void)
 {
 	u32 i = 0;
-	u32 family_id = osd_get_chip_type();
+	u32 family_id = get_cpu_id().family_id;
 	char *str = NULL;
 	char *hist_env_key[12] = {"hist_max_min_osd0","hist_spl_val_osd0","hist_spl_pix_cnt_osd0","hist_cheoma_sum_osd0",
 	                         "hist_max_min_osd1","hist_spl_val_osd1","hist_spl_pix_cnt_osd1","hist_cheoma_sum_osd1",
@@ -1355,19 +1283,7 @@ void hist_set_golden_data(void)
 	hist_cheoma_sum[OSD1][MESON_CPU_MAJOR_ID_G12A]
 						= hist_cheoma_sum[OSD2][MESON_CPU_MAJOR_ID_G12A]
 						= 0xd4ffdc;
-	//SC2
-	hist_max_min[OSD1][MESON_CPU_MAJOR_ID_SC2]
-						= hist_max_min[OSD2][MESON_CPU_MAJOR_ID_SC2]
-						= 0xf700;
-	hist_spl_val[OSD1][MESON_CPU_MAJOR_ID_SC2]
-						= hist_spl_val[OSD2][MESON_CPU_MAJOR_ID_SC2]
-						= 0x1e873c00;
-	hist_spl_pix_cnt[OSD1][MESON_CPU_MAJOR_ID_SC2]
-						= hist_spl_pix_cnt[OSD2][MESON_CPU_MAJOR_ID_SC2]
-						= 0x1fa409;
-	hist_cheoma_sum[OSD1][MESON_CPU_MAJOR_ID_SC2]
-						= hist_cheoma_sum[OSD2][MESON_CPU_MAJOR_ID_SC2]
-						= 0xfd20480;
+
 	for (i = 0; i < 12; i++) {
 		str = env_get(hist_env_key[i]);
 		if (str) {
@@ -1393,9 +1309,8 @@ int osd_rma_test(u32 osd_index)
 {
 	u32 i = osd_index, osd_max = 1;
 	u32 hist_result[4];
-	u32 family_id = osd_get_chip_type();
+	u32 family_id = get_cpu_id().family_id;
 
-	get_osd_version();
 	if (osd_hw.osd_ver == OSD_SIMPLE) {
 		osd_max = 0;
 	} else if (osd_hw.osd_ver == OSD_HIGH_ONE) {

@@ -25,8 +25,8 @@ static const char* _iniSets[] = {
 
 ConfigPara_t g_sdcBurnPara = {
     .setsBitMap.burnParts   = 0,
-    .setsBitMap.custom      = 1,
-    .setsBitMap.burnEx      = 1,
+    .setsBitMap.custom      = 0,
+    .setsBitMap.burnEx      = 0,
 
     .burnParts      = {
         .burn_num           = 0,
@@ -34,14 +34,14 @@ ConfigPara_t g_sdcBurnPara = {
     },
 
     .custom         = {
-        .eraseBootloader    = 1,//default to erase bootloader! no effect for usb_upgrade
-        .eraseFlash         = 1,//default erase flash for all cases
-        .bitsMap.eraseBootloader    = 1,
-        .bitsMap.eraseFlash         = 1,
+        .eraseBootloader    = 1,//default to erase bootloader!
+        .eraseFlash         = 0,
+        .bitsMap.eraseBootloader    = 0,
+        .bitsMap.eraseFlash         = 0,
     },
 
     .burnEx         = {
-        .bitsMap.pkgPath    = 1,
+        .bitsMap.pkgPath    = 0,
         .bitsMap.mediaPath  = 0,
     },
 };
@@ -84,7 +84,7 @@ int print_burn_parts_para(const BurnParts_t* pBurnParts)
     return 0;
 }
 
-int print_sdc_burn_para(const ConfigPara_t* pCfgPara)
+static int print_sdc_burn_para(const ConfigPara_t* pCfgPara)
 {
     printf("\n=========sdc_burn_paras=====>>>\n");
 
@@ -130,7 +130,7 @@ static int parse_set_burnEx(const char* key, const char* strVal)
             return __LINE__;
         }
 
-        strncpy(pBurnEx->pkgPath, strVal, sizeof pBurnEx->pkgPath - 1);
+        strcpy(pBurnEx->pkgPath, strVal);
         pBurnEx->bitsMap.pkgPath = 1;
 
         return 0;
@@ -144,7 +144,7 @@ static int parse_set_burnEx(const char* key, const char* strVal)
         }
         if (strVal)
         {
-            strncpy(pBurnEx->mediaPath, strVal, sizeof pBurnEx->mediaPath - 1);
+            strcpy(pBurnEx->mediaPath, strVal);
             pBurnEx->bitsMap.mediaPath = 1;
         }
 
@@ -239,19 +239,6 @@ static int parse_set_custom_para(const char* key, const char* strVal)
 
     }
 
-    if (!strcmp(key, "erase_ddr_para"))
-    {
-        if (pCustome->bitsMap.eraseDdrPara) {
-            goto _key_dup;
-        }
-
-        if (strVal)
-        {
-            pCustome->eraseDdrPara = cfgVal;
-            pCustome->bitsMap.eraseDdrPara = 1;
-        }
-    }
-
     return 0;
 
 _key_dup:
@@ -330,7 +317,7 @@ static int parse_burn_parts(const char* key, const char* strVal)
             return __LINE__;
         }
 
-        strncpy(partName, strVal, PART_NAME_LEN_MAX - 1);
+        strcpy(partName, strVal);
     }
 
     return 0;
@@ -406,7 +393,7 @@ static int optimus_aml_sdc_burn_ini_parse_usr_cfg(const char* setName, const cha
         return ret;
 }
 
-static int _parse_ini_cfg_file(const char* filePath, HIMAGE hImg)
+int parse_ini_cfg_file(const char* filePath)
 {
     const int MaxFileSz = OPTIMUS_DOWNLOAD_SLOT_SZ;
     char* CfgFileLoadAddr = (char*)OPTIMUS_DOWNLOAD_TRANSFER_BUF_ADDR;
@@ -417,20 +404,7 @@ static int _parse_ini_cfg_file(const char* filePath, HIMAGE hImg)
 
     init_config_para(&g_sdcBurnPara);
 
-    if (hImg) {
-        DWN_MSG("try to fetch para from item aml_sdc_burn.ini\n");
-        int itemSz = MaxFileSz;
-        rcode =  optimus_img_item2buf(hImg, "ini", "aml_sdc_burn", CfgFileLoadAddr, &itemSz);
-        if (ITEM_NOT_EXIST == rcode) {
-            DWN_MSG("Item ini not existed, so use hard-coded para\n");
-            return ITEM_NOT_EXIST;
-        } else if(rcode) {
-            DWN_ERR("Err when get item ini, rcode %d\n", rcode);
-            return __LINE__;
-        } else
-            validLineNum = parse_ini_buf_2_valid_lines(CfgFileLoadAddr, itemSz, lines);
-    } else
-        validLineNum = parse_ini_file_2_valid_lines(filePath, CfgFileLoadAddr, MaxFileSz, lines);
+    validLineNum = parse_ini_file_2_valid_lines(filePath, CfgFileLoadAddr, MaxFileSz, lines);
     if (!validLineNum) {
         err("error in parse ini file\n");
         return __LINE__;
@@ -453,16 +427,6 @@ static int _parse_ini_cfg_file(const char* filePath, HIMAGE hImg)
     print_sdc_burn_para(&g_sdcBurnPara);
 
     return 0;
-}
-
-int parse_ini_cfg_file(const char* filePath)
-{
-    return _parse_ini_cfg_file(filePath, NULL);
-}
-
-int parse_ini_cfg_from_item(HIMAGE hImg)
-{
-    return _parse_ini_cfg_file(NULL, hImg);
 }
 
 #define MYDBG 0

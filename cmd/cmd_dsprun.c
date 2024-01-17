@@ -9,7 +9,7 @@
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/timer.h>
 #include <asm/arch/bl31_apis.h>
-#include <asm/arch/register.h>
+#include <asm/arch/p_register.h>
 #include <serial.h>
 
 void dsp_reset(uint32_t id,uint32_t reset_addr)
@@ -17,7 +17,7 @@ void dsp_reset(uint32_t id,uint32_t reset_addr)
 	uint32_t StatVectorSel;
 	uint32_t strobe = 1;
 	//address remap
-	printf("start_dsp \n");
+	pr_info("\n start_dsp \n");
 	//*P_DSP_REMAP2 = 0x3000fff0; //replace the highest 12bits 0xfffxxxxx with 0x300xxxxx
 
 	StatVectorSel = (reset_addr!= 0xfffa0000);
@@ -26,32 +26,29 @@ void dsp_reset(uint32_t id,uint32_t reset_addr)
 	if (id == 0) { //dspa
 		init_dsp(id,reset_addr, (0x1 | StatVectorSel<<1 | strobe<<2));
 		udelay(50);
-
-		writel((readl(DSP_CFG0) &( ~(0xffff <<0))) | (0x2018 << 0) | (1<<29), DSP_CFG0);
+		pr_info("\n *P_DSP_CFG0 : ADDR_0X%p, value_0x%8x \n",P_DSP_CFG0,*P_DSP_CFG0);
+		*P_DSP_CFG0 = (*P_DSP_CFG0 & ~(0xffff <<0)) | (0x2018 << 0) | (1<<29) | (0<<0) ;      //irq_clken
 		udelay(10);
-
-		writel(readl(DSP_CFG0) | (1<<31), DSP_CFG0); //Dreset deassert
+		*P_DSP_CFG0 = *P_DSP_CFG0 & ~(1<<31);     //Dreset assert
 		udelay(10);
-
-		writel(readl(DSP_CFG0) & ~(1<<31), DSP_CFG0); //Dreset assert
+		// *P_DSP_CFG0 = *P_DSP_CFG0 | (1<<31);     //Dreset deassert
+		// _udelay(10);
+		*P_DSP_CFG0 = *P_DSP_CFG0 & ~(1<<30);    //Breset
 		udelay(10);
-
-		writel(readl(DSP_CFG0) | (1<<30), DSP_CFG0); //Breset deassert
-		udelay(10);
-
-		writel(readl(DSP_CFG0) & ~(1<<30), DSP_CFG0); //Breset
-		udelay(10);
-		printf("DSP_CFG0 : value_0x%8x \n",readl(DSP_CFG0));
+		// *P_DSP_CFG0 = *P_DSP_CFG0 | (1<<30);    //Breset deassert
+		// _udelay(10);
+		pr_info("\n *P_DSP_CFG0 : ADDR_0X%p, value_0x%8x \n",P_DSP_CFG0,*P_DSP_CFG0);
 	} else {
 		init_dsp(id,reset_addr, (0x1 | StatVectorSel<<1 | strobe<<2));
 		udelay(50);
-		writel((readl(DSPB_CFG0) & (~(0xffff <<0))) | (0x2019 << 0) | (1<<29), DSPB_CFG0);
+		pr_info("\n *P_DSPB_CFG0 : ADDR_0X%p, value_0x%8x \n",P_DSPB_CFG0,*P_DSPB_CFG0);
+		*P_DSPB_CFG0 = (*P_DSPB_CFG0 & ~(0xffff <<0)) | (0x2019 << 0) | (1<<29) | (0<<0) ;      //irq_clken
 		udelay(10);
-		writel(readl(DSPB_CFG0) & ~(1<<31), DSPB_CFG0); //Dreset
+		*P_DSPB_CFG0 = *P_DSPB_CFG0 & ~(1<<31);     //Dreset
 		udelay(10);
-		writel(readl(DSPB_CFG0) & ~(1<<30), DSPB_CFG0); //Breset
+		*P_DSPB_CFG0 = *P_DSPB_CFG0 & ~(1<<30);    //Breset
 		udelay(10);
-		printf("DSPB_CFG0 : value_0x%8x \n",readl(DSPB_CFG0));
+		pr_info("\n *P_DSPB_CFG0 : ADDR_0X%p, value_0x%8x \n",P_DSPB_CFG0,*P_DSPB_CFG0);
 	}
 }
 
@@ -59,26 +56,63 @@ static int do_dsprun(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	unsigned long addr;
 	unsigned int dspid;
+	unsigned long dspfw_size;
+
 	int ret=0;
-	if (argc <= 1) {
-		printf("plese input dsp boot args:id, addrss, clk!\n");
+	if (argc < 4) {
+		pr_err("please input dsp boot args: id, address, fw size!\n");
 		return CMD_RET_USAGE;
 	}
+
 	dspid = simple_strtoul(argv[1], NULL, 16);
 	addr = simple_strtoul(argv[2], NULL, 16);
-	printf("dsp%d boot \n",dspid);
-	printf("dspboot start address:0x%lx\n",addr);
+	dspfw_size = simple_strtoul(argv[3], NULL, 16);
+	pr_info("dsp%d boot address:0x%lx size:0x%lx", dspid, addr, dspfw_size);
+
+	flush_cache(addr, dspfw_size);
+
 	dsp_reset(dspid, addr);
-	printf("dsp init over! \n");
+	pr_info("dsp init over! \n");
 	return ret;
 }
 
 
 U_BOOT_CMD(
-	dsprun,	3,	1,	do_dsprun,
+	dsprun,	4,	1,	do_dsprun,
 	"load dspboot.bin from ddr address",
 	"arg[0]: cmd\n"
 	"arg[1]: dspid \n"
 	"arg[2]: dspboot.bin load address!"
+	"arg[3]: dsp firmware size\n"
 );
+
+
+static int do_flushmemory(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	unsigned long addr;
+	unsigned long size;
+
+	int ret=0;
+	if (argc < 3) {
+		pr_err("please input bootpackage args: address, fw size!\n");
+		return CMD_RET_USAGE;
+	}
+
+	addr = simple_strtoul(argv[1], NULL, 16);
+	size = simple_strtoul(argv[2], NULL, 16);
+	pr_info("%s address:0x%lx size:0x%lx\n", argv[0], addr, size);
+	flush_cache(addr, size);
+	return ret;
+}
+
+
+U_BOOT_CMD(
+	flushmemory,	3,	1,	do_flushmemory,
+	"flush cache",
+	"arg[0]: cmd\n"
+	"arg[1]: address \n"
+	"arg[2]: size \n"
+);
+
+
 

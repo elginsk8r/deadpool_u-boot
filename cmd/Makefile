@@ -78,9 +78,6 @@ obj-$(CONFIG_CMD_IOTRACE) += iotrace.o
 obj-$(CONFIG_CMD_HASH) += hash.o
 obj-$(CONFIG_CMD_IDE) += ide.o disk.o
 obj-$(CONFIG_CMD_INI) += ini.o
-ifdef CONFIG_CMD_INI
-obj-y += amlogic/ini/model.o amlogic/ini/model_data_check.o amlogic/ini/ini_proxy.o amlogic/ini/UnifyKey.o amlogic/ini/ini_platform.o amlogic/ini/ini_io.o amlogic/ini/ini_handler.o amlogic/ini/ini_core.o amlogic/ini/ini_log.o
-endif
 obj-$(CONFIG_CMD_IRQ) += irq.o
 obj-$(CONFIG_CMD_ITEST) += itest.o
 obj-$(CONFIG_CMD_JFFS2) += jffs2.o
@@ -171,9 +168,6 @@ obj-$(CONFIG_CMD_GPT) += gpt.o
 obj-$(CONFIG_CMD_ETHSW) += ethsw.o
 obj-$(CONFIG_CMD_AXI) += axi.o
 obj-$(CONFIG_CMD_SARADC) += saradc.o
-obj-$(CONFIG_CMD_STARTDSP) += cmd_startdsp.o
-obj-$(CONFIG_CMD_IR) += irkey.o
-obj-$(CONFIG_CMD_TCPC) += tcpc.o
 
 # Power
 obj-$(CONFIG_CMD_PMIC) += pmic.o

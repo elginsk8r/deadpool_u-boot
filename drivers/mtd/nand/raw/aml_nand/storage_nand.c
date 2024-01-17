@@ -12,17 +12,38 @@
 #include "aml_nand.h"
 #include <dm/device.h>
 
+static struct storage_t *slcnand_storage;
+#ifdef CONFIG_MTD_LOGIC_MAP
+extern void mtd_store_init_map(void);
+#endif
 extern void mtd_store_mount_ops(struct storage_t* store);
 struct aml_pre_scan *pre_scan;
+
+static inline void set_slc_nand_storage(struct storage_t *slc_nand)
+{
+	slcnand_storage = slc_nand;
+}
+
+static inline struct storage_t *get_slc_nand_storage(void)
+{
+	return slcnand_storage;
+}
 
 int nand_pre(void)
 {
 	int ret = 0;
-
 	pre_scan->pre_scan_flag = 1;
+	pre_scan->is_nand = 0;
 	board_nand_init();
-	ret = (pre_scan->is_nand)? 0:1;
+	if (pre_scan->is_nand) {
+		printf("scan valid slc-nand\n");
+		ret = 0;
+	} else {
+		ret = 1;
+		printf("scan no valid slc-nand\n");
+	}
 	pre_scan->pre_scan_flag = 0;
+	pre_scan->is_nand = 0;
 	return ret;
 }
 
@@ -33,6 +54,9 @@ int slcnand_fit_storage(void)
 
 	struct aml_nand_chip *aml_chip = mtd_to_nand_chip(nand_info[0]);
 	struct aml_nand_flash_dev *type = NULL;
+
+	if (get_slc_nand_storage())
+		return 0;
 
 	type = aml_chip->platform->nand_flash_dev;
 
@@ -48,7 +72,7 @@ int slcnand_fit_storage(void)
 	slc_nand->init_flag = 0;
 	printf("storage dev type: 0x%x, storage device is slc NAND\n",slc_nand->type);
 
-	memcpy(slc_nand->info.name, type->name, 32 * sizeof(char));
+	memcpy(slc_nand->info.name, type->name, 32*sizeof(char));
 	memcpy(slc_nand->info.id, type->id, 8);
 	printf("name: %s\n",slc_nand->info.name);
 
@@ -57,20 +81,44 @@ int slcnand_fit_storage(void)
 	slc_nand->info.erase_unit = type->erasesize;
 	slc_nand->info.caps = ((type->chipsize) << 20);
 	printf("cap: 0x%llx\n", slc_nand->info.caps);
+#ifdef CONFIG_DISCRETE_BOOTLOADER
 	slc_nand->info.mode = 1;
+#else
+	slc_nand->info.mode = 0;
+#endif
 
+	set_slc_nand_storage(slc_nand);
 	mtd_store_mount_ops(slc_nand);
 
+#ifdef CONFIG_MTD_LOGIC_MAP
+	mtd_store_init_map();
+#endif
 	return store_register(slc_nand);
 }
 
+extern int amlmtd_init;
+extern void board_nand_init(void);
 extern int meson_nfc_probe(struct udevice *dev);
 struct udevice *nand_dev;
 int nand_probe(uint32_t init_flag)
 {
+	struct storage_t *slc_nand  = get_slc_nand_storage();
+
+	if (slc_nand) {
+		slc_nand->init_flag = init_flag;
+		printf("nand probe success1\n");
+		return 0;
+	}
 
 	meson_nfc_probe(nand_dev);
-
+	slc_nand = get_slc_nand_storage();
+	if (!slc_nand) {
+		printf("%s %d can not get slc nand!\n",
+			   __func__, __LINE__);
+		return 1;
+	}
+	slc_nand->init_flag = init_flag;
+	printf("nand probe success0\n");
 	return 0;
 }
 

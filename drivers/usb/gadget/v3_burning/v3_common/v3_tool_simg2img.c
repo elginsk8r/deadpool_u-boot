@@ -95,15 +95,6 @@ int v3tool_simg2img_init(const ImgDownloadPara* downPara)
  * so don't update global var in get_img,
  * so update @leftTransLen in v3tool_simg2img_write_img, which is after usb->ddr check ok
  * */
-/*
- * code flow: first time, then {sz = header + first chunkinfo, offset = 0}
- * 		   else {
- * 		   		offset = _spPacketStates.fileOffset;
- *				sz = V3_DOWNLOAD_MEM_SIZE ;
- *				if (sz + spare >= img left sz) then sz = img left sz
- *				??write img only dispose DATA + chunkinfo, so maybe 8M > this, but not matter??
- * 		   }
- */
 int v3tool_simg2img_get_img(UsbDownInf* downInf)
 {
     downInf->dataBuf  = (char*)V3_DOWNLOAD_MEM_BASE;
@@ -124,7 +115,6 @@ int v3tool_simg2img_get_img(UsbDownInf* downInf)
         if (_spPacketStates.imgTotalLen == _spPacketStates.fileOffset) {
             *dataSize = 0;
             _downloadState = SP_DOWNLOAD_OK;
-            spmsg("Finish sparse img\n");
             return 0;
         }
         FBS_ERR(fb_response_str, "Excep:NO leftTransLen but img not end, fileOffset %llx, leftChunkNum %d",
@@ -179,7 +169,7 @@ static int check_chunk_info(const chunk_header_t* chunk, unsigned* pDataLen, uns
                     return -__LINE__;
                 }
                 const int fillFieldLen = 4;
-                if (fillVal) *fillVal = *(unsigned*)(chunk+1);
+                *fillVal = *(unsigned*)(chunk+1);
                 chunkDataLen = fillFieldLen;
             }break;
         case CHUNK_TYPE_CRC32:
@@ -230,7 +220,6 @@ static int simg2img_fill_chunk_write(const char* partName, int fillLen, const un
     }
     while (LeftDataLen >0) {
         const unsigned thisWriteLen = min(LeftDataLen, BufSz);
-        FB_DBG("fill off/sz/val 0x%08llx %x %x\n", flashAddr, thisWriteLen, fillVal);
         int ret = store_logic_write(partName, flashAddr, thisWriteLen, fillBuf);
         if (ret) {
             sperr("FILL_CHUNK:Want write 0x%x Bytes, but failed\n", thisWriteLen);
@@ -265,7 +254,7 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
     const chunk_header_t* nextDownInf = NULL;
     bool hasFileHeader      = false;
     bool hasChunkBody       = true;
-    bool hasNextChunkInfo   = true;//nextChunkInfo
+    bool hasNextChunkInfo   = true;
 
     //update globals not affected by rx data format
     _spPacketStates.fileOffset   += dataSize;
@@ -286,10 +275,10 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
 
         //2,
         sparse_header_t *header = (sparse_header_t*) dataBuf;
-        _spPacketStates.leftChunkNum    = header->total_chunks - 1;//how many chunkinfo not parsed
+        _spPacketStates.leftChunkNum    = header->total_chunks - 1;
         _spPacketStates.pktHeadLen      = header->file_hdr_sz;
         _spPacketStates.sparseBlkSz     = header->blk_sz;//often 4k
-        spmsg("totalChunkNum %d, fileHeadSz 0x%x, chunkHeadSz 0x%zx, blk 0x%x\n", _spPacketStates.leftChunkNum + 1,
+        spmsg("totalChunkNum %d, fileHeadSz 0x%x, chunkHeadSz 0x%zx, blk 0x%x\n", _spPacketStates.leftChunkNum,
                 _spPacketStates.pktHeadLen, CHUNK_HEAD_SIZE, _spPacketStates.sparseBlkSz);
 
         //3,
@@ -305,8 +294,8 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
     {
         if (lastChunk) {//img ended
             hasNextChunkInfo = false;
-            spmsg("last chunk\n");
-            /*return 0;*/
+            spmsg("sparse img ended\n");
+            return 0;
         }
         if ( _spPacketStates.leftTransLen ) {//only data body
             hasNextChunkInfo = false;
@@ -321,14 +310,13 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
     {
         const chunk_header_t* pChunk = _spPacketStates.chunkInfo;//this download info
         const char* part = downPara->commonInf.partName;
-        int64_t flashAddr = _spPacketStates.nextFlashAddr + downPara->commonInf.partStartOff;
+        int64_t flashAddr = _spPacketStates.nextFlashAddr;
         unsigned flashWrLen = dataSize;
         const unsigned chunkFlashSpace = pChunk->chunk_sz * _spPacketStates.sparseBlkSz;;
 
         //spmsg("chunkInfo %p, %x\n", pChunk, pChunk->chunk_type);
         const unsigned chunkType = pChunk->chunk_type;
         if (CHUNK_TYPE_RAW == chunkType) {
-            FB_DBG("raw wr: off/sz 0x%08llx flashWrLen %x\n", flashAddr, flashWrLen);
             if (store_logic_write(part, flashAddr, flashWrLen, dataBuf)) {
                 sperr("Fail in flash raw trunk\n");
                 return -__LINE__;
@@ -340,8 +328,7 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
                 return -__LINE__;
             }
             const unsigned* fillVal = (unsigned*)dataBuf;
-            FB_DBG("fill wr: off/sz 0x%08llx flashWrLen %x\n", _spPacketStates.nextFlashAddr, chunkFlashSpace);
-            if (simg2img_fill_chunk_write((char*)part, chunkFlashSpace, fillVal, flashAddr)) {
+            if (simg2img_fill_chunk_write((char*)part, chunkFlashSpace, fillVal, _spPacketStates.nextFlashAddr)) {
                 sperr("Fail in fill fill-chunk\n");
                 return -__LINE__;
             }
@@ -351,7 +338,6 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
                 sperr("DONT_CARE trunk sz %x err, should be 0\n", dataSize);
                 return -__LINE__;
             }
-            FB_DBG("donnot care: off/sz 0x%08llx flashWrLen", _spPacketStates.nextFlashAddr, chunkFlashSpace);
             _spPacketStates.nextFlashAddr += chunkFlashSpace;
         } else {
             sperr("chunk(%x) should not be here", chunkType);
@@ -458,7 +444,6 @@ int v3tool_simg2img_verify_img(sha1_context* ctx, const char* partName, int64_t 
         int64_t flashAddr = _partOffset + chunkDataLen - _dataChunkLeft;
         while ( _dataChunkLeft ) {
             const int thisLen = min(vryBuffLen, _dataChunkLeft);
-            FB_DBG("rd chunk %x: off/sz 0x%08llx %x\n", backInf->chunk_type, flashAddr, thisLen);
             if (store_logic_read(partName, flashAddr, thisLen, dataBuf)) {
                 sperr("Fail in read storage for verify\n");
                 goto _verify_end;

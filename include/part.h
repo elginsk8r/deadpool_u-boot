@@ -9,6 +9,9 @@
 #include <blk.h>
 #include <ide.h>
 #include <uuid.h>
+#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
+#include <part_efi.h>
+#endif
 #include <linux/list.h>
 
 struct block_drvr {
@@ -64,6 +67,9 @@ typedef struct disk_partition {
 #endif
 #ifdef CONFIG_PARTITION_TYPE_GUID
 	char	type_guid[UUID_STR_LEN + 1];	/* type GUID as string, if exists	*/
+#endif
+#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
+	gpt_entry_attributes attributes;
 #endif
 #ifdef CONFIG_DOS_PARTITION
 	uchar	sys_ind;	/* partition type 			*/
@@ -361,13 +367,6 @@ int gpt_restore(struct blk_desc *dev_desc, char *str_disk_guid,
  * @return - '0' on success, otherwise error
  */
 int is_valid_gpt_buf(struct blk_desc *dev_desc, void *buf);
-
-/**
- * erase_gpt_part_table() - erase Primary GPT and Backup GPT
- *
- * @return - '0' on success, otherwise error
- */
-int erase_gpt_part_table(struct blk_desc *dev_desc);
 
 /**
  * write_mbr_and_gpt_partitions() - write MBR, Primary GPT and Backup GPT

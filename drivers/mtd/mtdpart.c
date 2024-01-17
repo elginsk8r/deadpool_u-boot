@@ -32,7 +32,6 @@
 #ifdef CONFIG_AML_MTDPART
 #include <jffs2/load_kernel.h>
 #include <amlogic/aml_mtd.h>
-#include <amlogic/storage.h>
 #endif
 
 #ifndef __UBOOT__
@@ -876,6 +875,7 @@ int get_aml_mtdpart_count(void)
 
 int get_aml_mtdpart_name(struct mtd_info *master, int idx, char *name)
 {
+	int i;
 	struct part_info *temp;
 	struct mtd_device *dentry;
 	if (idx >= get_aml_mtdpart_count())
@@ -894,11 +894,12 @@ int get_aml_mtdpart_name(struct mtd_info *master, int idx, char *name)
 
 void list_aml_mtd_partitions(struct mtd_info *master)
 {
+	//struct mtd_info *slave, *next;
 	struct mtd_info *slave;
-	int i = 0;
+	int i;
 
 	list_for_each_entry(slave, &master->partitions, node)
-		printf("%2d: %-20s0x%08llx\t0x%08llx\n",
+		printf("%2d: %-20s0x%08x\t0x%08x\n",
 					i++, slave->name, slave->size, slave->offset);
 	return;
 }
@@ -1057,16 +1058,13 @@ int mtdparts_init(void)
 	struct mtd_info *mtd = NULL;
 	u8 i = 0;
 	u8 cnt = 0;
-	enum boot_type_e medium_type = store_get_type();
 
-	if (BOOT_NAND_MTD == medium_type)
-		cnt = MAX_MTD_CNT;
-	else if ((BOOT_SNAND == medium_type) || (BOOT_SNOR == medium_type))
-		cnt = MAX_MTD_CNT - 1;
-	else {
-		printf("no valid storage device\n");
-		return 1;
-	}
+#ifdef CONFIG_MESON_NFC
+	cnt = MAX_MTD_CNT;
+#endif
+#if defined(CONFIG_SPI_FLASH) || defined(CONFIG_SPI_NAND)
+	cnt = MAX_MTD_CNT - 1;
+#endif
 
 	if (init_flag) {
 		debug("%s %d part already init\n", __func__, __LINE__);
@@ -1089,8 +1087,10 @@ int mtdparts_init(void)
 				dev->id->type = 0;
 			dev->id->size = part->size;
 			dev->id->num = 0;
-		if ((BOOT_NAND_MTD == medium_type) && strcmp(part->name, "bootloader"))
+#ifdef CONFIG_MESON_NFC
+		if (strcmp(part->name, "bootloader"))
 			dev->id->num = 1;
+#endif
 		temp = kzalloc(sizeof(*temp), GFP_KERNEL);
 		temp->name = part->name;
 

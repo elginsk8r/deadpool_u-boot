@@ -5,7 +5,6 @@
 
 #ifndef _INC_AML_BL_EXTERN_H_
 #define _INC_AML_BL_EXTERN_H_
-#include <amlogic/media/vout/lcd/lcd_vout.h>
 
 enum bl_extern_type_e {
 	BL_EXTERN_I2C = 0,
@@ -63,11 +62,11 @@ struct aml_bl_extern_driver_s {
 	struct bl_extern_config_s *config;
 };
 
-struct aml_bl_extern_driver_s *aml_bl_extern_get_driver(void);
-int bl_extern_device_load(char *dtaddr, int index);
+extern struct aml_bl_extern_driver_s *aml_bl_extern_get_driver(void);
+extern int aml_bl_extern_device_load(const void *dt_blob, int index);
 extern struct bl_extern_config_s bl_extern_config_dtf;
 #ifdef CONFIG_AML_LCD_TABLET
-int dsi_write_cmd(struct aml_lcd_drv_s *pdrv, unsigned char *payload)
+extern int dsi_write_cmd(unsigned char *payload);
 #endif
 
 #endif

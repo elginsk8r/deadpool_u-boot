@@ -211,6 +211,7 @@ err:
 }
 #endif /* CONFIG_IS_ENABLED(OF_CONTROL) */
 
+#ifdef CONFIG_CLI_ENABLED
 void cli_loop(void)
 {
 #ifdef CONFIG_HUSH_PARSER
@@ -223,6 +224,7 @@ void cli_loop(void)
 	printf("## U-Boot command line is disabled. Please enable CONFIG_CMDLINE\n");
 #endif /*CONFIG_HUSH_PARSER*/
 }
+#endif /* CONFIG_CLI_ENABLED */
 
 void cli_init(void)
 {

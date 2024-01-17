@@ -30,8 +30,6 @@ obj-$(CONFIG_AML_NAND) += nand/
 obj-$(CONFIG_AML_DRIVER) += amlogic/
 obj-$(CONFIG_SPI_NAND) += mtd/nand/spi-nand/
 obj-$(CONFIG_MESON_NFC) += mtd/nand/raw/aml_nand/
-obj-$(CONFIG_TYPEC) += usb/typec/
-obj-$(CONFIG_USB_ROLE_SWITCH) += usb/roles/
 
 ifndef CONFIG_TPL_BUILD
 ifdef CONFIG_SPL_BUILD

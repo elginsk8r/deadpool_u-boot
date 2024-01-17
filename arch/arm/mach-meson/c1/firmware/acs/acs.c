@@ -47,5 +47,4 @@ acs_set_t __acs_set={
 					.board_id		= {0,},
 					.ddr_struct_size = {0,},
 					.ddr_struct_org_size = sizeof(ddr_set_t),
-					.revision		= ACS_VERSION,
 };

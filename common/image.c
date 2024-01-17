@@ -214,18 +214,11 @@ int image_check_hcrc(const image_header_t *hdr)
 
 int image_check_dcrc(const image_header_t *hdr)
 {
-
-#ifdef CONFIG_PXP_EMULATOR
-	puts("PXP skip CRC...");
-	return 1;
-#else
 	ulong data = image_get_data(hdr);
 	ulong len = image_get_data_size(hdr);
 	ulong dcrc = crc32_wd(0, (unsigned char *)data, len, CHUNKSZ_CRC32);
 
 	return (dcrc == image_get_dcrc(hdr));
-#endif
-
 }
 
 /**
@@ -1188,7 +1181,7 @@ int boot_ramdisk_high(struct lmb *lmb, ulong rd_data, ulong rd_len,
 			bootstage_mark(BOOTSTAGE_ID_COPY_RAMDISK);
 
 			*initrd_end = *initrd_start + rd_len;
-			printf("   Loading Ramdisk to %08lx, end %08lx ... ",
+			pr_info("   Loading Ramdisk to %08lx, end %08lx ... ",
 					*initrd_start, *initrd_end);
 
 			memmove_wd((void *)*initrd_start,
@@ -1203,7 +1196,7 @@ int boot_ramdisk_high(struct lmb *lmb, ulong rd_data, ulong rd_len,
 			flush_cache((unsigned long)*initrd_start,
 				    ALIGN(rd_len, ARCH_DMA_MINALIGN));
 #endif
-			puts("OK\n");
+			pr_info("OK\n");
 		}
 	} else {
 		*initrd_start = 0;

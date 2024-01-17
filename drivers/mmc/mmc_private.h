@@ -14,10 +14,8 @@
 
 #define SAMSUNG_MID			0x15
 #define KINGSTON_MID		0x70
-#define BIWIN_MID			0xf4
 #define SAMSUNG_FFU_ADDR	0xc7810000
 #define KINGSTON_FFU_ADDR	0x0000ffff
-#define BIWIN_FFU_ADDR		0x0
 #define MAX_TUNING_RETRY	(4)
 #define CALI_BLK_CNT		(1024)
 #define REFIX_BLK_CNT		(100)
@@ -51,7 +49,6 @@ struct meson_host {
 	uint is_sduart;
 	uint is_tuning;
 	uint card_type;
-	uint src_clk;
 	struct clk core;
 	struct clk xtal;
 	struct clk div2;

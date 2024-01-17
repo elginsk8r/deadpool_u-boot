@@ -245,9 +245,8 @@ static int _assert_logic_partition_cap(const char* thePartName, const uint64_t n
 
     int partIndex                   = 0;
     struct partitions * thePart     = NULL;
-    if (NULL == part_table) return 0;
-    if (!strcmp("1", thePartName)) return 0;
-
+    if (NULL == part_table)
+        return 0;
     for (thePart = part_table; partIndex < 36; ++thePart, ++partIndex)
     {
         if (memcmp(thePartName, thePart->name, strnlen(thePartName, MAX_PART_NAME_LEN))) continue;
@@ -276,7 +275,7 @@ static int optimus_download_dtb_image(struct ImgBurnInfo* pDownInfo, u32 dataSzR
 {
     int ret = 0;
     DWN_MSG("%s:dataSzReceived=0x%x\n", __func__, dataSzReceived);
-    store_rsv_erase("dtb");
+    store_erase("dtb", 0, store_rsv_size("dtb"), 0);
     ret = store_rsv_write("dtb", dataSzReceived, (u8*)data);
 
     return ret ? 0 : dataSzReceived;
@@ -305,6 +304,7 @@ static int optimus_download_bootloader_image(struct ImgBurnInfo* pDownInfo, u32 
 {
     int ret = OPT_DOWN_OK;
     int size = dataSzReceived;
+    int iCopy = 0;
 
     if (dataSzReceived < pDownInfo->imgPktSz) {
         DWN_ERR("please write back bootloader after all data rx end.0x(%x, %x)\n", dataSzReceived, (u32)pDownInfo->imgPktSz);
@@ -330,6 +330,7 @@ static int optimus_verify_bootloader(struct ImgBurnInfo* pDownInfo, u8* genSum)
     int ret = OPT_DOWN_OK;
     unsigned char* pBuf = (unsigned char*)OPTIMUS_DOWNLOAD_TRANSFER_BUF_ADDR;
     int size = 0;
+    int iCopy = 0;
     int bootRealSz = pDownInfo->imgPktSz;
 
     size=bootRealSz;

@@ -6,7 +6,6 @@
  * (C) Copyright 2014 Linaro, Ltd.
  * Rob Herring <robh@kernel.org>
  */
-#include <board_variant.h>
 #include <common.h>
 #include <command.h>
 #include <console.h>
@@ -18,11 +17,6 @@
 static int do_fastboot_udp(int argc, char *const argv[],
 			   uintptr_t buf_addr, size_t buf_size)
 {
-	if (get_board_variant() != BOARD_VARIANT_DEV) {
-		printf("Fastboot is disabled\n");
-		return CMD_RET_FAILURE;
-	}
-
 #if CONFIG_IS_ENABLED(UDP_FUNCTION_FASTBOOT)
 	int err = net_loop(FASTBOOT);
 
@@ -38,18 +32,9 @@ static int do_fastboot_udp(int argc, char *const argv[],
 #endif
 }
 
-#ifdef  CONFIG_USB_GADGET_CRG
-extern int phy_num;
-#endif
-
 static int do_fastboot_usb(int argc, char *const argv[],
 			   uintptr_t buf_addr, size_t buf_size)
 {
-	if (get_board_variant() != BOARD_VARIANT_DEV) {
-		printf("Fastboot is disabled\n");
-		return CMD_RET_FAILURE;
-	}
-
 #if CONFIG_IS_ENABLED(USB_FUNCTION_FASTBOOT)
 	int controller_index;
 	char *usb_controller;
@@ -66,9 +51,6 @@ static int do_fastboot_usb(int argc, char *const argv[],
 		return CMD_RET_FAILURE;
 	}
 
-#ifdef  CONFIG_USB_GADGET_CRG
-	phy_num = controller_index;
-#endif
 	/* ret = usb_gadget_initialize(controller_index); */
 	ret = 0;
 	if (ret) {
@@ -112,11 +94,6 @@ exit:
 
 static int do_fastboot(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
-	if (get_board_variant() != BOARD_VARIANT_DEV) {
-		printf("Fastboot is disabled\n");
-		return CMD_RET_FAILURE;
-	}
-
 	uintptr_t buf_addr = (uintptr_t)NULL;
 	size_t buf_size = 0;
 
@@ -129,8 +106,6 @@ static int do_fastboot(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		--argc;
 		while (*++arg) {
 			switch (*arg) {
-#if 0
-/*for secure consider ,no permission to download any address and size,use default only*/
 			case 'l':
 				if (--argc <= 0)
 					return CMD_RET_USAGE;
@@ -142,15 +117,13 @@ static int do_fastboot(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 					return CMD_RET_USAGE;
 				buf_size = simple_strtoul(*++argv, NULL, 16);
 				goto NXTARG;
-#endif
+
 			default:
 				return CMD_RET_USAGE;
 			}
 		}
-#if 0
 NXTARG:
 		;
-#endif
 	}
 
 	/* Handle case when USB controller param is just '-' */

@@ -63,7 +63,7 @@ int ring_msr(int index)
 			[0] = "am_ring_osc_clk_out_ee[0] " ,
 		};
 	const int tb[] = {0, 1, 2, 99, 100, 101, 102, 103, 104, 105, 3, 33};
-	unsigned long i = 0;
+	unsigned long i;
 	unsigned char efuseinfo[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	if ((index != 0xff) && (index != 0)) {
@@ -105,7 +105,7 @@ int ring_msr(int index)
 	}
 
 	printf("osc efuse info:\n");
-	for (i = 0; i < sizeof(efuseinfo) / sizeof(uint8_t); i++)
+	for (i = 0; i <= 11; i++)
 		printf("0x%x, ", efuseinfo[i]);
 	printf("\n");
 

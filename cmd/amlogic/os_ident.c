@@ -25,7 +25,7 @@ static int do_os_ident(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		return ret;
 	}
 
-	const void *img_addr = (const void *)simple_strtoul(argv[1], NULL, 16);
+	const void *img_addr = simple_strtoul(argv[1], NULL, 16);
 	debug_print("os hdr addr: 0x%lx\n", (ulong)img_addr);
 
 	ret = genimg_get_format(img_addr);
@@ -45,7 +45,17 @@ static int do_os_ident(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 			break;
 		case IMAGE_FORMAT_INVALID:
 			debug_print("IMAGE_FORMAT_INVALID format\n");
+#ifdef CONFIG_G_AB_SYSTEM
+			/* In A/B system, we modify os_type to force bootm load image,
+			 * then boot according to a/b flow:
+			 * 1. verify image failure
+			 * 2. retry again
+			 * 3. switch to other slot
+			 */
+			env_set("os_type", "kernel");
+#else
 			env_set("os_type", "invalid");
+#endif
 			break;
 		default:
 			debug_print("default format\n");

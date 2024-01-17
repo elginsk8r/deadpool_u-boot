@@ -118,11 +118,10 @@ int meson_clk_set_div(struct meson_clk *priv, struct meson_div *div,
 			unsigned int div_val)
 {
 	unsigned int val;
-	unsigned int div_max = (1 << div->width) - 1;
 
 	val = readl(priv->addr + div->reg);
-	val &= ~(div_max << div->shift);
-	val |= min_t(unsigned int, div_val, div_max) << div->shift;
+	val &= ~((1 << div->width) - 1);
+	val |= (div_val & ((1 << div->width) - 1)) << div->shift;
 	writel(val, priv->addr + div->reg);
 
 	return 0;

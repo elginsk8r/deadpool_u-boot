@@ -730,22 +730,6 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #endif /* CONFIG_USB_STORAGE */
 }
 
-int do_usb_detect(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-	if (argc >= 2) {
-		return usb_aml_detect_operation(argc, argv);
-	}
-	return CMD_RET_USAGE;
-}
-
-U_BOOT_CMD(
-	musb,	5,	1,	do_usb_detect,
-	"using for get USB information",
-	"info ----default operation to get dts information\n"
-	"musb disable ----disable USB PHY\n"
-);
-
-
 U_BOOT_CMD(
 	usb,	5,	1,	do_usb,
 	"USB sub-system",

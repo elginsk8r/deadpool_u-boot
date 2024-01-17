@@ -5,7 +5,7 @@
 
 #ifndef __AML_LCD_TV_H__
 #define __AML_LCD_TV_H__
-#include <amlogic/media/vout/lcd/lcd_vout.h>
+#include <amlogic/media/vout/lcd/aml_lcd.h>
 
 //**********************************
 //lcd driver version
@@ -14,9 +14,9 @@
 
 //**********************************
 
-void lcd_tv_config_update(struct aml_lcd_drv_s *pdrv);
-void lcd_tv_driver_init_pre(struct aml_lcd_drv_s *pdrv);
-int lcd_tv_driver_init(struct aml_lcd_drv_s *pdrv);
-void lcd_tv_driver_disable(struct aml_lcd_drv_s *pdrv);
+extern void lcd_tv_config_update(struct lcd_config_s *pconf);
+extern void lcd_tv_driver_init_pre(void);
+extern int lcd_tv_driver_init(void);
+extern void lcd_tv_driver_disable(void);
 
 #endif

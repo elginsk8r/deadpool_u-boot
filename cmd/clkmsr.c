@@ -6,8 +6,7 @@
 #include <common.h>
 #include <command.h>
 #include <asm/arch/clock.h>
-
-extern int clk_msr(int index);
+#include <asm/arch/clk_measure.h>
 
 static int do_clkmsr(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {

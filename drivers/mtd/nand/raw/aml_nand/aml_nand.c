@@ -10,7 +10,7 @@
 #include <malloc.h>
 #include <linux/err.h>
 #include <asm/cache.h>
-#include <amlogic/storage.h>
+//#include <asm/arch/secure_apb.h>
 #include <amlogic/cpu_id.h>
 #include <linux/log2.h>
 #include <dm/pinctrl.h>
@@ -20,8 +20,14 @@
 #include "aml_nand.h"
 #include <time.h> /*test*/
 
+#if  0
+#define aml_nand_debug(a...) \
+	{ printk("%s()[%s,%d]",__func__,__FILE__,__LINE__); printk(a); }
+#else
 #define aml_nand_debug(a...)
+#endif
 
+//extern int aml_nand_scan_bbt(struct mtd_info *mtd);
 extern int aml_nand_scan_shipped_bbt(struct mtd_info *mtd);
 
 uint8_t nand_boot_flag = 0;
@@ -34,6 +40,62 @@ extern struct hw_controller *controller;
 
 #define	SZ_1M	0x100000
 extern struct mtd_info *nand_info[CONFIG_SYS_MAX_NAND_DEVICE];
+
+/*
+* mtd nand partition table, only care the size!
+* offset will be calculated by nand driver.
+*/
+static struct mtd_partition normal_partition_info[] = {
+#ifdef CONFIG_DISCRETE_BOOTLOADER
+/* MUST NOT CHANGE this part unless u know what you are doing!
+* inherent parition for descrete bootloader to store fip
+* size is determind by TPL_SIZE_PER_COPY*TPL_COPY_NUM
+* name must be same with TPL_PART_NAME
+*/
+{
+	.name = "tpl",
+	.offset = 0,
+	.size = 0,
+},
+#endif
+{
+	.name = "logo",
+	.offset = 0,
+	.size = 2*SZ_1M,
+},
+{
+	.name = "recovery",
+	.offset = 0,
+	.size = 16*SZ_1M,
+},
+{
+	.name = "boot",
+	.offset = 0,
+	.size = 16*SZ_1M,
+},
+{
+	.name = "system",
+	.offset = 0,
+	.size = 64*SZ_1M,
+},
+/* last partition get the rest capacity */
+{
+	.name = "data",
+	.offset = MTDPART_OFS_APPEND,
+	.size = MTDPART_SIZ_FULL,
+},
+};
+
+struct mtd_partition *get_aml_mtd_partition(void)
+{
+	return normal_partition_info;
+}
+
+int get_aml_partition_count(void)
+{
+	return ARRAY_SIZE(normal_partition_info);
+}
+
 
 static struct nand_ecclayout aml_nand_uboot_oob = {
 	.eccbytes = 84,
@@ -167,15 +229,12 @@ int aml_nand_block_bad_scrub_update_bbt(struct mtd_info *mtd)
 	return 0;
 }
 
-extern struct mtd_partition *get_aml_mtd_partition(void);
-extern int get_aml_partition_count(void);
-extern struct storage_startup_parameter g_ssp;
+/****get partition table****/
 static int aml_nand_add_partition(struct aml_nand_chip *aml_chip)
 {
 	struct nand_chip *chip = &aml_chip->chip;
 	struct mtd_info *mtd = &chip->mtd;
 	struct aml_nand_platform *plat = aml_chip->platform;
-	cpu_id_t cpu_id = get_cpu_id();
 #ifdef CONFIG_MTD_PARTITIONS
 	struct mtd_partition *temp_parts = NULL;
 	struct mtd_partition *parts;
@@ -184,14 +243,17 @@ static int aml_nand_add_partition(struct aml_nand_chip *aml_chip)
 	uint64_t part_size = 0;
 	int reserved_part_blk_num = NAND_RSV_BLOCK_NUM;
 	uint64_t fip_part_size = 0;
+	int normal_base = 0;
 #ifndef CONFIG_NOT_SKIP_BAD_BLOCK
-	int phys_erase_shift, error = 0, internal_part_count = 0;
+	int phys_erase_shift, error = 0;
 	uint64_t start_blk = 0, part_blk = 0;
 	loff_t offset;
 
 	phys_erase_shift = fls(mtd->erasesize) - 1;
 #endif
-	if (!strncmp((char*)plat->name, NAND_BOOT_NAME, strlen((const char*)NAND_BOOT_NAME))) {
+
+	if (!strncmp((char*)plat->name,
+		NAND_BOOT_NAME, strlen((const char*)NAND_BOOT_NAME))) {\
 		/* boot partition must be set as this because of romboot restrict */
 		parts = kzalloc(sizeof(struct mtd_partition),
 				GFP_KERNEL);
@@ -201,43 +263,42 @@ static int aml_nand_add_partition(struct aml_nand_chip *aml_chip)
 		parts->offset = 0;
 		parts->size = (mtd->writesize * 1024);
 		nr = 1;
+		nand_boot_flag = 1;
 	} else {
 		/* normal partitions */
 		parts = get_aml_mtd_partition();
 		nr = get_aml_partition_count();
-		adjust_offset = 1024 * mtd->writesize + reserved_part_blk_num * mtd->erasesize;
-
-		if (store_get_device_bootloader_mode() != DISCRETE_BOOTLOADER)
-			goto _COMPAT_BOOTLOADER;
-
-		if ((cpu_id.family_id == MESON_CPU_MAJOR_ID_SC2) ||
-		    (cpu_id.family_id == MESON_CPU_MAJOR_ID_S4)) {
-			fip_part_size = g_ssp.boot_entry[BOOT_AREA_DEVFIP].size * CONFIG_NAND_TPL_COPY_NUM;
-			adjust_offset = g_ssp.boot_entry[BOOT_AREA_DEVFIP].offset + fip_part_size;
-			internal_part_count = 4;
-		} else {
-			fip_part_size = CONFIG_TPL_SIZE_PER_COPY * CONFIG_NAND_TPL_COPY_NUM;
-			internal_part_count = 1;
+		if (nand_boot_flag)
+			adjust_offset =
+				(1024 * mtd->writesize / aml_chip->plane_num);
+	#ifdef CONFIG_DISCRETE_BOOTLOADER
+		/* reserved area size is fixed 48 blocks and
+		 * have fip between rsv and normal, so
+		 * don't skip factory bad block and set fip part size.
+		 */
+		fip_part_size = CONFIG_TPL_SIZE_PER_COPY * CONFIG_TPL_COPY_NUM;
+		/* TODO: add fip 2 partition list */
+		temp_parts = parts;
+		if (strcmp(BOOT_TPL, temp_parts->name)) {
+			printf("nand: double check your mtd partition table!\n");
+			printf("%s should be the 1st part!, temp_parts->name:%s\n", BOOT_TPL, temp_parts->name);
+			return -ENODEV;
 		}
-
-		for (i = 0; i < internal_part_count; i++) {
-			temp_parts = parts + i;
-			if ((cpu_id.family_id == MESON_CPU_MAJOR_ID_SC2) ||
-			    (cpu_id.family_id == MESON_CPU_MAJOR_ID_S4)) {
-				temp_parts->offset = g_ssp.boot_entry[i + 1].offset;
-				if (i == internal_part_count -1)
-					temp_parts->size = fip_part_size;
-				else
-					temp_parts->size = g_ssp.boot_entry[i + 1].size * g_ssp.boot_bakups;
-			} else {
-				temp_parts->offset = adjust_offset;
-				temp_parts->size = fip_part_size;
-				adjust_offset += fip_part_size;
-			}
+		if (temp_parts->size) {
+			printf("nand: size of %s should not be pre-set\n",
+				temp_parts->name);
+			printf("it's should be determined by TPL_COPY_NUM*TPL_SIZE_PER_COPY\n");
+			printf("which is %lld\n", fip_part_size);
 		}
-
-_COMPAT_BOOTLOADER:
-		for (i = internal_part_count; i < nr; i++) {
+		temp_parts->offset = adjust_offset + reserved_part_blk_num * mtd->erasesize;
+		temp_parts->size = fip_part_size;
+		printf("%s : off %lld, size %lld\n", temp_parts->name,
+			temp_parts->offset, temp_parts->size);
+		normal_base = 1;
+	#endif /* CONFIG_DISCRETE_BOOTLOADER */
+		adjust_offset += reserved_part_blk_num * mtd->erasesize
+			+ fip_part_size;
+		for (i = normal_base; i < nr; i++) {
 			temp_parts = parts + i;
 			if (mtd->size < adjust_offset) {
 				printf("%s %d error : over the nand size!!!\n",
@@ -248,7 +309,7 @@ _COMPAT_BOOTLOADER:
 			part_size = temp_parts->size;
 			if (i == nr - 1)
 				part_size = mtd->size - adjust_offset;
-#ifndef CONFIG_NOT_SKIP_BAD_BLOCK
+	#ifndef CONFIG_NOT_SKIP_BAD_BLOCK
 			offset = 0;
 			start_blk = 0;
 			part_blk = part_size >> phys_erase_shift;
@@ -256,11 +317,14 @@ _COMPAT_BOOTLOADER:
 			do {
 				offset = adjust_offset + start_blk *
 					mtd->erasesize;
+
 				error = mtd->_block_isbad(mtd, offset);
+
 				if (error) {
 					pr_info("%s:%d factory bad addr=%llx\n",
-							__func__, __LINE__,
-							(uint64_t)(offset >> phys_erase_shift));
+						__func__, __LINE__,
+					(uint64_t)(offset >>
+						   phys_erase_shift));
 					if (i != nr - 1) {
 						adjust_offset += mtd->erasesize;
 						continue;
@@ -268,12 +332,15 @@ _COMPAT_BOOTLOADER:
 				}
 				start_blk++;
 			} while (start_blk < part_blk);
-#endif
+	#endif
 			if (temp_parts->name == NULL) {
-				temp_parts->name = kzalloc(MAX_MTD_PART_NAME_LEN, GFP_KERNEL);
+				temp_parts->name =
+					kzalloc(MAX_MTD_PART_NAME_LEN,
+						GFP_KERNEL);
 				if (!temp_parts->name)
 					return -ENOMEM;
-				sprintf((char *)temp_parts->name, "mtd%d", nr);
+				sprintf((char *)temp_parts->name,
+					"mtd%d", nr);
 			}
 			adjust_offset += part_size;
 			temp_parts->size = adjust_offset - temp_parts->offset;
@@ -288,7 +355,6 @@ _COMPAT_BOOTLOADER:
 #endif
 }
 
-/*
 void nand_get_chip(void *chip)
 {
 
@@ -302,7 +368,7 @@ void nand_get_chip(void *chip)
 	}
 	return;
 }
-*/
+
 
 static void inline nand_release_chip(void)
 {
@@ -320,7 +386,7 @@ static void aml_nand_select_chip(struct mtd_info *mtd, int chipnr)
 			nand_release_chip();
 			break;
 		case 0:
-			//nand_get_chip(aml_chip);
+			nand_get_chip(aml_chip);
 			aml_chip->aml_nand_select_chip(aml_chip, chipnr);
 			break;
 		case 1:
@@ -898,7 +964,7 @@ int aml_nand_erase_cmd(struct mtd_info *mtd, int page)
 		return 1;
 	/* fixme, skip bootloader */
 	if (page < 1024)
-		return 0;
+		return 1;
 	/* Send commands to erase a block */
 	valid_page_num = (mtd->writesize >> chip->page_shift);
 
@@ -1645,6 +1711,9 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 	struct nand_oobfree *oobfree = NULL;
 	cpu_id_t cpu_id = get_cpu_id();
 
+	chip->IO_ADDR_R = chip->IO_ADDR_W =
+		(void __iomem *)((volatile u32 *)(NAND_BASE_APB + P_NAND_BUF));
+
 	chip->ecc.layout = &aml_nand_oob_64;
 	chip->select_chip = aml_nand_select_chip;
 	chip->cmd_ctrl = aml_nand_cmd_ctrl;
@@ -1662,22 +1731,21 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 	/*use NO RB mode to detect nand chip num*/
 	aml_chip->ops_mode |= AML_CHIP_NONE_RB;
 	chip->chip_delay = 100;
+
 	aml_chip->aml_nand_hw_init(aml_chip);
 	aml_chip->toggle_mode =0;
 	aml_chip->bch_info = NAND_ECC_BCH60_1K;
 	if ((cpu_id.family_id == MESON_CPU_MAJOR_ID_AXG) ||
 	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_TXHD)||
-	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_C1) ||
-	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_C2) ||
-	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_S4))
+		(cpu_id.family_id == MESON_CPU_MAJOR_ID_C1))
 		aml_chip->bch_info = NAND_ECC_BCH8_1K;
 
 	chip->options = 0;
 	chip->options |=  NAND_SKIP_BBTSCAN;
 	chip->options |= NAND_NO_SUBPAGE_WRITE;
-
 	err = aml_nand_scan(mtd, controller->chip_num);
 	if (err || (pre_scan->pre_scan_flag)) {
+		err = -ENXIO;
 		goto exit_error;
 	}
 
@@ -1796,6 +1864,7 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 	for (i = 0; oobfree[i].length && i < ARRAY_SIZE(oobfree); i++)
 		chip->ecc.layout->oobavail += oobfree[i].length;
 	printk("oob avail size %d\n", chip->ecc.layout->oobavail);
+
 	mtd->oobavail = chip->ecc.layout->oobavail;
 	mtd->ecclayout = chip->ecc.layout;
 
@@ -1868,9 +1937,7 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 #endif
 		meson_rsv_check(aml_chip->rsv->key);
 		meson_rsv_check(aml_chip->rsv->dtb);
-		meson_rsv_check(aml_chip->rsv->ddr_para);
 	}
-
 	if (aml_nand_add_partition(aml_chip) != 0) {
 		err = -ENXIO;
 		goto exit_error;
@@ -1942,6 +2009,7 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 	offset = mtd->erasesize;
 	offset *= start_blk;
 	for (i=0; i < controller->chip_num; i++) {
+	//if (aml_chip->valid_chip[i]) {
 		for (read_cnt = 0; read_cnt < 3; read_cnt++) {
 			if (read_cnt == 2) {
 				if (aml_chip->mfr_type == NAND_MFR_AMD)
@@ -1949,10 +2017,7 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 				else
 					break;
 		    } else {
-				if ((aml_chip->mfr_type == NAND_MFR_SANDISK) ||
-					(aml_chip->mfr_type == NAND_ID_ESMT) ||
-					(aml_chip->mfr_type == NAND_MFR_MACRONIX) ||
-					aml_get_samsung_fbbt_flag()) {
+				if (aml_chip->mfr_type  == NAND_MFR_SANDISK) {
 					addr = offset + read_cnt*mtd->writesize;
 				} else
 					addr = offset +
@@ -2063,27 +2128,62 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 				//printk("col0_oob =%x\n",col0_oob);
 			}
 
+	if ((aml_chip->mfr_type  == 0xC8 )) {
+		if ((col0_oob != 0xFF) || (col0_data != 0xFF)) {
+			printk("detect factory Bad block:%llx blk:%d chip:%d\n",
+				(uint64_t)addr, start_blk, i);
+			bad_blk_cnt++;
+			aml_chip->block_status[start_blk] = NAND_FACTORY_BAD;
+			break;
+		}
+	}
+
+	if (aml_chip->mfr_type  == NAND_MFR_AMD ) {
+		if (col0_oob != 0xFF) {
+			printk("detect factory Bad block:%llx blk:%d chip:%d\n",
+				(uint64_t)addr, start_blk, i);
+			bad_blk_cnt++;
+			aml_chip->block_status[start_blk] = NAND_FACTORY_BAD;
+			break;
+		}
+	}
+
 	if ((col0_oob == 0xFF))
 		continue;
 
 	if (col0_oob != 0xFF) {
 		printk("%s:%d factory ship bbt found\n", __func__, __LINE__);
+		if (aml_chip->mfr_type  == 0xc2 ) {
+			if (col0_oob != 0xFF) {
+				printk("detect factory Bad block:%llx blk=%d chip=%d\n",
+					(uint64_t)addr, start_blk, i);
+				bad_blk_cnt++;
+				aml_chip->block_status[start_blk] = NAND_FACTORY_BAD;
+				break;
+			}
+		}
 
 		if (aml_chip->mfr_type  == NAND_MFR_DOSILICON ||
 		    aml_chip->mfr_type  == NAND_MFR_ATO ||
-		    aml_chip->mfr_type  == NAND_MFR_HYNIX ||
-		    aml_chip->mfr_type  == NAND_ID_WINBOND ||
-		    aml_chip->mfr_type == NAND_ID_ESMT ||
-		    aml_chip->mfr_type == NAND_MFR_MACRONIX ||
-		    aml_chip->mfr_type  == NAND_MFR_AMD ||
-		    aml_get_samsung_fbbt_flag()) {
-			printk("col0_data =%x col0_oob =%x\n",col0_data,col0_oob);
-			printk("detect a fbb:%llx blk=%d chip=%d\n",
-				(uint64_t)addr, start_blk, i);
-			bad_blk_cnt++;
-			aml_chip->block_status[start_blk] =
-				NAND_FACTORY_BAD;
-			break;
+			aml_chip->mfr_type  == NAND_MFR_HYNIX) {
+			if (col0_oob != 0xFF) {
+				pr_info("detect a fbb:%llx blk=%d chip=%d\n",
+					(uint64_t)addr, start_blk, i);
+				bad_blk_cnt++;
+				aml_chip->block_status[start_blk] =
+					NAND_FACTORY_BAD;
+				break;
+			}
+		}
+
+		if (aml_chip->mfr_type  == 0xef ) {
+			if (col0_oob != 0xFF) {
+				printk("detect factory Bad block:%llx blk=%d chip=%d\n",
+					(uint64_t)addr, start_blk, i);
+				bad_blk_cnt++;
+				aml_chip->block_status[start_blk] = NAND_FACTORY_BAD;
+				break;
+			}
 		}
 
 		if ((aml_chip->mfr_type  == NAND_MFR_SANDISK) ) {
@@ -2134,6 +2234,7 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 		}
 	}
 		}
+		//}
 	}
 	} while((++start_blk) < total_blk);
 

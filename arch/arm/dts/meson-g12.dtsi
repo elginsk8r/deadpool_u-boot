@@ -330,10 +330,14 @@
 				status = "disabled";
 					spi-flash@0 {
 						compatible = "spi-flash";
+						#address-cells = <1>;
+						#size-cells = <0>;
 						status = "disabled";
 					};
 					spi-nand@1 {
 						compatible = "spi-nand";
+						#address-cells = <1>;
+						#size-cells = <0>;
 						status = "disabled";
 					};
 			};

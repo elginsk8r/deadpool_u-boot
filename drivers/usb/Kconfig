@@ -128,7 +128,5 @@ source "drivers/usb/gadget/v2_burning/Kconfig"
 source "drivers/usb/gadget/v3_burning/Kconfig"
 
 source "drivers/usb/eth/Kconfig"
-source "drivers/usb/roles/Kconfig"
-source "drivers/usb/typec/Kconfig"
 
 endif

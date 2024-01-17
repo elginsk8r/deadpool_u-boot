@@ -1077,11 +1077,11 @@ static int usb_prepare_device(struct usb_device *dev, int addr, bool do_read,
 			err = usb_set_address(dev); /* set address */
 		}
 	if (err < 0) {
-		debug("\n  2    USB device not accepting new address " \
+		printf("\n  2    USB device not accepting new address " \
 			"(error=%lX)\n", dev->status);
 		if (retry_count == 0) {
 			retry_count++;
-			debug("retry new usb device\n");
+			printf("retry new usb device\n");
 			goto retry;
 		}
 		return err;

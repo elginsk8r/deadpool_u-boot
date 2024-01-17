@@ -6,6 +6,10 @@
 #include <asm/arch/regs.h>
 #include <asm/arch/register.h>
 
+/* for A/B system */
+#define P_AO_RTI_STICKY_REG0 SYSCTRL_STICKY_REG6
+#define P_AO_RTI_STICKY_REG1 SYSCTRL_STICKY_REG7
+
 #define DMA_BASE (uint32_t)(0xfe006000)
 
 #define DMA_T0   (uint32_t)(DMA_BASE + 0x00)

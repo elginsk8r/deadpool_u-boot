@@ -7,6 +7,9 @@
 #define __STORAGE_H
 
 #include <linux/types.h>
+#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
+#include <uuid.h>
+#endif
 #include <asm/arch/romboot.h>
 #ifndef __ASSEMBLY__
 
@@ -53,6 +56,15 @@ struct partitions {
 	uint64_t size;			/* partition size */
 	uint64_t offset;		/* offset within the master space */
 	unsigned mask_flags;		/* master flags to mask out for this partition */
+#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
+#if CONFIG_IS_ENABLED(PARTITION_UUIDS)
+	char	uuid[UUID_STR_LEN + 1];	/* filesystem UUID as string, if exists	*/
+#endif
+#ifdef CONFIG_PARTITION_TYPE_GUID
+	char	type_guid[UUID_STR_LEN + 1];	/* type GUID as string, if exists	*/
+#endif
+	gpt_entry_attributes attributes;
+#endif
 };
 
 struct config_nand {

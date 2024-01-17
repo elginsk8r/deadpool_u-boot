@@ -910,24 +910,19 @@
 
 };
 
+/*
 &spicc0 {
-	clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_SPICC0>,
-		 <&clkc CLKID_SPICC0_DIV>, <&clkc CLKID_SPICC0_GATE>;
-	clock-names = "core", "core-gate", "async", "async-gate";
-	assigned-clocks = <&clkc CLKID_SPICC0_MUX>, <&clkc CLKID_SPICC0_DIV>;
-	assigned-clock-parents = <&clkc CLKID_FCLK_DIV2>;
-	assigned-clock-rates = <0>, <200000000>;
+	clocks = <&clkc CLKID_SPICC0>,
+		 <&clkc CLKID_SPICC0_COMP>;
+	clock-names = "core", "comp";
 };
 
 &spicc1 {
-	clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_SPICC1>,
-		 <&clkc CLKID_SPICC1_DIV>, <&clkc CLKID_SPICC1_GATE>;
-	clock-names = "core", "core-gate", "async", "async-gate";
-	assigned-clocks = <&clkc CLKID_SPICC1_MUX>, <&clkc CLKID_SPICC1_DIV>;
-	assigned-clock-parents = <&clkc CLKID_FCLK_DIV2>;
-	assigned-clock-rates = <0>, <200000000>;
-};
-
+	clocks = <&clkc CLKID_SPICC1>,
+		 <&clkc CLKID_SPICC1_COMP>;
+	clock-names = "core", "comp";
+ };
+*/
 /*
 &spifc {
 	clocks = <&clkc CLKID_CLK81>;

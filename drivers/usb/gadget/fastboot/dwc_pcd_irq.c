@@ -7,7 +7,7 @@
 #include "usb_ch9.h"
 #include "dwc_pcd.h"
 #include "dwc_pcd_irq.h"
-#include "../platform.h"
+#include "platform.h"
 
 static void ep0_out_start(void);
 static int ep0_complete_request( pcd_struct_t * pcd);
@@ -666,7 +666,7 @@ static void dwc_otg_pcd_handle_enum_done_intr(void)
 
 	printf("SPEED ENUM\n");
 #ifdef CONFIG_USB_DEVICE_V2
-	set_usb_phy21_tuning_update();
+	set_usb_phy21_tuning_fb();
 #endif
 
 	gadget_wrapper.pcd.ep0state = EP0_IDLE;
