@@ -73,7 +73,7 @@
 #define PACKAGE_ID_MASK 	0xFF
 
 /*A1 SoC has problem to support AES for secure boot, here just disable it*/
-#define CONFIG_AML_CRYPTO_AES 1
+//#define CONFIG_AML_CRYPTO_AES 1
 
 
 /*Flag for enable AES key generate to EFUSE pattern, with this flag only

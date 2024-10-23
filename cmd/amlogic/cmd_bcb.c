@@ -44,21 +44,6 @@ struct bootloader_message {
     char reserved[192];
 };
 
-
-static int clear_misc_partition(char *clearbuf, int size)
-{
-    char *partition = "misc";
-
-    memset(clearbuf, 0, size);
-    if (store_write((const char *)partition,
-        0, size, (unsigned char *)clearbuf) < 0) {
-        printf("failed to clear %s.\n", partition);
-        return -1;
-    }
-
-    return 0;
-}
-
 static int do_RunBcbCommand(
     cmd_tbl_t * cmdtp,
     int flag,
@@ -154,14 +139,16 @@ static int do_RunBcbCommand(
         run_command("setenv bootargs ${bootargs} androidboot.quiescent=1;", 0);
     }
 
-    run_command("get_valid_slot", 0);
-    if (env_get("active_slot")) {
-        ActiveSlot = env_get("active_slot");
-        if (strstr(ActiveSlot, "normal") == NULL) {
-            printf("ab update mode\n");
-            run_command("setenv bootargs ${bootargs} androidboot.slot_suffix=${active_slot};", 0);
-        }
-    }
+	ActiveSlot = env_get("active_slot");
+	if (!ActiveSlot) {
+		run_command("get_valid_slot", 0);
+		ActiveSlot = env_get("active_slot");
+	}
+	if (ActiveSlot && !strstr(ActiveSlot, "normal")) {
+		printf("ab update mode\n");
+		run_command("setenv bootargs ${bootargs} androidboot.slot_suffix=${active_slot};",
+			0);
+	}
 
     if (!memcmp(command, CMD_RUN_RECOVERY, strlen(CMD_RUN_RECOVERY))) {
         if (run_command("run recovery_from_flash", 0) < 0) {
@@ -170,25 +157,6 @@ static int do_RunBcbCommand(
         }
         printf("run command:run recovery_from_flash successful.\n");
         return 0;
-    }
-
-    if (!memcmp(command_mark, command, strlen(command_mark))) {
-        printf("%s\n", recovery);
-        if (run_command((char *)recovery, 0) < 0) {
-            printf("run_command for cmd:%s failed.\n", recovery);
-            goto ERR;
-        }
-        printf("run command successful.\n");
-
-        if (clear_misc_partition(clearbuf, sizeof(clearbuf)) < 0) {
-            printf("clear misc partition failed.\n");
-            goto ERR;
-        } else {
-            printf("clear misc partition successful.\n");
-        }
-    } else {
-        printf("command mark(%s) not match %s,don't execute.\n",
-            command_mark, command);
     }
 
     return 0;

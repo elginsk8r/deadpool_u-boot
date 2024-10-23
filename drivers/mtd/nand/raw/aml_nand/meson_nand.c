@@ -370,7 +370,8 @@ static int m3_nand_options_confirm(struct aml_nand_chip *aml_chip)
 	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_AXG) ||
 	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_TXHD)||
 	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_C1) ||
-	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_C2))
+	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_C2) ||
+	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_S4))
 		options_support = NAND_ECC_BCH8_MODE;
 
 	switch (options_support) {
@@ -761,8 +762,8 @@ static int m3_nand_probe(struct aml_nand_platform *plat, unsigned dev_num)
 	err = aml_nand_init(aml_chip);
 	if (!err) {
 		nand_info[dev_num] = mtd;
-		mtd_store_set(nand_info[dev_num], dev_num);
 		slcnand_fit_storage();
+		mtd_store_set(nand_info[dev_num], dev_num);
 	}
 	if (err || pre_scan->pre_scan_flag)
 		goto exit_error;

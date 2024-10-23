@@ -79,6 +79,9 @@ int v3tool_buffman_img_verify_sha1sum(unsigned char* vrySum)
     } else if ( !strcmp("_aml_dtb", part) ) {
         ret = store_dtb_rw(vryBuff, imgTotalLen, 2);
         sha1_update(&ctx, vryBuff, imgTotalLen);
+    } else if (!strcmp("gpt", part)) {
+        ret = store_gpt_ops(imgTotalLen, vryBuff,0);
+        sha1_update(&ctx, vryBuff, imgTotalLen);
     } else {
         switch (imgFmt)
         {
@@ -256,7 +259,8 @@ static int _v3tool_buffman_next_download_info_rawimg(ImgDownloadPara* imgPara)
             {
                 _usbDownInf.fileOffset = _rawImgFileOffset;
                 int64_t leftLen        = cmnInf->imgSzTotal - _rawImgFileOffset;
-                if (strcmp("bootloader", cmnInf->partName) && strcmp("_aml_dtb", cmnInf->partName))
+                if (strcmp("bootloader", cmnInf->partName) && strcmp("_aml_dtb", cmnInf->partName)
+                        && strcmp("gpt", cmnInf->partName))
                 {_usbDownInf.dataSize   = _mymin(leftLen, _RAW_IMG_TRANSFER_LEN);}
                 else _usbDownInf.dataSize   = leftLen;
                 _usbDownInf.dataBuf    = (char*)V3_DOWNLOAD_MEM_BASE;
@@ -369,8 +373,9 @@ int v3tool_buffman_data_complete_download(const UsbDownInf* downloadInf)
                                 ret = bootloader_write(dataBuf, 0, thisTransferLen);
                             } else if ( !strcmp("_aml_dtb", partName) ) {
                                 ret = store_dtb_rw(dataBuf, thisTransferLen, 1);
-                            }
-                            else {
+                            } else if ( !strcmp("gpt", partName) ) {
+                                ret = store_gpt_ops(thisTransferLen, dataBuf,  1);
+                            } else {
                                 ret = store_logic_write(partName, partOffset, thisTransferLen, dataBuf);
                             }
                         } break;
@@ -446,7 +451,8 @@ int v3tool_buffman_next_upload_info(UsbUpInf** uploadInfo)
             }break;
         case V3TOOL_MEDIA_TYPE_STORE:
             {
-                if ( !strcmp("bootloader", partName) || !strcmp("_aml_dtb", partName)) {
+                if ( !strcmp("bootloader", partName) || !strcmp("_aml_dtb", partName) 
+                        || !strcmp("gpt", partName)) {
                     dataSize = _usbUpInf.dataSize = leftLen;
                 }
                 if (!strcmp("bootloader", partName)) {
@@ -454,8 +460,9 @@ int v3tool_buffman_next_upload_info(UsbUpInf** uploadInfo)
                 } else if (!strcmp("_aml_dtb", partName)) {
                     //'2' means using 'store dtb iread' rather than 'read'
                     ret = store_dtb_rw(dataBuf, dataSize, 2);
-                }
-                else  {
+                } else if ( !strcmp("gpt", partName) ) {
+                    ret = store_gpt_ops(dataSize, dataBuf,  0);
+                } else  {
                     ret = store_logic_read(partName, _rawImgFileOffset + cmnInf->partStartOff, dataSize, dataBuf);
                 }
                 if (ret) {

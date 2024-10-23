@@ -677,13 +677,13 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	if (ret < 0)
 		return 1;
 
-	pr_info("%llu bytes read in %lu ms", len_read, time);
+	printf("%llu bytes read in %lu ms", len_read, time);
 	if (time > 0) {
-		pr_info(" (");
+		puts(" (");
 		print_size(div_u64(len_read, time) * 1000, "/s");
-		pr_info(")");
+		puts(")");
 	}
-	pr_info("\n");
+	puts("\n");
 
 	env_set_hex("fileaddr", addr);
 	env_set_hex("filesize", len_read);

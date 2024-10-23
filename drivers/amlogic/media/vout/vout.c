@@ -13,6 +13,7 @@
 #ifdef CONFIG_AML_LCD
 #include <amlogic/media/vout/lcd/aml_lcd.h>
 #endif
+#include "vout.h"
 
 #define VOUT_LOG_DBG 0
 #define VOUT_LOG_TAG "[VOUT]"
@@ -23,29 +24,41 @@
 			vout_log("%s:%d\n", __func__, __LINE__); \
 	} while (0)
 
-#ifndef REG_BASE_VCBUS
-#define REG_BASE_VCBUS                  (0xff900000L)
-#endif
-#define REG_OFFSET_VCBUS(reg)           ((reg << 2))
-#define REG_ADDR_VCBUS(reg)             (REG_BASE_VCBUS + REG_OFFSET_VCBUS(reg))
-
-#define REG_CLK_ADDR(reg)               (reg + 0L)
-#define REG_VOUT_ADDR(reg)              (reg + 0L)
-
 static int g_vmode = -1;
+static struct vout_conf_s *vout_conf;
+static int vout_conf_check(void);
+#include "vout_reg.h"
 
-typedef struct vout_set_s {
-	char *name;
-	int mode;
-	ulong width;
-	ulong height;
-	ulong field_height;
-	int viu_color_fmt;
-	enum viu_mux_e viu_mux;
-} vout_set_t;
+static const struct vout_set_s vout_sets_lcd[] = {
+	{ /* VMODE_LCD */
+		.name              = "panel",
+		.mode              = VMODE_LCD,
+		.width             = 1920,
+		.height            = 1080,
+		.field_height      = 1080,
+		.viu_color_fmt     = VPP_CM_RGB,
+		.viu_mux           = VIU_MUX_ENCL,
+	},
+	{ /* VMODE_LCD */
+		.name              = "panel1",
+		.mode              = VMODE_LCD,
+		.width             = 1920,
+		.height            = 1080,
+		.field_height      = 1080,
+		.viu_color_fmt     = VPP_CM_RGB,
+		.viu_mux           = (1 << 4) | VIU_MUX_ENCL,
+	},{ /* VMODE_LCD */
+		.name              = "panel2",
+		.mode              = VMODE_LCD,
+		.width             = 1920,
+		.height            = 1080,
+		.field_height      = 1080,
+		.viu_color_fmt     = VPP_CM_RGB,
+		.viu_mux           = (2 << 4) | VIU_MUX_ENCL,
+	}
+};
 
-
-static const vout_set_t vout_sets[] = {
+static const struct vout_set_s vout_sets_dft[] = {
 	{ /* VMODE_480I */
 		.name              = "480i",
 		.mode              = VMODE_480I,
@@ -202,15 +215,6 @@ static const vout_set_t vout_sets[] = {
 	{ /* VMODE_fhdvga */
 		.name              = "fhdvga",
 		.mode              = VMODE_FHDVGA,
-		.width             = 1920,
-		.height            = 1080,
-		.field_height      = 1080,
-		.viu_color_fmt     = VPP_CM_YUV,
-		.viu_mux           = VIU_MUX_ENCP,
-	},
-	{ /* VMODE_LCD */
-		.name              = "panel",
-		.mode              = VMODE_LCD,
 		.width             = 1920,
 		.height            = 1080,
 		.field_height      = 1080,
@@ -408,7 +412,7 @@ static const vout_set_t vout_sets[] = {
 		.height            = 1080,
 		.viu_color_fmt     = VPP_CM_YUV,
 		.viu_mux           = VIU_MUX_ENCP,
-	},
+	}
 };
 
 static struct vinfo_s vout_info = {
@@ -428,121 +432,41 @@ static struct vinfo_s vout_info = {
 	.priv = NULL,                /* Pointer to driver-specific data */
 };
 
-#ifndef HHI_VPU_CLKC_CNTL
-#define HHI_VPU_CLKC_CNTL                          (0xff63c000 + (0x06d << 2))
-#endif
-#ifndef CLKCTRL_VPU_CLKC_CTRL
-#define CLKCTRL_VPU_CLKC_CTRL                      ((0x003c  << 2) + 0xfe000000)
-#endif
-#ifndef VPU_VENCX_CLK_CTRL
-#define VPU_VENCX_CLK_CTRL                         0x2785
-#endif
-
-static inline unsigned int vout_reg_read(u32 reg)
+static int vout_conf_check(void)
 {
-	unsigned int val;
+	if (vout_conf)
+		return 0;
 
-	if (reg > 0x10000)
-		val = *(volatile unsigned int *)REG_VOUT_ADDR(reg);
-	else
-		val = (*(volatile unsigned int *)REG_ADDR_VCBUS(reg));
+	vout_probe();
+	if (!vout_conf) {
+		vout_log("error: %s: no vout_conf\n", __func__);
+		return -1;
+	}
 
-	return val;
+	return 0;
 }
 
-static inline void vout_reg_write(u32 reg, const u32 val)
+static const struct vout_set_s *vout_find_mode_by_name(const char *name)
 {
-	if (reg > 0x10000)
-		*(volatile unsigned int *)REG_VOUT_ADDR(reg) = (val);
-	else
-		*(volatile unsigned int *)REG_ADDR_VCBUS(reg) = (val);
-}
-
-static inline void vout_reg_setb(unsigned int reg, unsigned int val,
-		unsigned int start, unsigned int len)
-{
-	vout_reg_write(reg, ((vout_reg_read(reg) &
-			~(((1L << (len))-1) << (start))) |
-			(((val)&((1L<<(len))-1)) << (start))));
-}
-
-static inline unsigned int vout_clk_read(u32 reg)
-{
-	return *(volatile unsigned int *)(REG_CLK_ADDR(reg));
-}
-
-static inline void vout_clk_write(u32 reg, const u32 val)
-{
-	*(volatile unsigned int *)REG_CLK_ADDR(reg) = (val);
-}
-
-static inline void vout_clk_setb(unsigned int reg, unsigned int val,
-		unsigned int start, unsigned int len)
-{
-	vout_clk_write(reg, ((vout_clk_read(reg) &
-			~(((1L << (len))-1) << (start))) |
-			(((val)&((1L<<(len))-1)) << (start))));
-}
-
-static int vout_find_mode_by_name(const char *name)
-{
-	int mode = -1;
+	const struct vout_set_s *vset = NULL;
 	int i = 0;
 
-	for (i = 0; i < sizeof(vout_sets) / sizeof(struct vout_set_s); i++) {
-		if (strncmp(name, vout_sets[i].name, strlen(vout_sets[i].name)) == 0) {
-			mode = vout_sets[i].mode;
-			return mode;
-		}
+	vset = vout_sets_dft;
+	for (i = 0; i < sizeof(vout_sets_dft) / sizeof(struct vout_set_s); i++) {
+		if (strncmp(name, vset->name, strlen(vset->name)) == 0)
+			return vset;
+		vset++;
+	}
+
+	vset = vout_sets_lcd;
+	for (i = 0; i < sizeof(vout_sets_lcd) / sizeof(struct vout_set_s); i++) {
+		if (strcmp(name, vset->name) == 0)
+			return vset;
+		vset++;
 	}
 
 	vout_log("mode: %s not found\n", name);
-	return -1;
-}
-
-static int vout_find_width_by_name(const char* name)
-{
-	int i = 0;
-	ulong width = 0;
-
-	for (i = 0; i < sizeof(vout_sets) / sizeof(struct vout_set_s); i++) {
-		if (strncmp(name, vout_sets[i].name, strlen(vout_sets[i].name)) == 0) {
-			width = vout_sets[i].width;
-			return width;
-		}
-	}
-
-	return width;
-}
-
-static int vout_find_height_by_name(const char* name)
-{
-	int height = 0;
-	int i = 0;
-
-	for (i = 0; i < sizeof(vout_sets) / sizeof(struct vout_set_s); i++) {
-		if (strncmp(name, vout_sets[i].name, strlen(vout_sets[i].name)) == 0) {
-			height = vout_sets[i].height;
-			return height;
-		}
-	}
-
-	return height;
-}
-
-static int vout_find_field_height_by_name(const char* name)
-{
-	int height = 0;
-	int i = 0;
-
-	for (i = 0; i < sizeof(vout_sets) / sizeof(struct vout_set_s); i++) {
-		if (strncmp(name, vout_sets[i].name, strlen(vout_sets[i].name)) == 0) {
-			height = vout_sets[i].field_height;
-			return height;
-		}
-	}
-
-	return height;
+	return NULL;
 }
 
 static unsigned int vout_env2uint(const char *name, int base)
@@ -573,33 +497,39 @@ static void vout_axis_init(ulong w, ulong h)
 static void vout_vmode_init(void)
 {
 	char *outputmode = NULL;
+	const struct vout_set_s *vset = NULL;
 	int vmode = -1;
 	ulong width = 0;
 	ulong height = 0;
 	ulong field_height = 0;
 #ifdef CONFIG_AML_LCD
-	struct aml_lcd_drv_s *lcd_drv;
+	struct aml_lcd_drv_s *pdrv;
+	unsigned int venc_index;
 #endif
 
 	outputmode = env_get("outputmode");
-	vmode = vout_find_mode_by_name(outputmode);
+	vset = vout_find_mode_by_name(outputmode);
+	if (!vset)
+		return;
+
+	vmode = vset->mode;
 	vout_set_current_vmode(vmode);
 	switch (vmode) {
 #ifdef CONFIG_AML_LCD
 	case VMODE_LCD:
-		lcd_drv = aml_lcd_get_driver();
-		width = lcd_drv->lcd_config->lcd_basic.h_active;
-		height = lcd_drv->lcd_config->lcd_basic.v_active;
-		field_height = lcd_drv->lcd_config->lcd_basic.v_active;
+		venc_index = (vset->viu_mux >> 4) & 0xf;
+		pdrv = aml_lcd_get_driver(venc_index);
+		width = pdrv->config.basic.h_active;
+		height = pdrv->config.basic.v_active;
+		field_height = pdrv->config.basic.v_active;
 		break;
 #endif
 	default:
-		width = vout_find_width_by_name(outputmode);
-		height = vout_find_height_by_name(outputmode);
-		field_height = vout_find_field_height_by_name(outputmode);
+		width = vset->width;
+		height = vset->height;
+		field_height = vset->field_height;
 		break;
 	}
-	vout_reg_write(VPP_POSTBLEND_H_SIZE, width);
 	vout_axis_init(width, height);
 
 	vout_vinfo_init(width, height, field_height);
@@ -748,31 +678,35 @@ void vout_vinfo_dump(void)
 	vout_log("vinfo.vl_bpix: %d\n", info->vl_bpix);
 	vout_log("vinfo.vd_color_fg: %d\n", info->vd_color_fg);
 	vout_log("vinfo.vd_color_bg: %d\n", info->vd_color_bg);
+
+	if (vout_conf_check())
+		return;
+	if (vout_conf->reg_dump)
+		vout_conf->reg_dump();
+}
+
+static void vout_reg_dump(void)
+{
+	unsigned int reg;
+
+	if (vout_conf_check())
+		return;
+
+	reg = vout_conf->viu_mux_reg;
+	vout_log("viu_mux: 0x%x = 0x%08x\n", reg, vout_reg_read(reg));
 }
 
 static unsigned int vout_viu1_mux = VIU_MUX_MAX;
 static unsigned int vout_viu2_mux = VIU_MUX_MAX;
-void vout_viu_mux(int viu_sel, int venc_sel)
+static void vout_viu_mux_default(int index, unsigned int mux_sel)
 {
 	unsigned int clk_bit = 0xff, clk_sel = 0;
-	unsigned int viu2_valid = 0;
 	unsigned int vout_viu_sel = 0xf;
+	unsigned int venc_sel = mux_sel;
 
-	switch (get_cpu_id().family_id) {
-	case MESON_CPU_MAJOR_ID_G12A:
-	case MESON_CPU_MAJOR_ID_G12B:
-	case MESON_CPU_MAJOR_ID_TL1:
-	case MESON_CPU_MAJOR_ID_TM2:
-	case MESON_CPU_MAJOR_ID_SM1:
-		viu2_valid = 1;
-		break;
-	default:
-		break;
-	}
-
-	switch (viu_sel) {
+	switch (index) {
 	case VOUT_VIU2_SEL:
-		if (viu2_valid) {
+		if (vout_conf->viu_valid[1]) {
 			/* set cts_vpu_clkc to 200MHz*/
 			vout_clk_setb(HHI_VPU_CLKC_CNTL, 2, 9, 3);
 			vout_clk_setb(HHI_VPU_CLKC_CNTL, 1, 0, 1);
@@ -784,11 +718,12 @@ void vout_viu_mux(int viu_sel, int venc_sel)
 		vout_viu2_mux = venc_sel;
 		break;
 	case VOUT_VIU1_SEL:
-		if (viu2_valid)
-			vout_clk_setb(HHI_VPU_CLKC_CNTL, 0, 8, 1);
 		clk_sel = 0;
-		if (venc_sel == vout_viu2_mux)
+		if (venc_sel == vout_viu2_mux) {
+			if (vout_conf->viu_valid[1])
+				vout_clk_setb(HHI_VPU_CLKC_CNTL, 0, 8, 1);
 			vout_viu2_mux = VIU_MUX_MAX;
+		}
 		vout_viu1_mux = venc_sel;
 		break;
 	default:
@@ -811,14 +746,106 @@ void vout_viu_mux(int viu_sel, int venc_sel)
 	}
 
 	vout_reg_setb(VPU_VIU_VENC_MUX_CTRL, vout_viu_sel, 0, 4);
-	if (viu2_valid) {
+	if (vout_conf->viu_valid[1]) {
 		if (clk_bit < 0xff)
 			vout_reg_setb(VPU_VENCX_CLK_CTRL, clk_sel, clk_bit, 1);
 	}
+}
+
+static void vout_viu_mux_t7(int index, unsigned int mux_sel)
+{
+	unsigned int viu_bit = 0xff, venc_idx;
+
+	switch (index) {
+	case VOUT_VIU1_SEL:
+		viu_bit = 0;
+		break;
+	case VOUT_VIU2_SEL:
+		viu_bit = 2;
+		break;
+	case VOUT_VIU3_SEL:
+		viu_bit = 4;
+		break;
+	default:
+		vout_log("error: %s: invalid index %d\n", __func__, index);
+		return;
+	}
+	venc_idx = (mux_sel >> 4) & 0xf;
+
+	/* viu_mux: viu0_sel: 0=venc0, 1=venc1, 2=venc2, 3=invalid */
+	vout_reg_setb(VPU_VIU_VENC_MUX_CTRL, venc_idx, viu_bit, 2);
+}
+
+void vout_viu_mux(int index, unsigned int mux_sel)
+{
+	if (vout_conf_check())
+		return;
+
+	if (vout_conf->viu_mux)
+		vout_conf->viu_mux(index, mux_sel);
 }
 
 void vout_init(void)
 {
 	vout_logl();
 	vout_vmode_init();
+}
+
+/* **********************************
+ * vout match data
+ * **********************************
+ */
+static struct vout_conf_s vout_config_single = {
+	.viu_valid[0] = 1,
+	.viu_valid[1] = 0,
+	.viu_valid[2] = 0,
+
+	.viu_mux_reg = VPU_VIU_VENC_MUX_CTRL,
+
+	.viu_mux = vout_viu_mux_default,
+	.reg_dump = vout_reg_dump,
+};
+
+static struct vout_conf_s vout_config_dual = {
+	.viu_valid[0] = 1,
+	.viu_valid[1] = 1,
+	.viu_valid[2] = 0,
+
+	.viu_mux_reg = VPU_VIU_VENC_MUX_CTRL,
+
+	.viu_mux = vout_viu_mux_default,
+	.reg_dump = vout_reg_dump,
+};
+
+static struct vout_conf_s vout_config_triple = {
+	.viu_valid[0] = 1,
+	.viu_valid[1] = 1,
+	.viu_valid[2] = 1,
+
+	.viu_mux_reg = VPU_VENC_CTRL,
+
+	.viu_mux = vout_viu_mux_t7,
+	.reg_dump = vout_reg_dump,
+};
+
+void vout_probe(void)
+{
+	switch (get_cpu_id().family_id) {
+	case MESON_CPU_MAJOR_ID_G12A:
+	case MESON_CPU_MAJOR_ID_G12B:
+	case MESON_CPU_MAJOR_ID_TL1:
+	case MESON_CPU_MAJOR_ID_TM2:
+	case MESON_CPU_MAJOR_ID_SM1:
+	case MESON_CPU_MAJOR_ID_T5:
+	case MESON_CPU_MAJOR_ID_T5D:
+		vout_conf = &vout_config_dual;
+		break;
+	case MESON_CPU_MAJOR_ID_T7:
+		vout_conf = &vout_config_triple;
+		vout_reg_write(VPU_VIU_VENC_MUX_CTRL, 0x3f);
+		break;
+	default:
+		vout_conf = &vout_config_single;
+		break;
+	}
 }

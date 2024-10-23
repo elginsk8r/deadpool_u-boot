@@ -38,6 +38,8 @@ int efuse_usr_api_init_dtb(const char*  dt_addr)
     unsigned efusekeynum = 0;
     struct efusekey_info * efusekey_infos = NULL;
 
+    extern int fdt_check_header(const void *fdt);
+    extern const char *fdt_strerror(int errval);
 	ret = fdt_check_header(dt_addr);
 	if (ret < 0) {
 		EFUSE_ERR("fdt check failed [%s]\n", fdt_strerror(ret));
@@ -45,12 +47,15 @@ int efuse_usr_api_init_dtb(const char*  dt_addr)
     }
     _efuseKeyInfos.initMaigc = 0;
 
+    extern int fdt_path_offset(const void *fdt, const char *path);
 	nodeoffset = fdt_path_offset(dt_addr, "/efusekey");
 	if (nodeoffset < 0) {
 		EFUSE_ERR("not find /efusekey node [%s].\n", fdt_strerror(nodeoffset));
         return __LINE__;
     }
 
+    extern const void *fdt_getprop(const void *fdt, int nodeoffset,
+            const char *name, int *lenp);
 	phandle = fdt_getprop(dt_addr, nodeoffset, "keynum", NULL);
 	efusekeynum = be32_to_cpup((u32 *)phandle);
 	EFUSE_MSG("keynum is %x\n", efusekeynum);
@@ -74,6 +79,8 @@ int efuse_usr_api_init_dtb(const char*  dt_addr)
 			EFUSE_ERR("don't find  match %s\n", propname);
 			goto err;
 		}
+
+	extern int fdt_node_offset_by_phandle(const void *fdt, uint32_t phandle);
         poffset = fdt_node_offset_by_phandle(dt_addr,
                 be32_to_cpup((u32 *)phandle));
         if (!poffset) {
@@ -344,6 +351,7 @@ static int do_usr_efuse_api(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
             ret = hex_ascii_to_buf(input, tmpBuf, bufSz);
             if (ret) {
                 EFUSE_ERR("Failed in change hex ascii to buf\n");
+                free(tmpBuf);
                 return __LINE__;
             }
             keydata = (char*)tmpBuf;

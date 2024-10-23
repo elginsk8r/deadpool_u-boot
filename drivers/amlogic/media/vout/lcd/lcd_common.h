@@ -10,119 +10,101 @@
 #include "lcd_unifykey.h"
 
 /* 20181106: init version */
-#define LCD_DRV_VERSION    "20181106"
+/* 20201211: support t5/t5d/t7 */
+/* 20210222: support multi driver index */
+#define LCD_DRV_VERSION    "20210222"
 
-#define LCD_STATUS_IF_ON      (1 << 0)
-#define LCD_STATUS_ENCL_ON    (1 << 1)
-#define VPP_OUT_SATURATE      (1 << 0)
+extern unsigned int lcd_debug_test;
+extern unsigned long clk_util_clk_msr(unsigned long clk_mux);
 
-/* -------------------------- */
-/* lvsd phy parameters define */
-/* -------------------------- */
-#define LVDS_PHY_CNTL1_G9TV    0x606cca80
-#define LVDS_PHY_CNTL2_G9TV    0x0000006c
-#define LVDS_PHY_CNTL3_G9TV    0x00000800
+void mdelay(unsigned long n);
 
-#define LVDS_PHY_CNTL1_TXHD    0x6c60ca80
-#define LVDS_PHY_CNTL2_TXHD    0x00000070
-#define LVDS_PHY_CNTL3_TXHD    0x03ff0c00
-/* -------------------------- */
-
-/* -------------------------- */
-/* vbyone phy parameters define */
-/* -------------------------- */
-#define VX1_PHY_CNTL1_G9TV            0x6e0ec900
-#define VX1_PHY_CNTL1_G9TV_PULLUP     0x6e0f4d00
-#define VX1_PHY_CNTL2_G9TV            0x0000007c
-#define VX1_PHY_CNTL3_G9TV            0x00ff0800
-/* -------------------------- */
-
-/* -------------------------- */
-/* minilvds phy parameters define */
-/* -------------------------- */
-#define MLVDS_PHY_CNTL1_TXHD   0x6c60ca80
-#define MLVDS_PHY_CNTL2_TXHD   0x00000070
-#define MLVDS_PHY_CNTL3_TXHD   0x03ff0c00
-/* -------------------------- */
-
-/* ******** MIPI_DSI_PHY ******** */
-/* bit[15:11] */
-#define MIPI_PHY_LANE_BIT        11
-#define MIPI_PHY_LANE_WIDTH      5
-
-/* MIPI-DSI */
-#define DSI_LANE_0              (1 << 4)
-#define DSI_LANE_1              (1 << 3)
-#define DSI_LANE_CLK            (1 << 2)
-#define DSI_LANE_2              (1 << 1)
-#define DSI_LANE_3              (1 << 0)
-#define DSI_LANE_COUNT_1        (DSI_LANE_CLK | DSI_LANE_0)
-#define DSI_LANE_COUNT_2        (DSI_LANE_CLK | DSI_LANE_0 | DSI_LANE_1)
-#define DSI_LANE_COUNT_3        (DSI_LANE_CLK | DSI_LANE_0 |\
-					DSI_LANE_1 | DSI_LANE_2)
-#define DSI_LANE_COUNT_4        (DSI_LANE_CLK | DSI_LANE_0 |\
-					DSI_LANE_1 | DSI_LANE_2 | DSI_LANE_3)
-/* -------------------------- */
-
-extern void mdelay(unsigned long n);
-extern unsigned int lcd_debug_load_flag;
+void lcd_display_init_test(struct aml_lcd_drv_s *pdrv);
+void lcd_display_init_reg_dump(struct aml_lcd_drv_s *pdrv);
 
 /* lcd common */
-extern int lcd_type_str_to_type(const char *str);
-extern char *lcd_type_type_to_str(int type);
-extern int lcd_mode_str_to_mode(const char *str);
-extern char *lcd_mode_mode_to_str(int mode);
+int lcd_type_str_to_type(const char *str);
+char *lcd_type_type_to_str(int type);
+int lcd_mode_str_to_mode(const char *str);
+char *lcd_mode_mode_to_str(int mode);
 
-extern void lcd_pinmux_set(int status);
+int lcd_get_config(char *dt_addr, int load_id, struct aml_lcd_drv_s *pdrv);
+void lcd_timing_init_config(struct lcd_config_s *pconf);
+int lcd_vmode_change(struct lcd_config_s *pconf);
+void lcd_pinmux_set(struct aml_lcd_drv_s *pdrv, int status);
+void lcd_vbyone_config_set(struct aml_lcd_drv_s *pdrv);
+void lcd_mipi_dsi_config_set(struct aml_lcd_drv_s *pdrv);
+void lcd_edp_config_set(struct aml_lcd_drv_s *pdrv);
 
-extern unsigned int lcd_lvds_channel_on_value(struct lcd_config_s *pconf);
-extern int lcd_power_load_from_dts(struct lcd_config_s *pconf,
-		const void *dt_blob, int child_offset);
-extern int lcd_power_load_from_unifykey(struct lcd_config_s *pconf,
-		unsigned char *buf, int key_len, int len);
-extern int lcd_pinmux_load_config(const void *dt_blob, struct lcd_config_s *pconf);
-extern void lcd_timing_init_config(struct lcd_config_s *pconf);
-extern int lcd_vmode_change(struct lcd_config_s *pconf);
+void lcd_set_venc(struct aml_lcd_drv_s *pdrv);
+
+/* lcd phy */
+void lcd_phy_tcon_chpi_bbc_init_tl1(struct lcd_config_s *pconf);
+void lcd_phy_set(struct aml_lcd_drv_s *pdrv, int status);
+int lcd_phy_probe(struct aml_lcd_drv_s *pdrv);
+int lcd_phy_config_init(struct aml_lcd_data_s *pdata);
+
+/*lcd vbyone*/
+void lcd_vbyone_sw_reset(struct aml_lcd_drv_s *pdrv);
+void lcd_vbyone_wait_timing_stable(struct aml_lcd_drv_s *pdrv);
+void lcd_vbyone_cdr_training_hold(struct aml_lcd_drv_s *pdrv, int flag);
+void lcd_vbyone_wait_hpd(struct aml_lcd_drv_s *pdrv);
+void lcd_vbyone_wait_stable(struct aml_lcd_drv_s *pdrv);
+void lcd_vbyone_hw_filter(struct aml_lcd_drv_s *pdrv, int flag);
 
 /* lcd tcon */
-extern void lcd_tcon_reg_table_print(void);
-extern void lcd_tcon_reg_readback_print(void);
-extern void lcd_tcon_info_print(void);
-extern int lcd_tcon_enable(struct lcd_config_s *pconf);
-extern void lcd_tcon_disable(void);
-extern int lcd_tcon_probe(const void *dt_blob, struct aml_lcd_drv_s *lcd_drv, int load_id);
+#ifdef CONFIG_AML_LCD_TCON
+void lcd_tcon_info_print(void);
+int lcd_tcon_enable(struct aml_lcd_drv_s *pdrv);
+void lcd_tcon_disable(struct aml_lcd_drv_s *pdrv);
+int lcd_tcon_probe(char *dt_addr, struct aml_lcd_drv_s *pdrv, int load_id);
+#endif
 
 /* lcd gpio */
-extern void lcd_cpu_gpio_info_print(void);
-extern int lcd_gpio_probe(const char *name, int index);
-extern int lcd_gpio_set(int gpio, int value);
-extern unsigned int lcd_gpio_input_get(int gpio);
+int lcd_gpio_name_map_num(const char *name);
+int lcd_gpio_set(int gpio, int value);
+unsigned int lcd_gpio_input_get(int gpio);
 
 /* lcd debug */
-extern void lcd_debug_test(unsigned int num);
-extern void lcd_mute_setting(unsigned char flag);
-extern void lcd_info_print(void);
-extern void lcd_reg_print(void);
-extern void lcd_debug_probe(struct aml_lcd_drv_s *lcd_drv);
+void aml_lcd_debug_test(struct aml_lcd_drv_s *pdrv, unsigned int num);
+void lcd_mute_setting(struct aml_lcd_drv_s *pdrv, unsigned char flag);
+void lcd_info_print(struct aml_lcd_drv_s *pdrv);
+void lcd_reg_print(struct aml_lcd_drv_s *pdrv);
+void lcd_vbyone_rst(struct aml_lcd_drv_s *pdrv);
+void lcd_vbyone_cdr(struct aml_lcd_drv_s *pdrv);
+void lcd_debug_probe(struct aml_lcd_drv_s *pdrv);
+int lcd_prbs_test(struct aml_lcd_drv_s *pdrv, unsigned int s, unsigned int mode_flag);
 
 /* lcd driver */
-extern int get_lcd_tv_config(const void *dt_blob, int load_id);
-extern int get_lcd_tablet_config(const void *dt_blob, int load_id);
-
-extern void lcd_wait_vsync(void);
+#ifdef CONFIG_AML_LCD_TV
+int lcd_mode_tv_init(struct aml_lcd_drv_s *pdrv);
+#endif
+#ifdef CONFIG_AML_LCD_TABLET
+int lcd_mode_tablet_init(struct aml_lcd_drv_s *pdrv);
+int lcd_mipi_dsi_init_table_detect(char *dt_addr, int child_offset,
+				   struct dsi_config_s *dconf, int flag);
+int lcd_mipi_dsi_init_table_check_bsp(struct dsi_config_s *dconf, int flag);
+void mipi_dsi_print_info(struct lcd_config_s *pconf);
+void mipi_dsi_config_init(struct lcd_config_s *pconf);
+void mipi_dsi_link_off(struct aml_lcd_drv_s *pdrv);
+void mipi_dsi_tx_ctrl(struct aml_lcd_drv_s *pdrv, int flag);
+void dptx_dpcd_dump(struct aml_lcd_drv_s *pdrv);
+void edp_tx_ctrl(struct aml_lcd_drv_s *pdrv, int flag);
+#endif
+void lcd_wait_vsync(struct aml_lcd_drv_s *pdrv);
 
 /* aml_bl driver */
-extern void bl_config_print(void);
-extern void bl_pwm_config_update(struct bl_config_s *bconf);
-extern void bl_set_level(unsigned int level);
-extern unsigned int bl_get_level(void);
-extern void bl_power_ctrl(int status);
-extern int bl_config_load(const void *dt_blob, int load_id);
-#ifdef CONFIG_AML_LOCAL_DIMMING
-extern int ldim_config_load_from_dts(const void *dt_blob, int child_offset);
-extern int ldim_config_load_from_unifykey(unsigned char *para);
-extern int ldim_config_load(const void *dt_blob);
-#endif
+int aml_bl_probe(char *dtaddr, int load_id);
+int aml_bl_remove(void);
+int aml_bl_index_add(int drv_index, int conf_index);
+int aml_bl_index_remove(int drv_index);
+int aml_bl_init(void);
+void aml_bl_driver_enable(int index);
+void aml_bl_driver_disable(int index);
+void aml_bl_set_level(int index, unsigned int level);
+unsigned int aml_bl_get_level(int index);
+void aml_bl_config_print(int index);
+int aml_bl_pwm_reg_config_init(struct aml_lcd_data_s *pdata);
 
 #endif
 

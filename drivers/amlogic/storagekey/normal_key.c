@@ -83,6 +83,7 @@ static struct storage_block_enc_head enchead;
 static char *blockmark = "AMLNORMAL";
 
 #if DBG
+static void dump_mem(const u8 *p, int len);
 static void dump_raw_head(struct storage_block_raw_head *prawhead)
 {
 	pr_info("rawhead:\n");
@@ -92,6 +93,10 @@ static void dump_raw_head(struct storage_block_raw_head *prawhead)
 	pr_info("wrtcnt: %u\n", prawhead->wrtcnt);
 	pr_info("errcnt: %u\n", prawhead->errcnt);
 	pr_info("flags: 0x%x\n", prawhead->flags);
+	pr_info("headhash:\n");
+	dump_mem(prawhead->headhash, 32);
+	pr_info("hash:\n");
+	dump_mem(prawhead->hash, 32);
 }
 
 static void dump_enc_head(struct storage_block_enc_head *penchead)
@@ -514,6 +519,11 @@ int normalkey_readfromblock(void *block, unsigned long size)
 
 	blockinited = 2;
 
+#if DBG
+	pr_info("size is %lu\n", size);
+	dump_raw_head(prawhead);
+#endif
+
 	memset(&rawhead, 0, sizeof(rawhead));
 	strncpy((char*)rawhead.mark, blockmark, 15);
 	rawhead.version = BLOCK_VERSION_0;
@@ -524,6 +534,7 @@ int normalkey_readfromblock(void *block, unsigned long size)
 		return 0;
 	}
 
+	flush_dcache_range((unsigned long)block, (unsigned long)block + size);
 	normalkey_hash((u8 *)prawhead, sizeof(*prawhead) - 64,
 		       rawhead.headhash);
 	if (memcmp(rawhead.headhash, prawhead->headhash, 32)) {
@@ -540,12 +551,11 @@ int normalkey_readfromblock(void *block, unsigned long size)
 
 	rawhead.initcnt++;
 
+	normalkey_hash(penchead, size - STORAGE_BLOCK_RAW_HEAD_SIZE,
+		       rawhead.hash);
 #if DBG
 	dump_raw_head(&rawhead);
 #endif
-
-	normalkey_hash(penchead, size - STORAGE_BLOCK_RAW_HEAD_SIZE,
-		       rawhead.hash);
 	if (memcmp(rawhead.hash, prawhead->hash, 32)) {
 		pr_info("data hash check fail\n");
 		rawhead.errcnt++;
@@ -646,12 +656,20 @@ int normalkey_writetoblock(void *block, unsigned long size)
 		return -1;
 
 	rawhead.wrtcnt++;
+	flush_dcache_range((unsigned long)&rawhead, (unsigned long)&rawhead + sizeof(rawhead));
+	flush_dcache_range((unsigned long)block, (unsigned long)block + size);
+	memset(rawhead.headhash, 0, sizeof(rawhead.headhash));
 	normalkey_hash((u8 *)&rawhead, sizeof(rawhead) - 64,
 		       rawhead.headhash);
+	memset(rawhead.hash, 0, sizeof(rawhead.hash));
 	normalkey_hash(penchead,
 		       enchead.flashsize - STORAGE_BLOCK_RAW_HEAD_SIZE,
 		       rawhead.hash);
 	memcpy(prawhead, &rawhead, sizeof(rawhead));
+#if DBG
+	pr_info("size is %lu\n", enchead.flashsize);
+	dump_raw_head(prawhead);
+#endif
 
 	return 0;
 }

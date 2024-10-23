@@ -5,14 +5,12 @@
 
 #include <common.h>
 #include <command.h>
-#include <amlogic/flash_ts.h>
 #include <asm/arch/reboot.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/io.h>
 #include <asm/arch/bl31_apis.h>
 #include <partition_table.h>
 #include <amlogic/storage.h>
-#include <amlogic/led_aw2015.h>
 /*
 run get_rebootmode  //set reboot_mode env with current mode
 */
@@ -20,124 +18,90 @@ run get_rebootmode  //set reboot_mode env with current mode
 int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	uint32_t reboot_mode_val;
-	char reboot_mode[16];
-#if defined(CONFIG_MESON_C1) || defined(CONFIG_MESON_C2)
-	reboot_mode_val = ((readl(SYSCTRL_SEC_STATUS_REG2 ) >> 12) & 0xf);
-	debug("reboot_mode(0x%x)=0x%x\n", SYSCTRL_SEC_STATUS_REG2, reboot_mode_val);
-#else
 	reboot_mode_val = ((readl(AO_SEC_SD_CFG15) >> 12) & 0xf);
+
 	debug("reboot_mode(0x%x)=0x%x\n", AO_SEC_SD_CFG15, reboot_mode_val);
-#endif
-
-	strcpy(reboot_mode, "reboot_mode");
-	if(is_flash_inited()) {
-		flash_ts_init();
-
-		const char *fts_key = "bootloader.command";
-		char fts_value[256] = { 0 };
-
-		printf("default reboot_mode_val is %d\n", reboot_mode_val);
-		flash_ts_get(fts_key, fts_value, sizeof(fts_value));
-		pr_info("FTS read: bootloader.command -> %s\n", fts_value);
-
-		if (strncmp(fts_value, "boot-recovery", sizeof(fts_value)) == 0) {
-#ifndef CONFIG_G_AB_SYSTEM
-			/* Disable the recovery mode support in A/B system */
-			reboot_mode_val = AMLOGIC_FACTORY_RESET_REBOOT;
-			pr_info("overwriting reboot_mode_val to: %d\n", reboot_mode_val);
-#endif
-		} else if (strncmp(fts_value, "boot-factory", sizeof(fts_value)) == 0) {
-			/* forece to u-boot console in factory mode */
-			if (reboot_mode_val == AMLOGIC_BOOTLOADER_REBOOT) {
-				env_set("bootdelay","-1");
-			} else {
-				pr_info("overwriting reboot_mode_val to: %d\n", reboot_mode_val);
-				env_set(reboot_mode, "factory_boot");
-				strncpy(reboot_mode, "real_reboot_mode", 16);
-			}
-		}
-	}
 
 	switch (reboot_mode_val)
 	{
 		case AMLOGIC_COLD_BOOT:
 		{
-			env_set(reboot_mode,"cold_boot");
+			env_set("reboot_mode","cold_boot");
 			break;
 		}
 		case AMLOGIC_NORMAL_BOOT:
 		{
-			env_set(reboot_mode,"normal");
-			break;
-		}
-		case AMLOGIC_QUIESCENT_REBOOT:
-		{
-			env_set(reboot_mode,"factory_boot");
+			env_set("reboot_mode","normal");
 			break;
 		}
 		case AMLOGIC_FACTORY_RESET_REBOOT:
 		{
-			env_set(reboot_mode,"factory_reset");
+			env_set("reboot_mode","factory_reset");
 			break;
 		}
 		case AMLOGIC_UPDATE_REBOOT:
 		{
-			env_set(reboot_mode,"update");
+			env_set("reboot_mode","update");
 			break;
 		}
 		case AMLOGIC_FASTBOOT_REBOOT:
 		{
-			env_set(reboot_mode,"fastboot");
+			env_set("reboot_mode","fastboot");
 			break;
 		}
 		case AMLOGIC_BOOTLOADER_REBOOT:
 		{
-			env_set(reboot_mode,"bootloader");
+			env_set("reboot_mode","bootloader");
 			break;
 		}
 		case AMLOGIC_SUSPEND_REBOOT:
 		{
-			env_set(reboot_mode,"suspend_off");
+			env_set("reboot_mode","suspend_off");
 			break;
 		}
 		case AMLOGIC_HIBERNATE_REBOOT:
 		{
-			env_set(reboot_mode,"hibernate");
+			env_set("reboot_mode","hibernate");
 			break;
 		}
 		case AMLOGIC_SHUTDOWN_REBOOT:
 		{
-			env_set(reboot_mode,"shutdown_reboot");
+			env_set("reboot_mode","shutdown_reboot");
 			break;
 		}
-		case AMLOGIC_CRASH_REBOOT:
+		case AMLOGIC_RESCUEPARTY_REBOOT:
 		{
-			env_set(reboot_mode,"crash_dump");
+			env_set("reboot_mode", "rescueparty");
 			break;
 		}
 		case AMLOGIC_KERNEL_PANIC:
 		{
-			env_set(reboot_mode,"kernel_panic");
+			env_set("reboot_mode","kernel_panic");
 			break;
 		}
 		case AMLOGIC_WATCHDOG_REBOOT:
 		{
-			env_set(reboot_mode,"watchdog_reboot");
+			env_set("reboot_mode","watchdog_reboot");
 			break;
 		}
 		case AMLOGIC_RPMBP_REBOOT:
 		{
-			env_set(reboot_mode,"rpmbp");
+			env_set("reboot_mode","rpmbp");
 			break;
 		}
-		case AMLOGIC_DELAYED_REBOOT:
+		case AMLOGIC_QUIESCENT_REBOOT:
 		{
-			env_set(reboot_mode,"delayed_reboot");
+			env_set("reboot_mode","quiescent");
+			break;
+		}
+		case AMLOGIC_RECOVERY_QUIESCENT_REBOOT:
+		{
+			env_set("reboot_mode","recovery_quiescent");
 			break;
 		}
 		default:
 		{
-			env_set(reboot_mode,"charging");
+			env_set("reboot_mode","charging");
 			break;
 		}
 	}
@@ -166,10 +130,11 @@ int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 int do_reboot (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	uint32_t reboot_mode_val = AMLOGIC_NORMAL_BOOT;
-	if (argc <= 1)
-		pr_info("reboot use default mode: normal\n");
+	if (argc <= 1) {
+		printf("reboot use default mode: normal\n");
+	}
 	else {
-		pr_info("reboot mode: %s\n", argv[1]);
+		printf("reboot mode: %s\n", argv[1]);
 		char * mode = argv[1];
 
 		if (strcmp(mode, "next") == 0) {
@@ -181,8 +146,6 @@ int do_reboot (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			reboot_mode_val = AMLOGIC_NORMAL_BOOT;
 		else if (strcmp(mode, "recovery") == 0 || strcmp(mode, "factory_reset") == 0)
 			reboot_mode_val = AMLOGIC_FACTORY_RESET_REBOOT;
-		else if (strcmp(mode, "factory_boot") == 0)
-			reboot_mode_val = AMLOGIC_QUIESCENT_REBOOT;
 		else if (strcmp(mode, "update") == 0)
 			reboot_mode_val = AMLOGIC_UPDATE_REBOOT;
 		else if (strcmp(mode, "fastboot") == 0) {
@@ -198,14 +161,14 @@ int do_reboot (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			reboot_mode_val = AMLOGIC_SUSPEND_REBOOT;
 		else if (strcmp(mode, "hibernate") == 0)
 			reboot_mode_val = AMLOGIC_HIBERNATE_REBOOT;
-		else if (strcmp(mode, "crash_dump") == 0)
-			reboot_mode_val = AMLOGIC_CRASH_REBOOT;
+		else if (strcmp(mode, "rescueparty") == 0)
+			reboot_mode_val = AMLOGIC_RESCUEPARTY_REBOOT;
 		else if (strcmp(mode, "kernel_panic") == 0)
 			reboot_mode_val = AMLOGIC_KERNEL_PANIC;
 		else if (strcmp(mode, "rpmbp") == 0)
 			reboot_mode_val = AMLOGIC_RPMBP_REBOOT;
 		else {
-			pr_info("Can not find match reboot mode, use normal by default\n");
+			printf("Can not find match reboot mode, use normal by default\n");
 			reboot_mode_val = AMLOGIC_NORMAL_BOOT;
 		}
 	}
@@ -231,12 +194,12 @@ int do_set_usb_boot(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	unsigned int usb_mode = 0;
 	if (argc <= 1) {
-		pr_info("usb flag default 0\n");
+		printf("usb flag default 0\n");
 	}
 	else {
 		usb_mode = simple_strtoul(argv[1], NULL, 16);
 	}
-	pr_info("usb flag: %d\n", usb_mode);
+	printf("usb flag: %d\n", usb_mode);
 	set_usb_boot_function(usb_mode);
 
 	return 0;
@@ -260,7 +223,6 @@ U_BOOT_CMD(
 	"    cold_boot\n"
 	"    normal[default]\n"
 	"    factory_reset/recovery\n"
-	"    factory_boot\n"
 	"    update\n"
 	"    fastboot\n"
 	"    bootloader\n"
@@ -287,28 +249,9 @@ int do_systemoff(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return 0;
 }
 
+
 U_BOOT_CMD(
 	systemoff,	2,	1,	do_systemoff,
 	"system off ",
 	"systemoff "
-);
-
-int do_delayed_reboot(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-	uint32_t delay_time;
-
-	delay_time = readl(SYSCTRL_STICKY_REG5);
-	if (delay_time == 0)
-		delay_time = 30;
-
-	pr_info("delay %ds before booting...\n", delay_time);
-	sys_led_init(YELLOW);
-	udelay(delay_time * 1000 * 1000);
-	return 0;
-}
-
-U_BOOT_CMD(
-	delayed_reboot,	1,	1,	do_delayed_reboot,
-	"delayed_reboot ",
-	"delayed_reboot "
 );

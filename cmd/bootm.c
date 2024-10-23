@@ -20,15 +20,11 @@
 #include <linux/err.h>
 #include <u-boot/zlib.h>
 #include <asm/arch/bl31_apis.h>
-#include <libavb.h>
+#include <amlogic/avb.h>
 #ifdef CONFIG_AML_ANTIROLLBACK
 #include <anti-rollback.h>
 #endif
 #include <asm/arch/secure_apb.h>
-#if defined(CONFIG_MESON_C1) || defined(CONFIG_MESON_C2)
-#include <asm/arch/register.h>
-#endif
-#include <time_logging.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -94,16 +90,23 @@ static int do_bootm_subcommand(cmd_tbl_t *cmdtp, int flag, int argc,
 	return ret;
 }
 
-static int is_secure_boot_enabled(void)
+static void recovery_mode_process(void)
 {
-#if defined(CONFIG_MESON_C1) || defined(CONFIG_MESON_C2)
-	const unsigned long cfg10 = readl(SYSCTRL_SEC_STATUS_REG1);
-	return ( cfg10 & (0x1 << 0) );
-#else
-	const unsigned long cfg10 = readl(AO_SEC_SD_CFG10);
-	return ( cfg10 & (0x1 << 4) );
-#endif
+	char *reboot_mode_s = NULL;
+	char *upgrade_step_s = NULL;
+
+	reboot_mode_s = env_get("reboot_mode");
+	upgrade_step_s = env_get("upgrade_step");
+	if ((!reboot_mode_s) || (!upgrade_step_s))
+		return;
+
+	if ((!strcmp(reboot_mode_s, "recovery")) || (!strcmp(reboot_mode_s, "update"))
+		|| (!strcmp(reboot_mode_s, "factory_reset")) || (!strcmp(upgrade_step_s, "3")))
+	{
+		run_command("amlbootsta -p -s",0);
+	}
 }
+
 
 /*******************************************************************/
 /* bootm - boot application image from image in memory */
@@ -114,7 +117,6 @@ static int is_secure_boot_enabled(void)
 //end
 int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	ulong img_addr;
 	int nRet = 0;
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
 	static int relocated = 0;
@@ -157,105 +159,21 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		//printf("aml log : addr = 0x%x\n",nLoadAddr);
 	}
 
-	const char *is_boot_external_image = env_get("boot_external_image");
-	if (is_boot_external_image && !strcmp(is_boot_external_image, "1")) {
-		pr_info("aml log : boot from usb\n");
-		nRet = aml_sec_boot_check(AML_D_P_EXT_IMG_DECRYPT_V3, nLoadAddr, GXB_IMG_SIZE, GXB_IMG_DEC_ALL);
-	} else {
-		pr_info("aml log : boot from nand\n");
-		/*
-		 * log boot time, format: go/freertos-gnq
-		 * Byte offset (starting from 0xfff62800): Data description
-		 * 0x0 Number of TE entries for bl2
-		 * 0x4 Up to 15 TE timestamp entries, 4B each
-		 * ...
-		 * 0x40 Number of TE entries for uboot
-		 * 0x44 Up to 15 TE timestamp entries, 4B each
-		 */
-		logging_set_entry(LOG_BEFORE_SEC);
-		nRet = aml_sec_boot_check(AML_D_P_IMG_DECRYPT_V3, nLoadAddr, GXB_IMG_SIZE, GXB_IMG_DEC_ALL);
-		logging_set_entry(LOG_AFTER_SEC);
-		pr_info("AML_D_P_IMG_DECRYPT_V3: 0x%x\n", AML_D_P_IMG_DECRYPT_V3);
-		pr_info("nLoadAddr: 0x%x\n", nLoadAddr);
-		pr_info("GXB_IMG_SIZE: 0x%x\n", GXB_IMG_SIZE);
-		pr_info("GXB_IMG_DEC_ALL: 0x%x\n", GXB_IMG_DEC_ALL);
-	}
-
-#ifdef CONFIG_G_AB_SYSTEM
-	/* for unsigned boot.img, the aml_sec_boot_check don't verify it's integrity and reliability,
-	 * check the loading status, which we stored to stick register on the loading stage(imgread.c).
-	 * */
-	if (!nRet) {
-		unsigned int load_fail;
-		load_fail = (readl(P_AO_RTI_STICKY_REG0) >> 26) & 0x1;
-		if (load_fail) {
-			writel(readl(P_AO_RTI_STICKY_REG0) & ~(1 << 26), P_AO_RTI_STICKY_REG0);
-			nRet = -1;
-		}
-	}
-#endif
+	nRet = aml_sec_boot_check(AML_D_P_IMG_DECRYPT,nLoadAddr,GXB_IMG_SIZE,GXB_IMG_DEC_ALL);
 
 	if (nRet)
 	{
-		pr_info("\naml log : Sig Check %d\n",nRet);
-#ifdef CONFIG_G_AB_SYSTEM
-		if (is_boot_external_image && !strcmp(is_boot_external_image, "1")) {
-			/* hang when booting from external usb disk */
-			while (1);
-		} else {
-			unsigned int sticky_reg0_val;
-			unsigned int sticky_reg1_val;
-			char *cur_slot;
-			pr_info("\nVerify boot.img failure, watchdog reset and try again\n");
-			/* clear successful_boot flag of the current slot when verifying boot.img failure,
-			 * make sure bl2 check the tries_remaining flag of the current slot after reset
-			 */
-			cur_slot = env_get("active_slot");
-			pr_info("cur_slot: %s\n", cur_slot);
-			if (strcmp(cur_slot, "_a") == 0) {
-				sticky_reg0_val = readl(P_AO_RTI_STICKY_REG0);
-				sticky_reg0_val &= ~(0xff << 16);
-				writel(sticky_reg0_val, P_AO_RTI_STICKY_REG0);
-			}
-			else if (strcmp(cur_slot, "_b") == 0) {
-				sticky_reg1_val = readl(P_AO_RTI_STICKY_REG1);
-				sticky_reg1_val &= ~(0xff << 16);
-				writel(sticky_reg1_val, P_AO_RTI_STICKY_REG1);
-			}
-		}
-#else
-		//don`t return but just deadlock here
-		while (1);
-#endif
-	}
-#ifdef CONFIG_G_AB_SYSTEM
-	/* save ab data to misc */
-	run_command("sync_ab_data", 0);
-	/* verify image fail, reset and try again */
-	if (nRet)
-		run_command("reset", 0);
-#endif
-	if (is_secure_boot_enabled()) {
-		/* Override load address argument to skip secure boot header (512).
-		 * Only skip if secure boot so normal boot can use plain boot.img
-		 */
-		img_addr = genimg_get_kernel_addr(argc < 1 ? NULL : argv[0]);
-		img_addr += 512;
-		char argv0_new[12] = {0};
-		char *argv_new = (char*)&argv0_new;
-		snprintf(argv0_new, sizeof(argv0_new), "%lx", img_addr);
-		argc = 1;
-		argv = (char**)&argv_new;
+		printf("\naml log : Sig Check %d\n",nRet);
+		return nRet;
 	}
 
-#ifndef CONFIG_G_AB_SYSTEM
 #ifdef CONFIG_CMD_BOOTCTOL_AVB
 	char *avb_s = env_get("avb2");
 	if (avb_s == NULL) {
 		run_command("get_avb_mode;", 0);
 		avb_s = env_get("avb2");
 	}
-	pr_info("avb2: %s\n", avb_s);
+	printf("avb2: %s\n", avb_s);
 	if (strcmp(avb_s, "1") == 0) {
 		AvbSlotVerifyData* out_data;
 		char *bootargs = NULL;
@@ -263,6 +181,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		const char *bootstate_o = "androidboot.verifiedbootstate=orange";
 		const char *bootstate_g = "androidboot.verifiedbootstate=green";
 		const char *bootstate = NULL;
+		uint8_t vbmeta_digest[AVB_SHA256_DIGEST_SIZE];
 		nRet = avb_verify(&out_data);
 		printf("avb verification: locked = %d, result = %d\n", !is_device_unlocked(), nRet);
 		if (is_device_unlocked()) {
@@ -301,6 +220,9 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			keymaster_boot_params boot_params;
 			const int is_dev_unlocked = is_device_unlocked();
 
+			boot_params.boot_patchlevel =
+				avb_get_boot_patchlevel_from_vbmeta(out_data);
+
 			boot_params.device_locked = is_dev_unlocked? 0: 1;
 			if (is_dev_unlocked) {
 				bootstate = bootstate_o;
@@ -310,9 +232,12 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				bootstate = bootstate_g;
 				boot_params.verified_boot_state = 0;
 			}
-			memcpy(boot_params.verified_boot_key, out_data->boot_key_hash,
+			memcpy(boot_params.verified_boot_key, boot_key_hash,
 					sizeof(boot_params.verified_boot_key));
-			memcpy(boot_params.verified_boot_hash, out_data->vbmeta_digest,
+
+			avb_slot_verify_data_calculate_vbmeta_digest(
+				out_data, AVB_DIGEST_TYPE_SHA256, vbmeta_digest);
+			memcpy(boot_params.verified_boot_hash, vbmeta_digest,
 					sizeof(boot_params.verified_boot_hash));
 
 			if (set_boot_params(&boot_params) < 0) {
@@ -332,7 +257,8 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		}
 	}
 #endif//CONFIG_CMD_BOOTCTOL_AVB
-#endif
+
+	recovery_mode_process();
 	return do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START |
 		BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER |
 		BOOTM_STATE_LOADOS |

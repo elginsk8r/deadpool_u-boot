@@ -10,7 +10,6 @@
 #include <version.h>
 #include <linux/ctype.h>
 #include <asm/io.h>
-#include <time_logging.h>
 
 char *display_options_get_banner_priv(bool newlines, const char *build_tag,
 				      char *buf, int size)
@@ -42,32 +41,8 @@ int display_options(void)
 {
 	char buf[DISPLAY_OPTIONS_BANNER_LENGTH];
 
-	/*
-	 * log boot time, format: go/freertos-gnq
-	 * Byte offset (starting from 0xfff62800): Data description
-	 * 0x0 Number of TE entries for bl2
-	 * 0x4 Up to 15 TE timestamp entries, 4B each
-	 * ...
-	 * 0x40 Number of TE entries for uboot
-	 * 0x44 Up to 15 TE timestamp entries, 4B each
-	 */
-	/*
-	 * hardcoded 8 entries (time ordered):
-	 * 1 here: uboot entry point
-	 * 2 in cmd/amlogic/imgread.c do_image_read_kernel():
-	 * before/after kernel loading
-	 * 2 in cmd/bootm.c do_bootm():
-	 * before/after kernel decryption/verification
-	 * 2 in common/bootm.c bootm_load_os():
-	 * before/after kernel decompression
-	 * 1 in arch/arm/lib/bootm.c do_bootm_linux():
-	 * before jumping to kernel
-	 */
-	logging_set_num(8);
-	logging_set_entry(LOG_UBOOT_ENTRY);
-
 	display_options_get_banner(true, buf, sizeof(buf));
-	pr_notice("%s", buf);
+	printf("%s", buf);
 
 	return 0;
 }
@@ -146,11 +121,11 @@ void print_size(uint64_t size, const char *s)
 		}
 	}
 
-	pr_notice ("%lu", n);
+	printf ("%lu", n);
 	if (m) {
-		pr_notice (".%ld", m);
+		printf (".%ld", m);
 	}
-	pr_notice (" %ciB%s", c, s);
+	printf (" %ciB%s", c, s);
 }
 
 #define MAX_LINE_LENGTH_BYTES (64)

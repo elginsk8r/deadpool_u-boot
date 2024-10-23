@@ -9,7 +9,7 @@
 #include <asm/arch/pwr_ctrl.h>
 #endif
 
-/* #define VPU_DEBUG_PRINT */
+//#define VPU_DEBUG_PRINT
 #define VPUPR(fmt, args...)     printf("vpu: "fmt"", ## args)
 #define VPUERR(fmt, args...)    printf("vpu: error: "fmt"", ## args)
 
@@ -20,15 +20,26 @@ enum vpu_chip_e {
 	VPU_CHIP_SM1, /* 3 */
 	VPU_CHIP_TM2, /* 4 */
 	VPU_CHIP_SC2, /* 5 */
+	VPU_CHIP_T5, /* 6 */
+	VPU_CHIP_T5D, /* 7 */
+	VPU_CHIP_T7, /* 8 */
+	VPU_CHIP_S4,  /* 9 */
 	VPU_CHIP_MAX,
 };
 
 #define VPU_PWR_ON             1
 #define VPU_PWR_OFF            0
-#define VPU_PWR_ID_INVALID     0xffff
+#define VPU_PWR_ID_END         0xffff
 #ifndef PM_VPU_HDMI
-#define PM_VPU_HDMI            5
+#define PM_VPU_HDMI            0xffff
 #endif
+#ifndef PM_VI_CLK1
+#define PM_VI_CLK1             0xffff
+#endif
+#ifndef PM_VI_CLK2
+#define PM_VI_CLK2             0xffff
+#endif
+#define VPU_PWR_ID_MAX         10
 
 #define VPU_REG_END            0xffff
 #define VPU_MEM_PD_CNT_MAX     10
@@ -71,7 +82,7 @@ struct vpu_data_s {
 	unsigned int vapb_clk_reg;
 	unsigned int vid_clk_reg;
 
-	unsigned int pwrctrl_id;
+	unsigned int *pwrctrl_id_table;
 
 	struct fclk_div_s *fclk_div_table;
 	struct vpu_clk_s  *vpu_clk_table;

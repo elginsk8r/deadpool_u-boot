@@ -86,6 +86,9 @@ enum {
 #define _RAW_IMG_TRANSFER_LEN (128<<10)	//each mwrite size for raw image
 #define _UNIFYKEY_MAX_SZ       (256<<10)
 
+#define V3_GPT_LOAD_ADDR        (CONFIG_DTB_MEM_ADDR + 0x100000) //payload sz not fixed and > 1M, so payload be after
+#define V3_PAYLOAD_LOAD_ADDR    (V3_GPT_LOAD_ADDR + 0x100000) //sheader for sc2 nand
+
 enum {
     V3TOOL_PART_IMG_FMT_RAW     = 0xabcd,
     V3TOOL_PART_IMG_FMT_SPARSE          ,
@@ -155,8 +158,12 @@ int v3tool_buffman_data_complete_upload(const UsbUpInf* uploadInf);
 
 //for usb
 #ifndef USE_FULL_SPEED
-#define BULK_EP_MPS	(512)		//full speed
+#define BULK_EP_MPS	(512)
+#ifndef  CONFIG_USB_GADGET_CRG
 #define DWC_BLK_MAX_LEN         (8*BULK_EP_MPS)
+#else
+#define DWC_BLK_MAX_LEN         (2*64*BULK_EP_MPS)//one DMA block is 16K, one burst <=64k
+#endif//#ifndef  CONFIG_USB_GADGET_CRG
 #else
 #define BULK_EP_MPS	(64)		//full speed
 #define DWC_BLK_MAX_LEN         (6*BULK_EP_MPS)
@@ -167,7 +174,7 @@ int v3tool_buffman_data_complete_upload(const UsbUpInf* uploadInf);
                                     ( (totalTransLen & (DWC_BLK_MAX_LEN-1)) >= BULK_EP_MPS ? 1 : 0 ) +\
                                     ( (totalTransLen & (BULK_EP_MPS-1)) ? 1 : 0 ) )
 
-int v3tool_storage_init(int toErase, unsigned dtbImgSz);
+int v3tool_storage_init(int toErase, unsigned dtbImgSz, unsigned gptImgSz);
 int v3tool_storage_exit(void);
 int is_v3tool_storage_inited(void);
 int v3tool_is_flash_erased(void);

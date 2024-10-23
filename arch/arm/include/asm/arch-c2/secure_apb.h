@@ -36,7 +36,3 @@
 #define P_DMA_STS5 (volatile uint32_t *)(0xfe006000 + 0x34)
 #define P_DMA_CFG  (volatile uint32_t *)(0xfe006000 + 0x40)
 #define P_DMA_SEC  (volatile uint32_t *)(0xfe006000 + 0x44)
-
-/* for A/B system */
-#define P_AO_RTI_STICKY_REG0 SYSCTRL_STICKY_REG6
-#define P_AO_RTI_STICKY_REG1 SYSCTRL_STICKY_REG7

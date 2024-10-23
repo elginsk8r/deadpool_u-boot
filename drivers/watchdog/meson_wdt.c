@@ -13,6 +13,7 @@
 #include <asm/arch/bl31_apis.h>
 
 #define MESON_WDT_CTRL_REG			0x0
+#define MESON_WDT_CTRL1_REG			0x4
 #define MESON_WDT_TCNT_REG			0x8
 #define MESON_WDT_RSET_REG			0xc
 
@@ -22,6 +23,7 @@
 #define MESON_WDT_CTRL_DIV_MASK			(BIT(18) - 1)
 #define MESON_WDT_TCNT_SETUP_MASK		(BIT(16) - 1)
 #define MESON_WDT_TCNT_CNT_SHIFT		(16)
+#define MESON_WDT_RST_SIG_EN			BIT(17)
 
 #define WDT_DISABLE	1
 #define WDT_ENABLE	2
@@ -109,7 +111,8 @@ static int meson_gxbb_wdt_probe(struct udevice *dev)
 	fdt_addr_t addr;
 	fdt_size_t size;
 	struct clk w_clk;
-	unsigned int rate = 0;
+	ulong rate = 0;
+	unsigned int reset_by_soc = 0;
 	int ret;
 
 	assert(dev);
@@ -125,12 +128,16 @@ static int meson_gxbb_wdt_probe(struct udevice *dev)
 		return ret;
 	}
 	rate = clk_get_rate(&w_clk);
-	if (rate < 0) {
+	if (IS_ERR_VALUE(rate)) {
 		printf("Failed to get wdt-clk rate.\n");
 		return ret;
 	}
+
+	reset_by_soc  = !(readl(priv->regs + MESON_WDT_CTRL1_REG) &
+			  MESON_WDT_RST_SIG_EN);
+
 	writel(((rate / 1000) & MESON_WDT_CTRL_DIV_MASK) |
-		BIT(data->rst_shift) |
+		(reset_by_soc << data->rst_shift) |
 		MESON_WDT_CTRL_CLK_EN |
 		MESON_WDT_CTRL_CLKDIV_EN, priv->regs + MESON_WDT_CTRL_REG);
 	meson_gxbb_wdt_set_timeout(dev, DEFAULT_TIMEOUT * 1000);

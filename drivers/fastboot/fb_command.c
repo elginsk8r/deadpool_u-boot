@@ -11,6 +11,7 @@
 #include <part.h>
 #include <stdlib.h>
 #include <emmc_partitions.h>
+#include <amlogic/storage.h>
 
 /**
  * image_size - final fastboot image size
@@ -36,9 +37,7 @@ static void download(char *, char *);
 static void flash(char *, char *);
 static void erase(char *, char *);
 #endif
-#ifndef CONFIG_NO_FASTBOOT_FLASHING
 static void flashing(char *, char *);
-#endif //CONFIG_NO_FASTBOOT_FLASHING
 static void reboot_bootloader(char *, char *);
 static void reboot_fastboot(char *, char *);
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_FORMAT)
@@ -50,10 +49,6 @@ static void snapshot_update_cmd(char *, char *);
 
 #ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
 extern int is_partition_logical(char* parition_name);
-#endif
-
-#ifdef CONFIG_G_AB_SYSTEM
-static void set_active(char *, char *);
 #endif
 
 static const struct {
@@ -68,12 +63,12 @@ static const struct {
 		.command = "download",
 		.dispatch = download
 	},
-#ifndef CONFIG_NO_FASTBOOT_FLASHING
+#if !CONFIG_IS_ENABLED(NO_FASTBOOT_FLASHING)
 	[FASTBOOT_COMMAND_FLASHING] =  {
 		.command = "flashing",
 		.dispatch = flashing
 	},
-#endif //CONFIG_NO_FASTBOOT_FLASHING
+#endif// #if !CONFIG_IS_ENABLED(NO_FASTBOOT_FLASHING)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	[FASTBOOT_COMMAND_FLASH] =  {
 		.command = "flash",
@@ -106,11 +101,7 @@ static const struct {
 	},
 	[FASTBOOT_COMMAND_SET_ACTIVE] =  {
 		.command = "set_active",
-#ifdef CONFIG_G_AB_SYSTEM
-		.dispatch = set_active,
-#else
-		.dispatch = okay
-#endif
+		.dispatch = set_active_cmd
 	},
 	[FASTBOOT_COMMAND_SNAOSHOT_UPDATE] =  {
 		.command = "snapshot-update",
@@ -190,12 +181,14 @@ static void okay(char *cmd_parameter, char *response)
 
 void dump_lock_info(LockData_t* info)
 {
+#if 0
 	printf("info->version_major = %d\n", info->version_major);
 	printf("info->version_minor = %d\n", info->version_minor);
 	printf("info->unlock_ability = %d\n", info->unlock_ability);
 	printf("info->lock_state = %d\n", info->lock_state);
 	printf("info->lock_critical_state = %d\n", info->lock_critical_state);
 	printf("info->lock_bootloader = %d\n", info->lock_bootloader);
+#endif
 }
 
 static const char* getvar_list[] = {
@@ -411,19 +404,98 @@ void fastboot_data_complete(char *response)
  */
 static void flash(char *cmd_parameter, char *response)
 {
-	char name[32];
+	char name[32] = {0};
+	u64 rc = 0;
 
-	if (strcmp(cmd_parameter, "userdata") == 0 && !vendor_boot_partition)
-		strncpy(name, "data", 4);
-	else if (strcmp(cmd_parameter, "dts") == 0)
-		strncpy(name, "dtb", 3);
-	else
-		strncpy(name, cmd_parameter, 32);
-
-	if (check_lock()) {
+	if (check_lock() == 1) {
 		printf("device is locked, can not run this cmd.Please flashing unlock & flashing unlock_critical\n");
 		fastboot_fail("locked device", response);
 		return;
+	}
+
+	printf("cmd_parameter: %s\n", cmd_parameter);
+
+#ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV
+#ifdef CONFIG_AML_GPT
+	struct mmc *mmc = find_mmc_device(CONFIG_FASTBOOT_FLASH_MMC_DEV);
+	if (mmc && strcmp(cmd_parameter, "bootloader") == 0) {
+		printf("try to read gpt data from bootloader.img\n");
+		struct blk_desc *dev_desc;
+		/* the max size of bootloader.img is 4M, we reserve 128k for gpt.bin
+		 * so we put gpt.bin at offset 0x3DFE00
+		 * 0 ~ 512 bootloader secure boot, we don't care it here.
+		 * 512 ~ 0x3DFDFF  original bootloader.img and 0
+		 * 0x3DFE00 ~ end  gpt.bin
+		 */
+
+		dev_desc = blk_get_dev("mmc", CONFIG_FASTBOOT_FLASH_MMC_DEV);
+		if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+			printf("invalid mmc device\n");
+			fastboot_fail("invalid mmc device", response);
+			return;
+		}
+
+		if (is_valid_gpt_buf(dev_desc, fastboot_buf_addr + 0x3DFE00)) {
+			printf("printf normal bootloader.img, no gpt partition table\n");
+		} else {
+			printf("find gpt parition table, update it\n"
+				"and write bootloader to boot0/boot1\n");
+
+			if (write_mbr_and_gpt_partitions(dev_desc, fastboot_buf_addr + 0x3DFE00)) {
+				printf("%s: writing GPT partitions failed\n", __func__);
+				fastboot_fail("writing GPT partitions failed", response);
+				return;
+			}
+			if (mmc_device_init(mmc) != 0) {
+				printf(" update gpt partition table fail\n");
+				fastboot_fail("fastboot update gpt partition fail", response);
+				return;
+			}
+			printf("%s: writing GPT partitions ok\n", __func__);
+		}
+
+		if (aml_gpt_valid(mmc) == 0) {
+			printf("gpt mode\n");
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
+			fastboot_mmc_flash_write("bootloader-boot0", fastboot_buf_addr, image_size,
+				 response);
+			fastboot_mmc_flash_write("bootloader-boot1", fastboot_buf_addr, image_size,
+				 response);
+			run_command("mmc dev 1 0;", 0);
+#endif
+			env_set("default_env", "1");
+			run_command("saveenv;", 0);
+			return;
+		}
+	}
+#endif  // CONFIG_AML_GPT
+
+#if CONFIG_IS_ENABLED(CHROMECAST_AB)
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
+	char *slot = env_get("slot-suffixes");
+	if ((!strcmp(slot, "0") && !strcmp(cmd_parameter, "bootloader_a")) ||
+	    (!strcmp(slot, "1") && !strcmp(cmd_parameter, "bootloader_b"))) {
+		fastboot_mmc_flash_write("bootloader-boot0", fastboot_buf_addr,
+					 image_size, response);
+		fastboot_mmc_flash_write("bootloader-boot1", fastboot_buf_addr,
+					 image_size, response);
+		run_command("mmc dev 1 0;", 0);
+	}
+#endif
+#endif
+
+#endif  // CONFIG_FASTBOOT_FLASH_MMC_DEV
+
+	if (strcmp(cmd_parameter, "userdata") == 0 || strcmp(cmd_parameter, "data") == 0) {
+		rc = store_part_size("userdata");
+		if (-1 == rc)
+			strncpy(name, "data", 4);
+		else
+			strncpy(name, "userdata", 8);
+	} else if (strcmp(cmd_parameter, "dts") == 0) {
+		strncpy(name, "dtb", 3);
+	} else {
+		strncpy(name, cmd_parameter, 32);
 	}
 
 #ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
@@ -444,6 +516,11 @@ static void flash(char *cmd_parameter, char *response)
 	fastboot_nand_flash_write(name, fastboot_buf_addr, image_size,
 				  response);
 #endif
+
+	if (strcmp(name, "bootloader") == 0) {
+		env_set("default_env", "1");
+		run_command("saveenv;", 0);
+	}
 }
 
 /**
@@ -457,27 +534,47 @@ static void flash(char *cmd_parameter, char *response)
  */
 static void erase(char *cmd_parameter, char *response)
 {
-	char name[32];
+	char name[32] = {0};
+	u64 rc = 0;
 
-	if (check_lock()) {
+	if (check_lock() == 1) {
 		printf("device is locked, can not run this cmd.Please flashing unlock & flashing unlock_critical\n");
 		fastboot_fail("locked device", response);
 		return;
 	}
 
+	printf("cmd_parameter: %s\n", cmd_parameter);
+
+#ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV
+#ifdef CONFIG_AML_GPT
+	struct mmc *mmc = find_mmc_device(CONFIG_FASTBOOT_FLASH_MMC_DEV);
+	if ((mmc != NULL) && strcmp(cmd_parameter, "bootloader") == 0 && (aml_gpt_valid(mmc) == 0)) {
+		printf("we write gpt partition table to bootloader now\n");
+		printf("plese write bootloader to bootloader-boot0/bootloader-boot1\n");
+		fastboot_okay("gpt mode, skip", response);
+		return;
+	}
+#endif
+#endif
+
 	struct misc_virtual_ab_message message;
 	get_mergestatus(&message);
 
-	if (strcmp(cmd_parameter, "userdata") == 0 && !vendor_boot_partition) {
-		strncpy(name, "data", 4);
+	if (strcmp(cmd_parameter, "userdata") == 0 || strcmp(cmd_parameter, "data") == 0) {
+		rc = store_part_size("userdata");
+		if (-1 == rc)
+			strncpy(name, "data", 4);
+		else
+			strncpy(name, "userdata", 8);
 		if (message.merge_status == SNAPSHOTTED || message.merge_status == MERGING) {
 			fastboot_fail("in merge state, cannot erase data", response);
 			return;
 		}
-	} else if (strcmp(cmd_parameter, "dts") == 0)
+	} else if (strcmp(cmd_parameter, "dts") == 0) {
 		strncpy(name, "dtb", 3);
-	else
+	} else {
 		strncpy(name, cmd_parameter, 32);
+	}
 
 #ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
 		if (dynamic_partition) {
@@ -507,7 +604,7 @@ static void set_active_cmd(char *cmd_parameter, char *response)
 	printf("cmd cb_set_active is %s\n", cmd_parameter);
 	cmd = cmd_parameter;
 
-	if (check_lock()) {
+	if (check_lock() == 1) {
 		printf("device is locked, can not run this cmd.Please flashing unlock & flashing unlock_critical\n");
 		fastboot_fail("locked device", response);
 		return;
@@ -533,13 +630,11 @@ static void set_active_cmd(char *cmd_parameter, char *response)
 static void snapshot_update_cmd(char *cmd_parameter, char *response)
 {
 	char *cmd;
-	int ret = 0;
-	char str[128];
 
 	printf("cmd snapshot_update_cmd is %s\n", cmd_parameter);
 	cmd = cmd_parameter;
 
-	if (check_lock()) {
+	if (check_lock() == 1) {
 		printf("device is locked, can not run this cmd.Please flashing unlock & flashing unlock_critical\n");
 		fastboot_fail("locked device", response);
 		return;
@@ -552,7 +647,7 @@ static void snapshot_update_cmd(char *cmd_parameter, char *response)
 	fastboot_okay(NULL, response);
 }
 
-#ifndef CONFIG_NO_FASTBOOT_FLASHING
+#if !CONFIG_IS_ENABLED(NO_FASTBOOT_FLASHING)
 /**
  * flashing() - lock/unlock.
  *
@@ -568,6 +663,7 @@ static void flashing(char *cmd_parameter, char *response)
 	char* lock_s;
 	LockData_t* info;
 	char lock_d[LOCK_DATA_SIZE];
+	u64 rc;
 
 	lock_s = env_get("lock");
 	if (!lock_s) {
@@ -608,6 +704,8 @@ static void flashing(char *cmd_parameter, char *response)
 		free(info);
 		return;
 	}
+
+	rc = store_part_size("userdata");
 
 	if (!strcmp_l1("unlock_critical", cmd)) {
 		info->lock_critical_state = 0;
@@ -650,22 +748,26 @@ static void flashing(char *cmd_parameter, char *response)
 				if (strcmp(avb_s, "1") == 0) {
 #ifdef CONFIG_AML_ANTIROLLBACK
 					if (avb_unlock()) {
-						printf("unlocking device.  Erasing userdata partition!\n");
-						if (vendor_boot_partition)
-							run_command("store erase userdata 0 0", 0);
-						else
+						if (-1 == rc) {
+							printf("unlocking device.  Erasing data partition!\n");
 							run_command("store erase data 0 0", 0);
+						} else {
+							printf("unlocking device.  Erasing userdata partition!\n");
+							run_command("store erase userdata 0 0", 0);
+						}
 						printf("unlocking device.  Erasing metadata partition!\n");
 						run_command("store erase metadata 0 0", 0);
 					} else {
 						printf("unlock failed!\n");
 					}
 #else
-					printf("unlocking device.  Erasing userdata partition!\n");
-					if (vendor_boot_partition)
-						run_command("store erase userdata 0 0", 0);
-					else
+					if (-1 == rc) {
+						printf("unlocking device.  Erasing data partition!\n");
 						run_command("store erase data 0 0", 0);
+					} else {
+						printf("unlocking device.  Erasing userdata partition!\n");
+						run_command("store erase userdata 0 0", 0);
+					}
 					printf("unlocking device.  Erasing metadata partition!\n");
 					run_command("store erase metadata 0 0", 0);
 #endif
@@ -693,20 +795,24 @@ static void flashing(char *cmd_parameter, char *response)
 				if (avb_lock()) {
 					printf("lock failed!\n");
 				} else {
-					printf("locking device.  Erasing userdata partition!\n");
-					if (vendor_boot_partition)
-						run_command("store erase userdata 0 0", 0);
-					else
+					if (-1 == rc) {
+						printf("locking device.  Erasing data partition!\n");
 						run_command("store erase data 0 0", 0);
+					} else {
+						printf("locking device.  Erasing userdata partition!\n");
+						run_command("store erase userdata 0 0", 0);
+					}
 					printf("unlocking device.  Erasing metadata partition!\n");
 					run_command("store erase metadata 0 0", 0);
 				}
 #else
-				printf("locking device.  Erasing userdata partition!\n");
-				if (vendor_boot_partition)
-					run_command("store erase userdata 0 0", 0);
-				else
+				if (-1 == rc) {
+					printf("locking device.  Erasing data partition!\n");
 					run_command("store erase data 0 0", 0);
+				} else {
+					printf("locking device.  Erasing userdata partition!\n");
+					run_command("store erase userdata 0 0", 0);
+				}
 				printf("unlocking device.  Erasing metadata partition!\n");
 				run_command("store erase metadata 0 0", 0);
 
@@ -728,7 +834,8 @@ static void flashing(char *cmd_parameter, char *response)
 	free(info);
 	return;
 }
-#endif //CONFIG_NO_FASTBOOT_FLASHING
+#endif// #if !CONFIG_IS_ENABLED(NO_FASTBOOT_FLASHING)
+
 /**
  * reboot_bootloader() - Sets reboot bootloader flag.
  *
@@ -797,30 +904,6 @@ static void oem_format(char *cmd_parameter, char *response)
 			fastboot_fail("", response);
 		else
 			fastboot_okay(NULL, response);
-	}
-}
-#endif
-
-#ifdef CONFIG_G_AB_SYSTEM
-static void set_active(char *cmd_parameter, char *response)
-{
-	char str[32];
-	int switch_flag = 0;
-	int ret = 0;
-
-	if (cmd_parameter && (!strcmp(cmd_parameter, "a") ||
-				!strcmp(cmd_parameter, "b"))) {
-		sprintf(str, "set_active_slot %s %d", cmd_parameter,
-				switch_flag);
-		printf("command:    %s\n", str);
-		ret = run_command(str, 0);
-		printf("ret = %d\n", ret);
-		if (ret == 0)
-			fastboot_okay("Done", response);
-		else
-			fastboot_okay("Failed", response);
-	} else {
-		fastboot_okay("unknow slot", response);
 	}
 }
 #endif

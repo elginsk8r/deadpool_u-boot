@@ -9,6 +9,7 @@
 #include <dm.h>
 #include <asm/arch/cpu.h>
 #include <amlogic/cpu_id.h>
+#include <amlogic/media/vout/aml_vout.h>
 #include <amlogic/media/vout/aml_cvbs.h>
 #include "cvbs_reg.h"
 #include "cvbs_config.h"
@@ -50,6 +51,20 @@ static struct cvbs_data_s cvbs_data_g12b = {
 
 static struct cvbs_data_s cvbs_data_sc2 = {
 	.chip_type = CVBS_CHIP_SC2,
+
+	.reg_vid_pll_clk_div = CLKCTRL_VID_PLL_CLK_DIV,
+	.reg_vid_clk_div = CLKCTRL_VID_CLK_DIV,
+	.reg_vid_clk_ctrl = CLKCTRL_VID_CLK_CTRL,
+	.reg_vid2_clk_div = CLKCTRL_VIID_CLK_DIV,
+	.reg_vid2_clk_ctrl = CLKCTRL_VIID_CLK_CTRL,
+	.reg_vid_clk_ctrl2 = CLKCTRL_VID_CLK_CTRL2,
+
+	.vdac_vref_adj = 0x10,
+	.vdac_gsw = 0x0,
+};
+
+static struct cvbs_data_s cvbs_data_s4 = {
+	.chip_type = CVBS_CHIP_S4,
 
 	.reg_vid_pll_clk_div = CLKCTRL_VID_PLL_CLK_DIV,
 	.reg_vid_clk_div = CLKCTRL_VID_CLK_DIV,
@@ -114,7 +129,6 @@ int cvbs_set_vdac(int status)
 		cvbs_set_vcbus_bits(VENC_VDAC_DACSEL0, 0, 5, 1);
 		if (cvbs_drv.data) {
 			vdac_ctrl_vref_adj(cvbs_drv.data->vdac_vref_adj);
-			vdac_ctrl_gsw_adj(cvbs_drv.data->vdac_gsw);
 			vdac_enable(1, VDAC_MODULE_CVBS_OUT);
 		} else {
 			printf("cvbs ERROR:need run cvbs init.\n");
@@ -210,8 +224,8 @@ int cvbs_reg_debug(int argc, char* const argv[])
 		if (argc != 3)
 			goto fail_cmd;
 		value = simple_strtoul(argv[2], NULL, 0);
-		if ((cvbs_drv.data->chip_type = CVBS_CHIP_G12A) ||
-		    (cvbs_drv.data->chip_type = CVBS_CHIP_G12B)) {
+		if ((cvbs_drv.data->chip_type == CVBS_CHIP_G12A) ||
+		    (cvbs_drv.data->chip_type == CVBS_CHIP_G12B)) {
 			if (value == 1 || value == 2 ||
 				value == 3 || value == 0) {
 				s_enci_clk_path = value;
@@ -225,8 +239,9 @@ int cvbs_reg_debug(int argc, char* const argv[])
 				printf("bit[0]: 0=vid_pll, 1=gp0_pll\n");
 				printf("bit[1]: 0=vid2_clk, 1=vid1_clk\n");
 			}
-		} else
-			printf("only support G12A chip");
+		} else {
+			printf("don't support for current chip\n");
+		}
 	}
 
 	return 0;
@@ -417,6 +432,7 @@ static int cvbs_config_clock(void)
 			cvbs_set_vid2_clk(s_enci_clk_path & 0x1);
 		break;
 	case CVBS_CHIP_SC2:
+	case CVBS_CHIP_S4:
 		cvbs_config_hdmipll_sc2();
 		cvbs_set_vid2_clk(0);
 		break;
@@ -575,23 +591,27 @@ static char *cvbs_mode_str[CVBS_MODE_CNT] = {
 	"pal_n",
 };
 
-// check for valid video mode
-int cvbs_outputmode_check(char *vmode_name, unsigned int frac)
+/***********************************************
+ * parameters:  vmode_name, such as 576cvbs, 480cvbs...
+ *              frac, cvbs alway 0. don't support.
+ * return:      viu_mux
+ ************************************************/
+unsigned int cvbs_outputmode_check(char *vmode_name, unsigned int frac)
 {
 	unsigned int i;
 
 	if (frac) {
 		printf("cvbs: don't support frac\n");
-		return -1;
+		return VIU_MUX_MAX;
 	}
 
 	for (i = 0; i < CVBS_MODE_CNT; i++) {
 		if (!strncmp(vmode_name, cvbs_mode_str[i], strlen(cvbs_mode_str[i])))
-			return 0;
+			return VIU_MUX_ENCI;
 	}
 
-	printf("cvbs: outputmode[%s] is invalid\n", vmode_name);
-	return -1;
+	//printf("cvbs: outputmode[%s] is invalid\n", vmode_name);
+	return VIU_MUX_MAX;
 }
 
 // list for valid video mode
@@ -601,43 +621,6 @@ void cvbs_show_valid_vmode(void)
 
 	for (i = 0; i < CVBS_MODE_CNT; i++)
 		printf("%s\n", cvbs_mode_str[i]);
-}
-
-static unsigned char cvbs_get_trimming_version(unsigned int flag)
-{
-	unsigned char version = 0xff;
-
-	if ((flag & 0xf0) == 0xa0)
-		version = 5;
-	else if ((flag & 0xf0) == 0x40)
-		version = 2;
-	else if ((flag & 0xc0) == 0x80)
-		version = 1;
-	else if ((flag & 0xc0) == 0x00)
-		version = 0;
-	return version;
-}
-
-static unsigned int cvbs_config_vdac(unsigned int value)
-{
-	unsigned char version = 0;
-	unsigned int cfg_valid, gsw_cfg;
-
-	version = cvbs_get_trimming_version((value >> 8) & 0xff);
-	/* flag 1/0 for validity of vdac config */
-	if ((version == 1) || (version == 2) || (version == 5)) {
-		cfg_valid = 1;
-		gsw_cfg = value & 0x7;
-	} else {
-		cfg_valid = 0;
-		gsw_cfg = 0xffff;
-	}
-	if (cfg_valid) {
-		printf("cvbs: %s: cvbs trimming 0x%x: %d.v%d, 0x%x\n",
-			__func__, value, cfg_valid, version, gsw_cfg);
-	}
-
-	return gsw_cfg;
 }
 
 static char *cvbsout_performance_str[] = {
@@ -681,14 +664,6 @@ static void cvbs_get_config(void)
 	if (propdata) {
 		s_enci_clk_path = be32_to_cpup((u32*)propdata);
 		printf("cvbs: find clk_path: 0x%x\n", s_enci_clk_path);
-	}
-
-	/* vdac config */
-	propdata = (char *)fdt_getprop(dt_blob, node, "vdac_config", NULL);
-	if (propdata) {
-		temp = cvbs_config_vdac(be32_to_cpup((u32*)propdata));
-		if (temp < 0xff)
-			cvbs_drv.data->vdac_gsw = temp;
 	}
 
 	/* performance */
@@ -785,7 +760,11 @@ void vdac_data_config(void)
 	case MESON_CPU_MAJOR_ID_SC2:
 		cvbs_drv.data = &cvbs_data_sc2;
 		break;
+	case MESON_CPU_MAJOR_ID_S4:
+		cvbs_drv.data = &cvbs_data_s4;
+		break;
 	default:
+		cvbs_drv.data = &cvbs_data_s4;
 		break;
 	}
 }

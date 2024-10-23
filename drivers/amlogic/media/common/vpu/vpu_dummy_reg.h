@@ -76,6 +76,10 @@
 #define AO_RTI_GEN_PWR_ISO0                        (0xff800000 + (0x03b << 2))
 #endif
 
+#ifndef HHI_MEM_PD_REG0
+#define HHI_MEM_PD_REG0                            (0xff63c000 + (0x040 << 2))
+#endif
+
 #ifndef HHI_VPU_MEM_PD_REG0
 #define HHI_VPU_MEM_PD_REG0                        (0xff63c000 + (0x041 << 2))
 #endif
@@ -94,6 +98,10 @@
 
 #ifndef HHI_VPU_MEM_PD_REG4
 #define HHI_VPU_MEM_PD_REG4                        (0xff63c000 + (0x044 << 2))
+#endif
+
+#ifndef HHI_MEM_PD_REG0
+#define HHI_MEM_PD_REG0                            (0xff63c000 + (0x040 << 2))
 #endif
 
 #ifndef RESET0_LEVEL
@@ -123,6 +131,10 @@
 
 #ifndef CLKCTRL_VID_CLK_CTRL2
 #define CLKCTRL_VID_CLK_CTRL2                      ((0x0031  << 2) + 0xfe000000)
+#endif
+
+#ifndef CLKCTRL_VID_CLK0_CTRL2
+#define CLKCTRL_VID_CLK0_CTRL2                     ((0x0031  << 2) + 0xfe000000)
 #endif
 
 #ifndef PWRCTRL_PWR_ACK0

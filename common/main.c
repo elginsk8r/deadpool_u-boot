@@ -45,6 +45,7 @@ void main_loop(void)
 	bootstage_mark_name(BOOTSTAGE_ID_MAIN_LOOP, "main_loop");
 
 #ifdef CONFIG_MDUMP_COMPRESS
+	extern void ramdump_init(void);
 	ramdump_init();
 #endif
 
@@ -64,10 +65,6 @@ void main_loop(void)
 
 	autoboot_command(s);
 
-#if defined(CONFIG_CLI_ENABLED)
 	cli_loop();
-#endif /* CONFIG_CLI_ENABLED */
-	pr_info("U-boot No CLI, to kernel\n");
-	run_command("run storeboot", 1);
 	panic("No CLI available");
 }

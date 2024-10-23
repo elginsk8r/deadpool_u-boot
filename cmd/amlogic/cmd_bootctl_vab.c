@@ -11,9 +11,10 @@
 #include <config.h>
 #include <asm/arch/io.h>
 #include <partition_table.h>
-#include <libavb.h>
+#include <amlogic/avb.h>
 #include <version.h>
 #include <amlogic/storage.h>
+#include <fastboot.h>
 
 #ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
 
@@ -162,16 +163,6 @@ typedef struct bootloader_control {
     uint32_t crc32_le;
 }bootloader_control;
 
-// Holds Virtual A/B merge status information. Current version is 1. New fields
-// must be added to the end.
-struct misc_virtual_ab_message {
-    uint8_t version;
-    uint32_t magic;
-    uint8_t merge_status;  // IBootControl 1.1, MergeStatus enum.
-    uint8_t source_slot;   // Slot number when merge_status was written.
-    uint8_t reserved[57];
-};
-
 #define MISC_VIRTUAL_AB_MESSAGE_VERSION 2
 #define MISC_VIRTUAL_AB_MAGIC_HEADER 0x56740AB0
 
@@ -193,7 +184,7 @@ void boot_info_reset(bootloader_control* boot_ctrl)
     memcpy(boot_ctrl->slot_suffix, "_a", 2);
     boot_ctrl->magic = BOOT_CTRL_MAGIC;
     boot_ctrl->version = BOOT_CTRL_VERSION;
-    boot_ctrl->nb_slot = 1;
+    boot_ctrl->nb_slot = 2;
 
     for (slot = 0; slot < 4; ++slot) {
         slot_metadata entry = {};
@@ -286,7 +277,7 @@ int boot_info_open_partition(char *miscbuf)
 {
     char *partition = "misc";
     printf("Start read %s partition datas!\n", partition);
-    if (store_read((unsigned char *)partition,
+    if (store_read((const char *)partition,
         0, MISCBUF_SIZE, (unsigned char *)miscbuf) < 0) {
         printf("failed to store read %s.\n", partition);
         return -1;
@@ -305,13 +296,48 @@ bool boot_info_save(bootloader_control *info, char *miscbuf)
 {
     char *partition = "misc";
     printf("save boot-info \n");
-    info->crc32_le = avb_htobe32(
+    info->crc32_le = cpu_to_le32(
       avb_crc32((const uint8_t*)info, sizeof(bootloader_control) - sizeof(uint32_t)));
 
     memcpy(miscbuf+AB_METADATA_MISC_PARTITION_OFFSET, info, sizeof(bootloader_control));
     dump_boot_info(info);
-    store_write((unsigned char *)partition, 0, MISCBUF_SIZE, (unsigned char *)miscbuf);
+    store_write((const char *)partition, 0, MISCBUF_SIZE, (unsigned char *)miscbuf);
     return true;
+}
+
+int write_bootloader(int copy, int dstindex) {
+    int iRet = 0;
+    int ret = -1;
+    unsigned char* buffer = NULL;
+
+    buffer = (unsigned char *)malloc(0x2000 * 512);
+    if (!buffer)
+    {
+        printf("ERROR! fail to allocate memory ...\n");
+        goto exit;
+    }
+    memset(buffer, 0, 0x2000 * 512);
+    printf("copy from boot%d to boot%d\n", copy, dstindex);
+    iRet = store_boot_read("bootloader", copy, 0, buffer);
+    if (iRet) {
+        printf("Fail read bootloader from rsv with sz\n");
+        goto exit;
+    }
+    iRet = store_boot_write("bootloader", dstindex, 0, buffer);
+    if (iRet) {
+        printf("Failed to write bootloader\n");
+        goto exit;
+    } else {
+        ret = 0;
+    }
+
+exit:
+    if (buffer)
+    {
+        free(buffer);
+        buffer = NULL;
+    }
+    return ret;
 }
 
 static int do_GetValidSlot(
@@ -349,6 +375,11 @@ static int do_GetValidSlot(
     else
         env_set("partiton_mode","normal");
 
+    if (gpt_partition)
+        env_set("gpt_mode","true");
+    else
+        env_set("gpt_mode","false");
+
     if (vendor_boot_partition) {
         env_set("vendor_boot_mode","true");
         printf("set vendor_boot_mode true\n");
@@ -358,36 +389,68 @@ static int do_GetValidSlot(
         printf("set vendor_boot_mode false\n");
     }
 
-    if ((slot == 0) && (bootable_a)) {
-        if (has_boot_slot == 1) {
-            env_set("active_slot","_a");
-            env_set("boot_part","boot_a");
-            env_set("recovery_part","recovery_a");
-            env_set("slot-suffixes","0");
+    if (slot == 0) {
+        if (bootable_a) {
+            if (has_boot_slot == 1) {
+                env_set("active_slot","_a");
+                env_set("boot_part","boot_a");
+                env_set("recovery_part","recovery_a");
+                env_set("slot-suffixes","0");
+            }
+            else {
+                env_set("active_slot","normal");
+                env_set("boot_part","boot");
+                env_set("recovery_part","recovery");
+                env_set("slot-suffixes","-1");
+            }
+            return 0;
+        } else if (bootable_b) {
+            write_bootloader(2, 0);
+#ifdef CONFIG_FASTBOOT
+            struct misc_virtual_ab_message message;
+            set_mergestatus_cancel(&message);
+#endif
+            run_command("set_active_slot b", 0);
+            env_set("update_env","1");
+            env_set("reboot_status","reboot_next");
+            env_set("expect_index","0");
+            run_command("saveenv", 0);
+            run_command("reset", 0);
+        } else {
+            run_command("run init_display; run storeargs; run update;", 0);
         }
-        else {
-            env_set("active_slot","normal");
-            env_set("boot_part","boot");
-            env_set("recovery_part","recovery");
-            env_set("slot-suffixes","-1");
-        }
-        return 0;
     }
 
-    if ((slot == 1) && (bootable_b)) {
-        if (has_boot_slot == 1) {
-            env_set("active_slot","_b");
-            env_set("boot_part","boot_b");
-            env_set("recovery_part","recovery_b");
-            env_set("slot-suffixes","1");
+    if (slot == 1) {
+        if (bootable_b) {
+            if (has_boot_slot == 1) {
+                env_set("active_slot","_b");
+                env_set("boot_part","boot_b");
+                env_set("recovery_part","recovery_b");
+                env_set("slot-suffixes","1");
+            }
+            else {
+                env_set("active_slot","normal");
+                env_set("boot_part","boot");
+                env_set("recovery_part","recovery");
+                env_set("slot-suffixes","-1");
+            }
+            return 0;
+        } else if (bootable_a) {
+            write_bootloader(1, 0);
+#ifdef CONFIG_FASTBOOT
+            struct misc_virtual_ab_message message;
+            set_mergestatus_cancel(&message);
+#endif
+            run_command("set_active_slot a", 0);
+            env_set("update_env","1");
+            env_set("reboot_status","reboot_next");
+            env_set("expect_index","0");
+            run_command("saveenv", 0);
+            run_command("reset", 0);
+        } else {
+            run_command("run init_display; run storeargs; run update;", 0);
         }
-        else {
-            env_set("active_slot","normal");
-            env_set("boot_part","boot");
-            env_set("recovery_part","recovery");
-            env_set("slot-suffixes","-1");
-        }
-        return 0;
     }
 
     return 0;
@@ -440,6 +503,101 @@ static int do_SetActiveSlot(
     }
 
     boot_info_save(&info, miscbuf);
+
+    return 0;
+}
+
+static int do_SetUpdateTries(
+    cmd_tbl_t * cmdtp,
+    int flag,
+    int argc,
+    char * const argv[])
+{
+    char miscbuf[MISCBUF_SIZE] = {0};
+    bootloader_control boot_ctrl;
+    bool bootable_a, bootable_b;
+    int slot;
+
+    boot_info_open_partition(miscbuf);
+    boot_info_load(&boot_ctrl, miscbuf);
+
+    if (!boot_info_validate(&boot_ctrl)) {
+        printf("boot-info is invalid. Resetting\n");
+        boot_info_reset(&boot_ctrl);
+        boot_info_save(&boot_ctrl, miscbuf);
+    }
+
+    slot = get_active_slot(&boot_ctrl);
+    bootable_a = slot_is_bootable(&(boot_ctrl.slot_info[0]));
+    bootable_b = slot_is_bootable(&(boot_ctrl.slot_info[1]));
+
+    if (slot == 0) {
+        if (bootable_a) {
+            if (boot_ctrl.slot_info[0].successful_boot == 0)
+                boot_ctrl.slot_info[0].tries_remaining -= 1;
+        }
+    }
+
+    if (slot == 1) {
+        if (bootable_b) {
+            if (boot_ctrl.slot_info[1].successful_boot == 0)
+                boot_ctrl.slot_info[1].tries_remaining -= 1;
+        }
+    }
+
+    boot_info_save(&boot_ctrl, miscbuf);
+    return 0;
+}
+
+static int do_CopySlot(
+    cmd_tbl_t * cmdtp,
+    int flag,
+    int argc,
+    char * const argv[])
+{
+    char miscbuf[MISCBUF_SIZE] = {0};
+    bootloader_control boot_ctrl;
+    int copy = -1;
+    int dest = -1;
+
+    boot_info_open_partition(miscbuf);
+    boot_info_load(&boot_ctrl, miscbuf);
+
+    if (!boot_info_validate(&boot_ctrl)) {
+        printf("boot-info is invalid. Resetting\n");
+        boot_info_reset(&boot_ctrl);
+        boot_info_save(&boot_ctrl, miscbuf);
+    }
+
+    if (strcmp(argv[1], "1") == 0) {
+        copy = 1;
+    } else if (strcmp(argv[1], "2") == 0) {
+        copy = 2;
+    } else if (strcmp(argv[1], "0") == 0) {
+        copy = 0;
+    }
+
+    if (strcmp(argv[2], "1") == 0) {
+        dest = 1;
+    } else if (strcmp(argv[2], "2") == 0) {
+        dest = 2;
+    } else if (strcmp(argv[2], "0") == 0) {
+        dest = 0;
+    }
+
+    if (copy == 1) {
+        if (boot_ctrl.slot_info[0].successful_boot == 1)
+            write_bootloader(copy, dest);
+    } else if (copy == 2){
+        if (boot_ctrl.slot_info[1].successful_boot == 1) {
+            write_bootloader(copy, dest);
+        } else {
+            env_set("update_env","1");
+            env_set("reboot_status","reboot_next");
+            env_set("expect_index","2");
+            run_command("saveenv", 0);
+        }
+    }
 
     return 0;
 }
@@ -500,6 +658,20 @@ U_BOOT_CMD(
     "set_active_slot",
     "\nThis command will set active slot\n"
     "So you can execute command: set_active_slot a"
+);
+
+U_BOOT_CMD(
+    copy_slot_bootable, 3, 1, do_CopySlot,
+    "copy_slot_bootable",
+    "\nThis command will set active slot\n"
+    "So you can execute command: copy_slot_bootable 2 1"
+);
+
+U_BOOT_CMD(
+    update_tries, 2, 0, do_SetUpdateTries,
+    "update_tries",
+    "\nThis command will change tries_remaining in misc\n"
+    "So you can execute command: update_tries"
 );
 
 U_BOOT_CMD(

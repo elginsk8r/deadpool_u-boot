@@ -92,7 +92,6 @@ static void print_mmcinfo(struct mmc *mmc)
 		}
 	}
 }
-
 static struct mmc *init_mmc_device(int dev, bool force_init)
 {
 	struct mmc *mmc;
@@ -106,7 +105,6 @@ static struct mmc *init_mmc_device(int dev, bool force_init)
 		mmc->has_init = 0;
 	if (mmc_init(mmc))
 		return NULL;
-
 	return mmc;
 }
 static int do_mmcinfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])

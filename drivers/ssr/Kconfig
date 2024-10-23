@@ -1,9 +1,0 @@
-#
-# Schumacher (Nest PS13216 SSR) device
-#
-
-config SCHUMACHER_SSR
-	tristate "Schumacher SSR"
-	help
-	  Select this to enable PS13216 Solid-State Relay (SSR) support. This driver
-	  controls the SSR via i2c bus.

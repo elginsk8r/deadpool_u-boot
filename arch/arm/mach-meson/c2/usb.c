@@ -47,7 +47,7 @@ int get_usbphy_baseinfo(struct phy *usb_phys)
 	struct udevice *bus;
 	struct uclass *uc;
 	int ret, i;
-	unsigned int count;
+	int count;
 
 	if (usb_phys[0].dev && usb_phys[1].dev)
 		return 0;
@@ -395,184 +395,6 @@ void usb_device_mode_init(void){
 
 }
 
-/**************************************************************/
-/*           BC Detect                                        */
-/**************************************************************/
-#define USB_AML_BC_OFFSET 0xA0
-
-static void usb_bc_set_device(uint32_t phy2_config_base){
-	struct u2p_aml_regs  * u2p_aml_regs = (struct u2p_aml_regs * )((ulong)phy2_config_base);
-	u2p_r0_t u2p_r0;
-
-	u2p_r0.d32 = u2p_aml_regs->u2p_r0;
-	u2p_r0.b.host_device = 0;
-
-	u2p_aml_regs->u2p_r0 = u2p_r0.d32;
-	return;
-}
-
-static void usb_bc_en_det(uint32_t bc_reg_base, uint32_t usb3_config_base)
-{
-	bc_reg_list_t * bc_reg_s = (struct bc_reg_list *)bc_reg_base;
-	bc_ctrl_t ctrl;
-	struct usb_aml_regs * usb3_config_reg = (struct usb_aml_regs *)usb3_config_base;
-	usb_r0_t cfg0_reg;
-
-	cfg0_reg.d32 = usb3_config_reg->usb_r0;
-	cfg0_reg.b.u2d_act = 1;
-	usb3_config_reg->usb_r0 = cfg0_reg.d32;
-	mdelay(20);
-
-	ctrl.d32 = bc_reg_s->bc_ctrl;
-	ctrl.b.bc_en = 1;
-	bc_reg_s->bc_ctrl = ctrl.d32;
-
-	mdelay(700);
-}
-
-static void usb_bc_disable_det(uint32_t bc_reg_base)
-{
-	bc_reg_list_t * bc_reg_s = (struct bc_reg_list *)bc_reg_base;
-	bc_ctrl_t ctrl;
-
-	ctrl.d32 = bc_reg_s->bc_ctrl;
-	ctrl.b.bc_en = 0;
-	bc_reg_s->bc_ctrl = ctrl.d32;
-}
-
-static void usb_bc_clean_det(uint32_t bc_reg_base)
-{
-	bc_reg_list_t * bc_reg_s = (struct bc_reg_list *)bc_reg_base;
-	bc_ctrl_t ctrl;
-
-	ctrl.d32 = bc_reg_s->bc_ctrl;
-	ctrl.b.bc_int_clean = 1;
-	bc_reg_s->bc_ctrl = ctrl.d32;
-}
-
-
-static int usb_bc_read_bc_status(uint32_t bc_reg_base)
-{
-	bc_reg_list_t *bc_reg_s = (bc_reg_list_t *)bc_reg_base;
-	bc_status_t b_status;
-	int ret;
-	unsigned int i;
-
-	for (i = 0; i < 3; i++) {
-		pr_crit("check bc detection: %d times\n", i+1);
-		if ((readl(0xfe0044a4) & 0x1) == 0) {
-			pr_crit("bc detection ERROR\n");
-			pr_crit("0xfe0044a0:0x%x\n", readl(0xfe0044a0));
-			pr_crit("0xfe0044a4:0x%x\n", readl(0xfe0044a4));
-			pr_crit("0xfe0044a8:0x%x\n", readl(0xfe0044a8));
-			pr_crit("0xfe0044ac:0x%x\n", readl(0xfe0044ac));
-			pr_crit("0xfe0044b0:0x%x\n", readl(0xfe0044b0));
-			pr_crit("0xfe0044b4:0x%x\n", readl(0xfe0044b4));
-			pr_crit("0xfe0044b8:0x%x\n", readl(0xfe0044b8));
-			pr_crit("0xfe0044c0:0x%x\n", readl(0xfe0044c0));
-			pr_crit("0xfe0044c4:0x%x\n", readl(0xfe0044c4));
-			pr_crit("0xfe0044c8:0x%x\n", readl(0xfe0044c8));
-			pr_crit("0xfe0044cc:0x%x\n", readl(0xfe0044cc));
-			pr_crit("0xfe0044d0:0x%x\n", readl(0xfe0044d0));
-			pr_crit("0xfe0044d4:0x%x\n", readl(0xfe0044d4));
-			pr_crit("0xfe004420:0x%x\n", readl(0xfe004420));
-			pr_crit("0xfe004480:0x%x\n", readl(0xfe004480));
-			pr_crit("0xfe004050:0x%x\n", readl(0xfe004050));
-			pr_crit("0xfe000800:0x%x\n", readl(0xfe000800));
-			pr_crit("0xfe013080:0x%x\n", readl(0xfe013080));
-			pr_crit("0xfe000004:0x%x\n", readl(0xfe000004));
-			pr_crit("0xfe000044:0x%x\n", readl(0xfe000044));
-			pr_crit("0xfe000084:0x%x\n", readl(0xfe000084));
-			mdelay(700);
-		} else {
-			pr_crit("bc detection end\n");
-			pr_crit("status reg: 0x%x\n", readl(0xfe0044a4));
-			break;
-		}
-	}
-
-	b_status.d32 = bc_reg_s->bc_status;
-	pr_crit("BC STATUS is :  ");
-	switch (b_status.b.port_status) {
-		case 0:
-			env_set("charger_type","UNKNOWN");
-			pr_crit("port status: default\n");
-			break;
-		case 1:
-			env_set("charger_type","SDP");
-			pr_crit("SDP:Standard downstream port\n");
-			break;
-		case 2:
-			env_set("charger_type","DCP");
-			pr_crit("DCP: Delicated charging port\n");
-			break;
-		case 3:
-			env_set("charger_type","CDP");
-			pr_crit("CDP: charging downstream port\n");
-			break;
-		case 4:
-			pr_crit("ACA_A: ACA with ID resistance of RID_A\n");
-			break;
-		case 5:
-			pr_crit("ACA_B: ACA with ID resistance of RID_B\n");
-			break;
-		case 6:
-			pr_crit("ACA_C: ACA with ID resistance of RID_C\n");
-			break;
-		case 7:
-			pr_crit("ACA_DOCK: Equivalent to a charging hub\n");
-			break;
-		case 8:
-			pr_crit("port status: ACA GND error\n");
-			break;
-		case 9:
-			pr_crit("port status: analog output error\n");
-			break;
-		case 10:
-			pr_crit("VBUS remove\n");
-			break;
-		case 11:
-			pr_crit("VBUS invalid\n");
-			break;
-		default:
-			pr_crit("port status: reserved\n");
-			break;
-	}
-	if (b_status.b.port_status >= 4)
-		env_set("charger_type","UNKNOWN");
-
-	ret = b_status.b.port_status;
-	usb_bc_clean_det(bc_reg_base);
-	return ret;
-}
-
-void usb_bc_detect(void)
-{
-	struct phy_aml_usb2_priv *usb2_priv;
-	struct phy_aml_usb3_priv *usb3_priv;
-	int ret;
-	uint32_t phy2_cfg_base, phy3_cfg_base, bc_cfg_base;
-
-	ret = get_usbphy_baseinfo(usb_phys);
-	if (ret) {
-		pr_err("get usb dts failed\n");
-		return;
-	}
-	usb2_priv = dev_get_priv(usb_phys[0].dev);
-	usb3_priv = dev_get_priv(usb_phys[1].dev);
-	phy2_cfg_base = usb2_priv->base_addr;
-	bc_cfg_base = phy2_cfg_base - PHY_REGISTER_SIZE + USB_AML_BC_OFFSET;
-	phy3_cfg_base = usb3_priv->base_addr;
-
-	writel(0x5018, 0xfe000004);
-	mdelay(10);
-
-	usb_bc_set_device(phy2_cfg_base);
-	usb_bc_en_det(bc_cfg_base, phy3_cfg_base);
-	usb_bc_read_bc_status(bc_cfg_base);
-	usb_bc_disable_det(bc_cfg_base);
-}
-
 static void usb_disable_phy(uint32_t phy2_pll_base)
 {
 	(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x40))=
@@ -613,11 +435,6 @@ int usb_aml_detect_operation(int argc, char * const argv[])
 	usb3_priv = dev_get_priv(usb_phys[1].dev);
 
 	if (argc >= 2) {
-		if (strncmp(argv[1], "bc", 2) == 0) {
-			usb_bc_detect();
-			return 0;
-		}
-
 		if (strncmp(argv[1], "disable", 7) == 0) {
 			usb_disable_phy_pll();
 			usb_disable_phy(usb2_priv->usb_phy2_pll_base_addr[0]);

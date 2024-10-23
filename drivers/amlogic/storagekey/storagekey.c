@@ -17,6 +17,7 @@
 #include <amlogic/secure_storage.h>
 #include <amlogic/amlkey_if.h>
 #include <amlogic/storage.h>
+#include <linux/libfdt.h>
 #ifdef CONFIG_STORE_COMPATIBLE
 #include <partition_table.h>
 #endif
@@ -220,7 +221,7 @@ static ssize_t _amlkey_write(const uint8_t *name, uint8_t *buffer, uint32_t len,
 {
 	int32_t ret = 0;
 	ssize_t retval = 0;
-	uint32_t actual_size;
+	//uint32_t actual_size;
 
 	if ( NULL == name ) {
 		printf("%s() %d, invalid key ", __func__, __LINE__);
@@ -241,7 +242,7 @@ static ssize_t _amlkey_write(const uint8_t *name, uint8_t *buffer, uint32_t len,
 					__func__, __LINE__);
 				retval = 0;
 			}
-            actual_size = storagekey_info.size;
+			//actual_size = storagekey_info.size;
 		}
 	}
 _out:
@@ -264,10 +265,9 @@ static int32_t _amlkey_hash_4_secure(const uint8_t * name, uint8_t * hash)
  * 7. del key by name
  * return success 0, fail -1
  */
-static int32_t _amlkey_del(const uint8_t * name)
+static int32_t __maybe_unused _amlkey_del(const uint8_t * name)
 {
 	int32_t ret = 0;
-	uint32_t actual_size;
 
 	ret = secure_storage_remove((uint8_t *)name);
 	if ((ret == 0) && (storagekey_info.buffer != NULL)) {

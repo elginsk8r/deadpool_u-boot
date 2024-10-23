@@ -294,7 +294,7 @@ static struct hdmi_format_para fmt_para_3840x2160p60_y420_16x9 = {
 	.progress_mode = 1,
 	.scrambler_en = 1,
 	.tmds_clk_div40 = 1,
-	.tmds_clk = 297000,
+	.tmds_clk = 594000,
 	.timing = {
 		.pixel_freq = 594000,
 		.h_freq = 135000,
@@ -356,7 +356,7 @@ static struct hdmi_format_para fmt_para_3840x2160p50_y420_16x9 = {
 	.progress_mode = 1,
 	.scrambler_en = 1,
 	.tmds_clk_div40 = 1,
-	.tmds_clk = 297000,
+	.tmds_clk = 594000,
 	.timing = {
 		.pixel_freq = 594000,
 		.h_freq = 112500,
@@ -573,7 +573,7 @@ static struct hdmi_format_para fmt_para_4096x2160p50_y420_256x135 = {
 	.progress_mode = 1,
 	.scrambler_en = 1,
 	.tmds_clk_div40 = 1,
-	.tmds_clk = 297000,
+	.tmds_clk = 594000,
 	.timing = {
 		.pixel_freq = 594000,
 		.h_freq = 112500,
@@ -635,7 +635,7 @@ static struct hdmi_format_para fmt_para_4096x2160p60_y420_256x135 = {
 	.progress_mode = 1,
 	.scrambler_en = 1,
 	.tmds_clk_div40 = 1,
-	.tmds_clk = 297000,
+	.tmds_clk = 594000,
 	.timing = {
 		.pixel_freq = 594000,
 		.h_freq = 135000,
@@ -1217,7 +1217,7 @@ static struct hdmi_format_para fmt_para_720x576i50_4x3 = {
 };
 
 static struct hdmi_format_para fmt_para_non_hdmi_fmt = {
-	.vic = HDMI_unkown,
+	.vic = HDMI_unknown,
 	.name = "invalid",
 	.sname = "invalid",
 };
@@ -2263,7 +2263,7 @@ void hdmi_parse_attr(struct hdmi_format_para *para, char const *name)
 }
 
 /*
- * Paramter 'name' can be 1080p60hz, or 1920x1080p60hz
+ * Parameter 'name' can be 1080p60hz, or 1920x1080p60hz
  * or 3840x2160p60hz, 2160p60hz
  * or 3840x2160p60hz420, 2160p60hz420 (Y420 mode)
  */
@@ -2272,11 +2272,11 @@ enum hdmi_vic hdmi_get_fmt_vic(char const *name)
 	int i;
 	unsigned int name_len;
 	char *lname;
-	enum hdmi_vic vic = HDMI_unkown;
+	enum hdmi_vic vic = HDMI_unknown;
 	struct hdmi_format_para *para = NULL;
 
 	if (!name)
-		return HDMI_unkown;
+		return HDMI_unknown;
 	for (i = 0; all_fmt_paras[i] != NULL; i++) {
 		lname = all_fmt_paras[i]->name;
 		if (lname && (strncmp(name, lname, strlen(lname)) == 0)) {
@@ -2289,7 +2289,7 @@ enum hdmi_vic hdmi_get_fmt_vic(char const *name)
 			break;
 		}
 	}
-	if ((vic != HDMI_unkown) && (all_fmt_paras[i] != NULL)) {
+	if (vic != HDMI_unknown && all_fmt_paras[i]) {
 		para = all_fmt_paras[i];
 		memset(&para->ext_name[0], 0, sizeof(para->ext_name));
 		name_len = strlen(name);
@@ -2382,11 +2382,11 @@ struct hdmi_format_para *hdmi_tst_fmt_name(char const *name, char const *attr)
 {
 	int i;
 	char *lname;
-	enum hdmi_vic vic = HDMI_unkown;
+	enum hdmi_vic vic = HDMI_unknown;
 	unsigned int copy_len;
 
 	copy_para(&tst_para, &fmt_para_non_hdmi_fmt);
-	if (!name)
+	if (!name || !attr)
 		return &tst_para;
 
 	for (i = 0; all_fmt_paras[i]; i++) {
@@ -2401,7 +2401,7 @@ struct hdmi_format_para *hdmi_tst_fmt_name(char const *name, char const *attr)
 			break;
 		}
 	}
-	if ((vic != HDMI_unkown) && (i != sizeof(all_fmt_paras) /
+	if (vic != HDMI_unknown && (i != sizeof(all_fmt_paras) /
 		sizeof(struct hdmi_format_para *))) {
 		copy_para(&tst_para, all_fmt_paras[i]);
 		memset(&tst_para.ext_name[0], 0, sizeof(tst_para.ext_name));

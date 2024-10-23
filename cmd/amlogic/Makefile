@@ -8,6 +8,7 @@ obj-$(CONFIG_AML_CVBS) += cmd_cvbs.o
 obj-$(CONFIG_AML_HDMITX) += cmd_hdmitx.o
 obj-$(CONFIG_AML_LCD) += cmd_lcd.o
 obj-$(CONFIG_AML_OSD) += cmd_osd.o
+obj-$(CONFIG_AML_DOLBY) += cmd_dolbyvision.o
 obj-$(CONFIG_CMD_PLLTEST) += cmd_plltest.o
 
 obj-$(CONFIG_AML_STORE_WRAPPER) += store_wrapper.o
@@ -15,18 +16,21 @@ obj-$(CONFIG_AML_IMG_READ) += imgread.o
 obj-$(CONFIG_AML_DEFENV) += defenv_without.o
 obj-$(CONFIG_AML_ROBUST) += bootloader_status.o
 
-# amlogic commands
-obj-$(CONFIG_CMD_REBOOT) += cmd_reboot.o flash_ts.o nand_ts.o mmc_ts.o
-obj-$(CONFIG_CMD_FACTORY_BOOT) += cmd_factory_boot.o flash_ts.o nand_ts.o mmc_ts.o
-
+obj-$(CONFIG_AML_REBOOT) += cmd_reboot.o
 obj-$(CONFIG_CMD_RSVMEM) += cmd_rsvmem.o
 
+obj-y += cmd_version.o
+
 ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
-#obj-y += cmd_bcb.o
-#obj-y += get_bcb_boot_part.o
+obj-y += cmd_bcb.o
+obj-y += get_bcb_boot_part.o
 obj-y += cmd_dynamic.o
 ifdef CONFIG_CMD_BOOTCTOL_AVB
+ifdef CONFIG_CMD_BOOTCTOL_VAB
+obj-y += cmd_bootctl_vab.o
+else
 obj-y += cmd_bootctl_avb.o
+endif
 else
 obj-y += cmd_bootctl.o
 endif
@@ -37,6 +41,5 @@ obj-$(CONFIG_CMD_DDR_D2PLL) += cmd_d2pll.o
 obj-$(CONFIG_CMD_DDR_TEST) += cmd_ddr_test_g12.o
 
 obj-$(CONFIG_CMD_OS_IDENT) += os_ident.o
-obj-$(CONFIG_CMD_GET_CHIPTYPE) += cmd_get_chiptype.o
 obj-$(CONFIG_AML_FACTORY_PROVISION) += cmd_factory_provision.o
-obj-$(CONFIG_CMD_AML_MISC) += cmd_misc.o
+obj-$(CONFIG_SECURE_POWER_CONTROL) += cmd_power.o

@@ -120,8 +120,6 @@ struct sram_hal_api_arg {
 	#define AML_D_P_W_EFUSE_CUSTOMER_ID  (0x12)
 	#define AML_D_P_W_EFUSE_AMLOGIC 	 (0x20)
 	#define AML_D_P_IMG_DECRYPT          (0x40)
-	#define AML_D_P_IMG_DECRYPT_V3       (0x41)
-	#define AML_D_P_EXT_IMG_DECRYPT_V3   (0x51)
 	#define AML_D_P_UPGRADE_CHECK        (0x80)
 	#define AML_D_Q_IMG_SIG_HDR_SIZE     (0x100)
 

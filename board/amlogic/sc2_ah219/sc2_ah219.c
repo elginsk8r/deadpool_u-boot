@@ -93,17 +93,36 @@ static void hdmitx_set_hdmi_5v(void)
 	/*Power on VCC_5V for HDMI_5V*/
 }
 #endif
+
+static const char ddr_type_info[6][8] =
+{
+	"DDR3\0",       //CONFIG_DDR_TYPE_DDR3			//0
+	"DDR4\0",       //CONFIG_DDR_TYPE_DDR4			//1
+	"LPDDR4\0",     //CONFIG_DDR_TYPE_LPDDR4		//2
+	"LPDDR3\0",     //CONFIG_DDR_TYPE_LPDDR3		//3
+	"LPDDR2\0",     //CONFIG_DDR_TYPE_LPDDR2		//4
+	"LPDDR4X\0",    //CONFIG_DDR_TYPE_LPDDR4X		//5
+};
+
 void board_init_mem(void) {
 	#if 1
 	/* config bootm low size, make sure whole dram/psram space can be used */
 	phys_size_t ram_size;
+	unsigned int ddr_type;
 	char *env_tmp;
 	env_tmp = env_get("bootm_size");
 	if (!env_tmp) {
-		ram_size = (((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFFF0000) << 4);
+		ram_size = (((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFF80000) << 4);
 		env_set_hex("bootm_low", 0);
 		env_set_hex("bootm_size", ram_size);
 	}
+	env_tmp = env_get("boot_ddr_type");
+	if (!env_tmp) {
+		ddr_type = (((readl(SYSCTRL_SEC_STATUS_REG4)) & 0x00070000) >> 16);
+		env_set("boot_ddr_type", 0);
+		env_set("boot_ddr_type", ddr_type_info[ddr_type]);
+	}
+
 	#endif
 }
 
@@ -136,6 +155,12 @@ int board_init(void)
 int board_late_init(void)
 {
 	printf("board late init\n");
+
+	//default uboot env need before anyone use it
+	if (env_get("default_env")) {
+		printf("factory reset, need default all uboot env.\n");
+		run_command("defenv_reserv; setenv upgrade_step 2; saveenv;", 0);
+	}
 
 	run_command("echo upgrade_step $upgrade_step; if itest ${upgrade_step} == 1; then "\
 			"defenv_reserv; setenv upgrade_step 2; saveenv; fi;", 0);
@@ -172,17 +197,36 @@ int board_late_init(void)
 	cvbs_init();
 #endif
 	run_command("amlsecurecheck", 0);
+	run_command("update_tries", 0);
 	return 0;
 }
 
+unsigned int get_ddr_memsize(void)
+{
+	unsigned int ddr_size;
+#if 0
+	/*if soc don't support automatic get ddr size,
+	  then it get ddr size with software method*/
+	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
+		ddr_size += gd->bd->bi_dram[i].size;
+	}
+#if defined(CONFIG_SYS_MEM_TOP_HIDE)
+	ddr_size += CONFIG_SYS_MEM_TOP_HIDE;
+#endif
+#else
+	/*auto get ddr size from hardware method*/
+	ddr_size = ((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFFF0000) << 4;
+#endif
+	return ddr_size;
+}
 
 phys_size_t get_effective_memsize(void)
 {
 	// >>16 -> MB, <<20 -> real size, so >>16<<20 = <<4
 #if defined(CONFIG_SYS_MEM_TOP_HIDE)
-	return (((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFFF0000) << 4) - CONFIG_SYS_MEM_TOP_HIDE;
+	return (((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFF80000) << 4) - CONFIG_SYS_MEM_TOP_HIDE;
 #else
-	return (((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFFF0000) << 4);
+	return (((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFF80000) << 4);
 #endif /* CONFIG_SYS_MEM_TOP_HIDE */
 
 }
@@ -246,7 +290,7 @@ static const struct mtd_partition spiflash_partitions[] = {
 	}
 };
 
-const struct mtd_partition *get_partition_table(int *partitions)
+const struct mtd_partition *get_spiflash_partition_table(int *partitions)
 {
 	*partitions = ARRAY_SIZE(spiflash_partitions);
 	return spiflash_partitions;
@@ -260,7 +304,6 @@ uint64_t spiflash_bootloader_size(void)
 
 #ifdef CONFIG_MESON_NFC
 static struct mtd_partition normal_partition_info[] = {
-#ifdef CONFIG_DISCRETE_BOOTLOADER
 {
 	.name = BOOT_BL2E,
 	.offset = 0,
@@ -281,7 +324,6 @@ static struct mtd_partition normal_partition_info[] = {
 	.offset = 0,
 	.size = 0,
 },
-#endif
 {
 	.name = "logo",
 	.offset = 0,
@@ -353,12 +395,58 @@ static const struct mtd_partition spinand_partitions[] = {
 		.size = MTDPART_SIZ_FULL,
 	}
 };
-const struct mtd_partition *get_partition_table(int *partitions)
+const struct mtd_partition *get_spinand_partition_table(int *partitions)
 {
 	*partitions = ARRAY_SIZE(spinand_partitions);
 	return spinand_partitions;
 }
 #endif /* CONFIG_SPI_NAND */
+
+#ifdef CONFIG_MULTI_DTB
+int checkhw(char * name)
+{
+#ifdef CONFIG_AUTO_ADAPT_DDR_DTB
+	unsigned int ddr_size = 0;
+	char loc_name[64] = {0};
+	char *mem_size = env_get("mem_size");
+
+	ddr_size = get_ddr_memsize();
+
+	printf("%s:%d ddr_size:0x%x\r\n",__func__,__LINE__,ddr_size);
+	switch (ddr_size) {
+		case CONFIG_2G_SIZE:
+			strcpy(loc_name, "sc2_s905x4_ah219\0");
+
+			/* if limit memory size */
+			if (mem_size && !strcmp(mem_size, "1g")) {
+				strcpy(loc_name, "sc2_s905x4_ah219-1g\0");
+			}
+			break;
+		case CONFIG_1G_SIZE:
+			strcpy(loc_name, "sc2_s905x4_ah219-1g\0");
+			break;
+		case CONFIG_3G_SIZE:
+			strcpy(loc_name, "sc2_s905x4_ah219-3g\0");
+			break;
+		case CONFIG_DDR_MAX_SIZE:
+			strcpy(loc_name, "sc2_s905x4_ah219-4g\0");
+			break;
+		default:
+			printf("DDR size: 0x%x, multi-dt doesn't support\n", ddr_size);
+			strcpy(loc_name, "sc2_s905x4_ah219_unsupport\0");
+			break;
+	}
+
+	strcpy(name, loc_name);
+	env_set("aml_dt", loc_name);
+	return 0;
+#else
+	strcpy(name, "sc2_s905x4_ah219\0");
+	env_set("aml_dt", "sc2_s905x4_ah219\0");
+	return 0;
+#endif
+}
+#endif
 
 const char * const _env_args_reserve_[] =
 {

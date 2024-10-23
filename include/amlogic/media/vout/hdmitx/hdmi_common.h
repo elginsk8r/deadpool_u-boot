@@ -35,11 +35,12 @@ enum scdc_addr {
 
 #define HDMITX_VIC420_OFFSET	0x100
 #define HDMITX_VESA_OFFSET	0x300
+#define HDMI_UNKNOWN	HDMI_unknown
 
 /* HDMI VIC definitions */
 enum hdmi_vic {
 	/* Refer to CEA 861-D */
-	HDMI_unkown = 0,
+	HDMI_unknown = 0,
 	HDMI_640x480p60_4x3 = 1,
 	HDMI_720x480p60_4x3 = 2,
 	HDMI_720x480p60_16x9 = 3,
@@ -417,6 +418,7 @@ struct dv_info {
 	uint8_t sup_backlight_control:1;/*only ver2*/
 	uint8_t backlt_min_luma;/*only ver2*/
 	uint8_t Interface;/*only ver2*/
+	u8 parity:1;/*only ver2*/
 	uint8_t sup_10b_12b_444;/*only ver2*/
 	uint8_t support_DV_RGB_444_8BIT;
 	uint8_t support_LL_YCbCr_422_12BIT;
@@ -459,13 +461,18 @@ struct dv_vsif_para {
 	} vers;
 };
 
+/* the default max_tmds_clk is 165MHz/5 in H14b Table 8-16 */
+#define DEFAULT_MAX_TMDS_CLK    33
 #define Y420CMDB_MAX 32
 #define VIC_MAX_NUM  256
+#define SVD_VIC_MAX_NUM 128
 struct rx_cap {
 	unsigned int native_Mode;
 	/*video*/
 	unsigned int VIC[VIC_MAX_NUM];
+	unsigned int SVD_VIC[SVD_VIC_MAX_NUM]; /* used to store SVD in VDB */
 	unsigned int VIC_count;
+	unsigned int SVD_VIC_count;
 	unsigned int native_VIC;
 	/*vendor*/
 	unsigned int IEEEOUI;
@@ -596,7 +603,7 @@ struct parse_cr {
 	const char *name;
 };
 
-#define EDID_BLK_NO	4
+#define EDID_BLK_NO	8
 #define EDID_BLK_SIZE	128
 struct hdmi_format_para {
 	enum hdmi_vic vic;
@@ -625,15 +632,65 @@ struct hdmi_support_mode {
 #define DOLBY_VISION_STD_ENABLE         1
 #define DOLBY_VISION_DISABLE            0
 #define DOLBY_VISION_ENABLE	1
+/* used to indicate that no ubootenv of user_prefer_dv_type,
+ * which means that user has not selected dv type on menu
+ */
+#define DV_NONE -1
 
 #define HDMI_IEEEOUI 0x000C03
 #define MODE_LEN	32
 #define VESA_MAX_TIMING 64
 
+#define DEFAULT_OUTPUTMODE_ENV		"1080p60hz"
+#define DEFAULT_HDMIMODE_ENV		"1080p60hz"
+#define DEFAULT_COLORATTRIBUTE_ENV	"444,8bit"
+
+#define DEFAULT_COLOR_FORMAT_4K         "420,8bit"
+#define DEFAULT_COLOR_FORMAT            "rgb,8bit"
+#define DEFAULT_HDMI_MODE               "720p60hz"
+
+typedef enum {
+	DOLBY_VISION_PRIORITY = 0,
+	HDR10_PRIORITY        = 1,
+	SDR_PRIORITY          = 2,
+} hdr_priority_e;
+
+typedef enum {
+	HDR_POLICY_SINK   = 0,
+	HDR_POLICY_SOURCE = 1,
+	HDR_POLICY_FORCE = 4,
+} hdr_policy_e;
+
+#define DV_SINK_LED    0
+#define DV_SOURCE_LED  1
+#define FORCE_DV       2
+#define FORCE_HDR10    3
+#define FORCE_HLG      5
+
+typedef enum {
+	MESON_HDR_FORCE_MODE_INVALID    = 0,
+	MESON_HDR_FORCE_MODE_SDR        = 1,
+	MESON_HDR_FORCE_MODE_DV         = 2,
+	MESON_HDR_FORCE_MODE_HDR10      = 3,
+	MESON_HDR_FORCE_MODE_HDR10PLUS  = 4,  //need to do
+	MESON_HDR_FORCE_MODE_HLG        = 5,
+} hdr_force_mode_e;
+
+enum {
+	RESOLUTION_PRIORITY = 0,
+	FRAMERATE_PRIORITY  = 1,
+};
+
 typedef struct input_hdmi_data {
 	char ubootenv_hdmimode[MODE_LEN];
 	char ubootenv_colorattribute[MODE_LEN];
 	int ubootenv_dv_type;
+	/* dynamic range fromat preference,0:dolby vision,1:hdr,2:sdr */
+	hdr_priority_e hdr_priority;
+	/* dynamic range policy,0 :follow sink, 1: match content */
+	hdr_policy_e hdr_policy;
+	/* save user force hdr mode 1 :force sdr, 2: force dv, 3: force hdr10, 5:force hlg */
+	hdr_force_mode_e hdr_force_mode;
 	#if 0
 	bool isbestpolicy;
 	bool isSupport4K30Hz;
@@ -642,7 +699,7 @@ typedef struct input_hdmi_data {
 	bool isframeratepriority;
 	bool isLowPowerMode;
 	#endif
-	struct rx_cap *pRXCap;
+	struct rx_cap *prxcap;
 } hdmi_data_t;
 
 typedef struct scene_output_info {

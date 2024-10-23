@@ -20,6 +20,10 @@
 #define CLK_LEVEL_DFT_G12A     7
 #define CLK_LEVEL_MAX_G12A     8
 
+/* T5D */
+/* freq max=400M, default=250M */
+#define CLK_LEVEL_DFT_T5D     3
+#define CLK_LEVEL_MAX_T5D     6
 
 /* vpu clk setting */
 enum vpu_mux_e {
@@ -146,6 +150,21 @@ static struct vpu_reset_s vpu_reset_tl1[] = {
 	{RESET4_LEVEL, ((1<<6) | (1<<7) | (1<<13) | (1<<5) | (1<<9) | (1<<4) | (1<<12))},
 	{RESET7_LEVEL, (1<<7)},
 	{VPU_REG_END,  0},
+};
+
+/* ******************************************************* */
+/*                 VPU pwrctrl id table                 */
+/* ******************************************************* */
+static unsigned int vpu_pwrctrl_id_table[] = {
+	PM_VPU_HDMI,
+	VPU_PWR_ID_END
+};
+
+static unsigned int vpu_pwrctrl_id_table_t7[] = {
+	PM_VPU_HDMI,
+	PM_VI_CLK1,
+	PM_VI_CLK2,
+	VPU_PWR_ID_END
 };
 
 /* ******************************************************* */

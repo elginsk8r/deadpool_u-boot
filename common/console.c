@@ -758,25 +758,25 @@ int console_init_f(void)
 void stdio_print_current_devices(void)
 {
 	/* Print information */
-	pr_info("In:    ");
+	puts("In:    ");
 	if (stdio_devices[stdin] == NULL) {
 		puts("No input devices available!\n");
 	} else {
-		pr_info ("%s\n", stdio_devices[stdin]->name);
+		printf ("%s\n", stdio_devices[stdin]->name);
 	}
 
-	pr_info("Out:   ");
+	puts("Out:   ");
 	if (stdio_devices[stdout] == NULL) {
 		puts("No output devices available!\n");
 	} else {
-		pr_info ("%s\n", stdio_devices[stdout]->name);
+		printf ("%s\n", stdio_devices[stdout]->name);
 	}
 
-	pr_info("Err:   ");
+	puts("Err:   ");
 	if (stdio_devices[stderr] == NULL) {
 		puts("No error devices available!\n");
 	} else {
-		pr_info ("%s\n", stdio_devices[stderr]->name);
+		printf ("%s\n", stdio_devices[stderr]->name);
 	}
 }
 

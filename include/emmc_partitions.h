@@ -60,6 +60,7 @@
 #define     EMMCKEY_RESERVE_OFFSET           (0x4000)
 #define     MMC_RESERVED_OFFSET              (36*SZ_1M)
 #define     MMC_BLOCK_SIZE                   (512)
+#define     KEY_COPIES                       (2)
 // #define     MMC_SECURE_NAME                 "secure"
 // #define     MMC_SECURE_SIZE                 (0x1*SZ_1M)
 
@@ -252,6 +253,8 @@ typedef struct FastbootContext {
 } FastbootContext_t;
 
 extern bool is_partition_checked;
+extern struct partitions *part_table;
+extern int parts_total_num;
 extern struct partitions emmc_partition_table[];
 
 extern int get_emmc_partition_arraysize(void);
@@ -263,6 +266,10 @@ extern int get_emmc_partition_arraysize(void);
  *	>= 0 means valid partition
  */
 extern int get_partition_num_by_name(char const *name);
+extern int aml_gpt_valid(struct mmc *mmc);
+int mmc_gpt_read(void *source);
+int mmc_gpt_write(void *source);
+int mmc_gpt_erase(void);
 
 struct partitions* find_mmc_partition_by_name (char const *name);
 struct partitions *aml_get_partition_by_name(const char *name);
@@ -270,6 +277,7 @@ int mmc_boot_size(char *name, uint64_t* size);
 struct virtual_partition *aml_get_virtual_partition_by_name(const char *name);
 bool aml_is_emmc_tsd (struct mmc *mmc);
 int mmc_device_init (struct mmc *mmc);
+int get_ept_from_gpt(struct mmc *mmc);
 
 #define PARTITION_ELEMENT(na, sz, flags) {.name = na, .size = sz, .mask_flags = flags,}
 

@@ -83,7 +83,7 @@ int32_t meson_trustzone_efuse(struct efuse_hal_api_arg *arg)
 	if (arg->cmd == EFUSE_HAL_API_WRITE)
 		memcpy((void *)sharemem_input_base,
 		       (const void *)arg->buffer_phy, size);
-		asm __volatile__("" : : : "memory");
+	asm __volatile__("" : : : "memory");
 
 	register uint64_t x0 asm("x0") = cmd;
 	register uint64_t x1 asm("x1") = offset;
@@ -114,7 +114,7 @@ int32_t meson_trustzone_efuse(struct efuse_hal_api_arg *arg)
 int32_t meson_trustzone_efuse_get_max(struct efuse_hal_api_arg *arg)
 {
 	int32_t ret;
-	unsigned cmd;
+	unsigned cmd = 0;
 
 	if (arg->cmd == EFUSE_HAL_API_USER_MAX)
 		cmd = EFUSE_USER_MAX;

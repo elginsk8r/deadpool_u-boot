@@ -60,7 +60,6 @@ static struct aml_dtb_info dtb_infos = {{0, 0}, {0, 0}};
 /* max 2MB for emmc in blks */
 #define UBOOT_SIZE  (0x1000)
 
-
 extern int mmc_key_write(unsigned char *buf, unsigned int size, uint32_t *actual_lenth);
 extern int mmc_key_read(unsigned char *buf, unsigned int size, uint32_t *actual_lenth);
 
@@ -199,16 +198,12 @@ static inline int isstring(char *p)
 */
 int amlmmc_erase_bootloader(int dev, int map)
 {
-	int ret = 0, i, count = 3, mmc_part_nonius = MMC_PART_USER;
+	int ret = 0, i, count = 3;
 	int blk_shift;
 	unsigned long n;
 	char *partname[3] = {"user", "boot0", "boot1"};
 	cpu_id_t cpu_id = get_cpu_id();
 	struct mmc *mmc = find_mmc_device(dev);
-
-#if defined(CONFIG_AML_GPT)
-	mmc_part_nonius = MMC_PART_BOOT0;
-#endif
 
 	/* do nothing */
 	if (0 == map)
@@ -229,7 +224,7 @@ int amlmmc_erase_bootloader(int dev, int map)
 
 	blk_shift = ffs(mmc->read_bl_len) -1;
 	/* erase bootloader in user/boot0/boot1 */
-	for (i = mmc_part_nonius; i < count; i++) {
+	for (i = 0; i < count; i++) {
 		if (map & (0x1 << i)) {
 			if (!blk_select_hwpart_devnum(IF_TYPE_MMC, 1, i)) {
 				lbaint_t start = 0, blkcnt;
@@ -258,10 +253,10 @@ int amlmmc_erase_bootloader(int dev, int map)
 					blkcnt = CONFIG_EMMC_BOOT1_TOUCH_REGION >> blk_shift;
 				}
 #endif/* CONFIG_EMMC_BOOT1_TOUCH_REGION */
-#ifdef CONFIG_AML_GPT
-			if (i == 0)
-				continue;
-#endif
+
+				if (i == 0 && (aml_gpt_valid(mmc) == 0))
+					continue;
+
 				printf("Erasing blocks " LBAFU " to " LBAFU " @ %s\n",
 				   start, blkcnt, partname[i]);
 				n = blk_derase(mmc_get_blk_desc(mmc), start, blkcnt);
@@ -290,16 +285,12 @@ _out:
 */
 int amlmmc_write_bootloader(int dev, int map, unsigned int size, const void *src)
 {
-	int ret = 0, i, count = 3, mmc_part_nonius = MMC_PART_USER;
+	int ret = 0, i, count = 3;
 	unsigned long n;
 	char *partname[3] = {"user", "boot0", "boot1"};
 	struct mmc *mmc = find_mmc_device(dev);
 	lbaint_t start = GXB_START_BLK, blkcnt;
 	cpu_id_t cpu_id = get_cpu_id();
-
-#if defined(CONFIG_AML_GPT)
-	mmc_part_nonius = MMC_PART_BOOT0;
-#endif
 
 	/* do nothing */
 	if (0 == map)
@@ -323,7 +314,7 @@ int amlmmc_write_bootloader(int dev, int map, unsigned int size, const void *src
 	blkcnt = (size + mmc->read_bl_len - 1) / mmc->read_bl_len;
 
 	/* erase bootloader in user/boot0/boot1 */
-	for (i = mmc_part_nonius; i < count; i++) {
+	for (i = 0; i < count; i++) {
 		if (map & (0x1 << i)) {
 			if (!blk_select_hwpart_devnum(IF_TYPE_MMC, 1, i)) {
 /* some customer may use boot1 higher 2M as private data. */
@@ -334,10 +325,9 @@ int amlmmc_write_bootloader(int dev, int map, unsigned int size, const void *src
 					break;
 				}
 #endif /* CONFIG_EMMC_BOOT1_TOUCH_REGION */
-#ifdef CONFIG_AML_GPT
-			if (i == 0)
-				continue;
-#endif
+				if (i == 0 && (aml_gpt_valid(mmc) == 0))
+					continue;
+
 				printf("Wrting blocks " LBAFU " to " LBAFU " @ %s\n",
 				   start, blkcnt, partname[i]);
 				n = blk_dwrite(mmc_get_blk_desc(mmc), start, blkcnt, src);
@@ -410,6 +400,10 @@ static int amlmmc_erase_in_card(int argc, char *const argv[])
 	mmc = find_mmc_device(dev);
 
 	tmp_shift = ffs(mmc->read_bl_len) -1;
+	if (tmp_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 	cnt = size >> tmp_shift;
 	blk = offset_addr >> tmp_shift;
 	/* sz_byte = size - (cnt<<tmp_shift); */
@@ -529,6 +523,10 @@ static int amlmmc_erase_non_loader(int argc, char *const argv[])
 	mmc_init(mmc);
 
 	blk_shift = ffs(mmc->read_bl_len) -1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 	part_info = find_mmc_partition_by_name(MMC_BOOT_NAME);
 
 	if (part_info == NULL) {
@@ -588,6 +586,10 @@ static int amlmmc_erase_single_part(int argc, char *const argv[])
 	mmc_init(mmc);
 
 	blk_shift = ffs(mmc->read_bl_len) -1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 	if (emmckey_is_protected(mmc)
 		&& (strncmp(name, MMC_RESERVED_NAME, sizeof(MMC_RESERVED_NAME)) == 0x00)) {
 		printf("\"%s-partition\" is been protecting and should no be erased!\n",
@@ -612,6 +614,7 @@ static int amlmmc_erase_single_part(int argc, char *const argv[])
 
 static int amlmmc_erase_whole(int argc, char *const argv[])
 {
+	char *name = NULL;
 	int dev;
 	u32 n = 0;
 	int blk_shift;
@@ -621,12 +624,21 @@ static int amlmmc_erase_whole(int argc, char *const argv[])
 	struct mmc *mmc;
 	int map;
 
-	dev = CONFIG_SYS_MMC_BOOT_DEV;
+	name = "logo";
+	dev = find_dev_num_by_partition_name(name);
+	if (dev < 0) {
+		printf("Cannot find dev.\n");
+		return 1;
+	}
 	mmc = find_mmc_device(dev);
 	if (!mmc)
 		return 1;
 	mmc_init(mmc);
 	blk_shift = ffs(mmc->read_bl_len) -1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 	start_blk = 0;
 
 	if (emmckey_is_protected(mmc)) {
@@ -646,7 +658,7 @@ static int amlmmc_erase_whole(int argc, char *const argv[])
 		if (n == 0) { // not error
 			// (2) erase all the area after reserve-partition
 			start_blk = (part_info->offset + part_info->size + PARTITION_RESERVED)
-				>> blk_shift;
+						 >> blk_shift;
 			u64 erase_cnt = (mmc->capacity >> blk_shift) - start_blk;
 			n = blk_derase(mmc_get_blk_desc(mmc), start_blk, erase_cnt);
 		}
@@ -663,6 +675,7 @@ static int amlmmc_erase_whole(int argc, char *const argv[])
 
 static int amlmmc_erase_non_cache(int arc, char *const argv[])
 {
+	char *name = NULL;
 	int dev;
 	u32 n = 0;
 	int blk_shift;
@@ -671,51 +684,60 @@ static int amlmmc_erase_non_cache(int arc, char *const argv[])
 	struct mmc *mmc;
 	int map;
 
-	dev = CONFIG_SYS_MMC_BOOT_DEV;
-	mmc = find_mmc_device(dev);
-	if (!mmc)
+	name = "logo";
+	dev = find_dev_num_by_partition_name(name);
+	if (dev < 0) {
+		 printf("Cannot find dev.\n");
+		 return 1;
+	 }
+	 mmc = find_mmc_device(dev);
+	 if (!mmc)
+		 return 1;
+	 mmc_init(mmc);
+	 blk_shift = ffs(mmc->read_bl_len) -1;
+	 if (blk_shift < 0) {
+		printf("bad shift.\n");
 		return 1;
-	mmc_init(mmc);
-	blk_shift = ffs(mmc->read_bl_len) -1;
-	if (emmckey_is_protected(mmc)) {
-		part_info = find_mmc_partition_by_name(MMC_RESERVED_NAME);
-		if (part_info == NULL) {
-			return 1;
-		}
+	 }
+	 if (emmckey_is_protected(mmc)) {
+		 part_info = find_mmc_partition_by_name(MMC_RESERVED_NAME);
+		 if (part_info == NULL) {
+			 return 1;
+		 }
 
-		blk = part_info->offset;
-		// it means: there should be other partitions before reserve-partition.
+		 blk = part_info->offset;
+		 // it means: there should be other partitions before reserve-partition.
 		if (blk > 0) {
 			blk -= PARTITION_RESERVED;
-		}
-		blk >>= blk_shift;
-		blk -= start_blk;
-		// (1) erase all the area before reserve-partition
-		if (blk > 0) {
-			n = blk_derase(mmc_get_blk_desc(mmc), start_blk, blk);
-			// printf("(1) erase blk: 0 --> %llx %s\n", blk, (n == 0) ? "OK" : "ERROR");
-		}
-		if (n == 0) { // not error
-			// (2) erase all the area after reserve-partition
-			part_info = find_mmc_partition_by_name(MMC_CACHE_NAME);
-			if (part_info == NULL) {
-				return 1;
-			}
-			start_blk = (part_info->offset + part_info->size + PARTITION_RESERVED)
-				>> blk_shift;
-			u64 erase_cnt = (mmc->capacity >> blk_shift) - start_blk;
-			n = blk_derase(mmc_get_blk_desc(mmc), start_blk, erase_cnt);
-		}
-	} else {
-		n = blk_derase(mmc_get_blk_desc(mmc), start_blk, 0); // erase the whole card
-	}
-	map = AML_BL_BOOT;
-	if (n == 0) {
-		n = amlmmc_erase_bootloader(dev, map);
-		if (n)
-			printf("erase bootloader in boot partition failed\n");
-	}
-	return (n == 0) ? 0 : 1;
+		 }
+		 blk >>= blk_shift;
+		 blk -= start_blk;
+		 // (1) erase all the area before reserve-partition
+		 if (blk > 0) {
+			 n = blk_derase(mmc_get_blk_desc(mmc), start_blk, blk);
+			 // printf("(1) erase blk: 0 --> %llx %s\n", blk, (n == 0) ? "OK" : "ERROR");
+		 }
+		 if (n == 0) { // not error
+			 // (2) erase all the area after reserve-partition
+			 part_info = find_mmc_partition_by_name(MMC_CACHE_NAME);
+			 if (part_info == NULL) {
+				 return 1;
+			 }
+			 start_blk = (part_info->offset + part_info->size + PARTITION_RESERVED)
+						  >> blk_shift;
+			 u64 erase_cnt = (mmc->capacity >> blk_shift) - start_blk;
+			 n = blk_derase(mmc_get_blk_desc(mmc), start_blk, erase_cnt);
+		 }
+	 } else {
+		 n = blk_derase(mmc_get_blk_desc(mmc), start_blk, 0); // erase the whole card
+	 }
+	 map = AML_BL_BOOT;
+	 if (n == 0) {
+		 n = amlmmc_erase_bootloader(dev, map);
+		 if (n)
+			 printf("erase bootloader in boot partition failed\n");
+	 }
+	 return (n == 0) ? 0 : 1;
 }
 
 static int amlmmc_erase_dev(int argc, char *const argv[])
@@ -727,15 +749,10 @@ static int amlmmc_erase_allbootloader(int argc, char*const argv[])
 {
 	int map;
 	int rc;
-	int dev;
-#ifndef CONFIG_AML_GPT
 	char *name = NULL;
-#endif
+	int dev;
 	map = AML_BL_ALL;
 
-#if defined(CONFIG_AML_GPT)
-	dev = CONFIG_SYS_MMC_BOOT_DEV;
-#else
 	name = "bootloader";
 	dev = find_dev_num_by_partition_name(name);
 
@@ -743,7 +760,7 @@ static int amlmmc_erase_allbootloader(int argc, char*const argv[])
 		printf("Cannot find dev.\n");
 		return 1;
 	}
-#endif
+
 	rc = amlmmc_erase_bootloader(dev, map);
 	return rc;
 }
@@ -874,6 +891,10 @@ static int amlmmc_write_in_card(int argc, char *const argv[])
 		return 1;
 
 	int blk_shift = ffs( mmc->read_bl_len) -1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 	cnt = size >> blk_shift;
 	blk = offset >> blk_shift;
 	sz_byte = size - (cnt<<blk_shift);
@@ -1008,6 +1029,10 @@ static int amlmmc_read_in_card(int argc, char *const argv[])
 		return 1;
 
 	blk_shift = ffs( mmc->read_bl_len) - 1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 	cnt = size >> blk_shift;
 	blk = offset >> blk_shift;
 	sz_byte = size - (cnt<<blk_shift);
@@ -1654,6 +1679,10 @@ static int compute_write_protect_range(struct mmc *mmc, char *name,
 	wp_grp_size = write_protect_group_size(mmc, ext_csd);
 
 	blk_shift = ffs(mmc->read_bl_len) -1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 
 	part_info = find_mmc_partition_by_name(name);
 	if (part_info == NULL)
@@ -1791,8 +1820,10 @@ static int send_part_wp_type(struct mmc *mmc, char *name)
 
 	err = compute_write_protect_range(mmc, name, ext_csd,
 			&wp_grp_size, &start, &part_end);
-	if (err)
+	if (err) {
+		free(addr);
 		return 1;
+	}
 
 	group_start = start;
 
@@ -1857,10 +1888,16 @@ static int send_add_wp_type(struct mmc *mmc, u64 start, u64 cnt)
 	}
 
 	blk_shift = ffs(mmc->read_bl_len) - 1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		free(addr);
+		return 1;
+	}
 	mmc_boundary = mmc->capacity>>blk_shift;
 
 	if ((part_end + 1) > mmc_boundary) {
 		printf("Error: the operation cross the boundary of mmc\n");
+		free(addr);
 		return 1;
 	}
 
@@ -1980,6 +2017,10 @@ static int set_add_write_protect(struct mmc *mmc, u8 wp_type, u64 start, u64 cnt
 	}
 
 	blk_shift = ffs(mmc->read_bl_len) - 1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 	mmc_boundary = mmc->capacity>>blk_shift;
 
 	if ((part_end + 1) > mmc_boundary) {
@@ -2196,6 +2237,10 @@ static int set_add_clear_wp(struct mmc *mmc, u64 start, u64 cnt)
 	 }
 
 	 blk_shift = ffs(mmc->read_bl_len) - 1;
+	 if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	 }
 	 mmc_boundary = mmc->capacity>>blk_shift;
 
 	 if ((part_end + 1) > mmc_boundary) {
@@ -2392,6 +2437,10 @@ static int send_add_wp_status(struct mmc *mmc, u64 start, u64 cnt)
 	 }
 
 	blk_shift = ffs(mmc->read_bl_len) - 1;
+	if (blk_shift < 0) {
+		printf("bad shift.\n");
+		return 1;
+	}
 	mmc_boundary = mmc->capacity>>blk_shift;
 
 	if ((part_end + 1) > mmc_boundary) {
@@ -2992,7 +3041,6 @@ _out:
 	return ret;
 }
 
-
 int dtb_write(void *addr)
 {
 	int ret = 0;
@@ -3054,12 +3102,23 @@ int renew_partition_tbl(unsigned char *buffer)
 	unsigned char *temp = NULL;
 	if (!buffer)
 		return 1;
+	temp = malloc (AML_DTB_IMG_MAX_SZ);
+	if (!temp)
+		return 1;
+	memcpy(temp, buffer, AML_DTB_IMG_MAX_SZ);
+	     /* todo, check new dts imcoming.... */
+	ret = check_valid_dts(temp);
+		free(temp);
 	/* todo, check new dts imcoming.... */
 /*	ret = check_valid_dts(buffer);*/
 	/* only the dts new is valid */
 	if (!ret) {
 		free_partitions();
-		get_partition_from_dts(buffer);
+		ret = get_partition_from_dts(buffer);
+		if (ret) {
+			printf("Fail to get partition talbe from dts\n");
+			goto _out;
+		}
 		if (0 == mmc_device_init(_dtb_init())) {
 			printf("partition table success\n");
 			ret = 0;
@@ -3355,7 +3414,6 @@ int fastboot_context_read(void *buf, size_t size)
 	return 0;
 }
 
-
 int do_emmc_fb_read(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	int ret = 0;
@@ -3436,26 +3494,6 @@ int do_emmc_fb_write(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return ret;
 }
 
-int do_emmc_part_write(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-	int ret = 0;
-	void *addr = NULL;
-
-	if (argc != 3)
-		return CMD_RET_USAGE;
-
-	/*erase MBR*/
-	ret = run_command("amlmmc erase 1 0 1", 0);
-	if (ret != 0) {
-		printf("amlmmc erase 1 0 1 failed!\n");
-		return -1;
-	}
-
-	addr = (void *)simple_strtoul(argv[2], NULL, 16);
-	ret = emmc_update_ept(addr);
-	return ret;
-}
-
 int do_emmc_key_read(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	int ret = 0;
@@ -3489,12 +3527,7 @@ int do_emmc_key_write(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	size = simple_strtoull(argv[3], NULL, 16);
 	ret = mmc_key_write(addr, size,actual_lenth);
 	return ret;
-
-
 }
-
-
-
 
 static cmd_tbl_t cmd_emmc[] = {
 	U_BOOT_CMD_MKENT(dtb_read,  4, 0, do_emmc_dtb_read,  "", ""),
@@ -3504,7 +3537,6 @@ static cmd_tbl_t cmd_emmc[] = {
 	U_BOOT_CMD_MKENT(fastboot_write, 4, 0, do_emmc_fb_write, "", ""),
 	U_BOOT_CMD_MKENT(key_read, 4, 0, do_emmc_key_read, "", ""),
 	U_BOOT_CMD_MKENT(key_write, 4, 0, do_emmc_key_write, "", ""),
-	U_BOOT_CMD_MKENT(part_write, 3, 0, do_emmc_part_write, "", ""),
 };
 
 static int do_emmc_dtb_key(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -3520,7 +3552,6 @@ static int do_emmc_dtb_key(cmd_tbl_t *cmdtp, int flag, int argc, char * const ar
 	return cp->cmd(cmdtp, flag, argc, argv);
 }
 
-
 U_BOOT_CMD(
 	emmc, 4, 1, do_emmc_dtb_key,
 	"EMMC sub system",
@@ -3532,6 +3563,5 @@ U_BOOT_CMD(
 	"emmc fastboot_write addr size\n"
 	"emmc key_read addr size\n"
 	"emmc key_write addr size\n"
-	"emmc part_write addr\n"
 );
 

@@ -265,7 +265,7 @@ config SHA_PROG_HW_ACCEL
 	  is performed in hardware.
 
 config MD5
-	bool
+	bool "Support MD5 algorithm"
 
 config CRC32C
 	bool
@@ -422,5 +422,6 @@ endmenu
 source lib/efi/Kconfig
 source lib/efi_loader/Kconfig
 source lib/optee/Kconfig
+source lib/chromecast/Kconfig
 
 endmenu

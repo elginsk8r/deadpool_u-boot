@@ -32,7 +32,6 @@
 #define GET_SHARE_STORAGE_BLOCK_SIZE		0x82000027
 #define SET_STORAGE_INFO		0x82000028
 #define SET_REBOOT_REASON		0x82000049
-#define GET_DVFS_TABLE_INDEX            0x82000088
 
 /* Set Reboot Reason then Reboot*/
 #define PSCI_SYS_REBOOT		0x84000009
@@ -94,9 +93,7 @@
 /*start hifi4 */
 #define START_HIFI4			0x82000090
 #define DSP_SEC_POWERSET		0x82000092
-#define POWER_CTRL              0x82000093
-#define POWER_CTRL_IRQ_SET  0x82000094
-#define POWER_STATUS        0x82000095
+
 
 #define SRAM_HAL_API_CHECK_EFUSE 0x403
 struct sram_hal_api_arg {
@@ -124,11 +121,7 @@ struct sram_hal_api_arg {
 	#define AML_D_P_W_EFUSE_CUSTOMER_ID  (0x12)
 	#define AML_D_P_W_EFUSE_AMLOGIC 	 (0x20)
 	#define AML_D_P_IMG_DECRYPT          (0x40)
-	#define AML_D_P_IMG_DECRYPT_V3       (0x41)
-	#define AML_D_P_EXT_IMG_DECRYPT_V3   (0x51)
 	#define AML_D_P_UPGRADE_CHECK        (0x80)
-	#define AML_D_Q_IMG_SIG_HDR_SIZE     (0x100)
-	#define AML_D_P_MRK_CHECK            (0x200)
 
 #define GXB_EFUSE_PATTERN_SIZE      (0x500)
 #define GXB_IMG_SIZE                (24<<20)
@@ -137,10 +130,6 @@ struct sram_hal_api_arg {
 	#define GXB_IMG_DEC_RMD   (1<<1)
 	#define GXB_IMG_DEC_DTB   (1<<2)
 	#define GXB_IMG_DEC_ALL   (GXB_IMG_DEC_KNL|GXB_IMG_DEC_RMD|GXB_IMG_DEC_DTB)
-
-#define PDID_ACODEC                 14
-#define PDID_AUDIO                  15
-#define PDID_PDM                    26
 
 #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
 
@@ -158,13 +147,7 @@ void bl31_get_chipid(unsigned int *, unsigned int *,
 void set_viu_probe_enable(void);
 void wdt_send_cmd_to_bl31(uint64_t cmd, uint64_t value);
 void power_set_dsp(unsigned int id, unsigned int powerflag);
-void power_set_ctl(unsigned int id, unsigned int powerflag);
 void init_dsp(unsigned int id,unsigned int addr,unsigned int cfg0);
 void set_boot_first_timeout(uint64_t arg0);
 int bl31_get_cornerinfo(uint8_t *outbuf, int size);
-unsigned aml_get_dvfs_id(void);
-void __attribute__((weak))aml_set_bootsequence(uint32_t val)
-{
-	return 0;
-}
 #endif

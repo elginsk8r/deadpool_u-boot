@@ -23,6 +23,7 @@ extern void test_timing(struct mtd_info *mtd, struct nand_chip *chip);
 #endif
 
 int nand_fbb_issue_flag;
+int check_1_2page_sparebyte;
 struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 	{"B revision NAND 8GiB MT29F64G08CBABA",
 		{NAND_MFR_MICRON, 0x64, 0x44, 0x4B, 0xA9},
@@ -863,6 +864,39 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 	{NULL,}
 };
 
+/* detects factory bad blocks for the following samsung nand,
+ * it needs to detect the first byte of the spare area at
+ * the first page and the second page
+ */
+u8 samsung_nand_id0[][MAX_ID_LEN] = {
+	{NAND_MFR_SAMSUNG, 0xf1, 0x00, 0x95, 0x42},
+	{NAND_MFR_SAMSUNG, 0xda, 0x10, 0x15, 0x44},
+	{NAND_MFR_SAMSUNG, 0xdc, 0x10, 0x95, 0x54},
+	{NAND_MFR_SAMSUNG, 0xd3, 0x11, 0x95, 0x58},
+	{NAND_MFR_SAMSUNG, 0xdc, 0x10, 0x95, 0x55},
+	{NAND_MFR_SAMSUNG, 0xd3, 0x51, 0x95, 0x59},
+	{NAND_MFR_SAMSUNG, 0xdc, 0x10, 0x95, 0x56},
+	{NAND_MFR_SAMSUNG, 0xd3, 0x51, 0x95, 0x5a},
+};
+
+
+int aml_get_samsung_fbbt_flag(void)
+{
+	return check_1_2page_sparebyte;
+}
+
+void aml_nand_check_samsung_fbbt_flag(u8 *dev_id)
+{
+	int i, k;
+
+	k = ARRAY_SIZE(samsung_nand_id0);
+	for (i = 0; i < k; i++) {
+		if (!strncmp((char *)samsung_nand_id0[i], (char *)dev_id,
+			     strlen((const char *)samsung_nand_id0[i])))
+			check_1_2page_sparebyte = 1;
+	}
+}
+
 int aml_nand_get_fbb_issue(void)
 {
 	return nand_fbb_issue_flag;
@@ -1051,7 +1085,7 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 	struct aml_nand_platform *plat = aml_chip->platform;
 	struct aml_nand_flash_dev *type = NULL;
 	int i, maf_idx;
-	u8 dev_id[MAX_ID_LEN];
+	u8 dev_id[MAX_ID_LEN]= {0};
 
 
 	/* Send the command for reading device ID */
@@ -1068,7 +1102,7 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 	/* Lookup the flash id */
 	for (i = 0; aml_nand_flash_ids[i].name != NULL; i++) {
 		if (!strncmp((char*) aml_nand_flash_ids[i].id,
-		(char*)dev_id, strlen((const char*)aml_nand_flash_ids[i].id))) {
+		(char*)dev_id, 6)) {
 			type = &aml_nand_flash_ids[i];
 			break;
 		}
@@ -1087,6 +1121,8 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 		}
 	}
 	aml_nand_check_fbb_issue(dev_id);
+	if (NAND_MFR_SAMSUNG == dev_id[0])
+		aml_nand_check_samsung_fbbt_flag(dev_id);
 
 	plat->nand_flash_dev = type;
 

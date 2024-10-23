@@ -26,6 +26,10 @@
 
 #define __asmeq(x, y) ".ifnc " x "," y " ; .err ; .endif\n\t"
 
+#ifndef getenv
+#define getenv env_get
+#endif
+
 #define FUNCID_PROVISION_SET_IV                0xB200E030
 #define FUNCID_PROVISION_ENCRYPT               0xB200E031
 #define FUNCID_PROVISION_GET_TRANSFER_ADDR     0xB2000007
@@ -326,10 +330,10 @@ static void parse_params(int argc, char * const argv[],
 		if (!memcmp(argv[1], "query", strlen("query"))) {
 			params->action = ACTION_QUERY;
 			params->keybox_name = argv[2];
-			if (getenv("loadaddr") != NULL)
+			if (env_get("loadaddr"))
 				params->ret_data_addr =
 					(uint32_t)simple_strtoul(
-						getenv("loadaddr"), NULL, 0);
+						(char * const)env_get("loadaddr"), NULL, 0);
 			else
 				params->ret_data_addr = CONFIG_SYS_LOAD_ADDR;
 		} else if (!memcmp(argv[1], "remove", strlen("remove"))) {

@@ -43,7 +43,7 @@
 #define AML_ADC_POWER_KEY_VAL    0  /*sample value range: 0-1023*/
 
 #ifdef CONFIG_DTB_BIND_KERNEL	//load dtb from kernel, such as boot partition
-#define CONFIG_DTB_LOAD  "imgread dtb boot ${dtb_mem_addr}"
+#define CONFIG_DTB_LOAD  "imgread dtb ${boot_part} ${dtb_mem_addr}"
 #else
 #define CONFIG_DTB_LOAD  "imgread dtb _aml_dtb ${dtb_mem_addr}"
 #endif//#ifdef CONFIG_DTB_BIND_KERNEL	//load dtb from kernel, such as boot partition
@@ -83,7 +83,7 @@
         "frac_rate_policy=1\0" \
         "hdr_policy=0\0" \
         "hdmi_read_edid=1\0" \
-        "usb_burning=adnl 1000\0" \
+        "usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
         "fdt_high=0x20000000\0"\
         "sdcburncfg=aml_sdc_burn.ini\0"\
         "EnableSelinux=enforcing\0" \
@@ -102,7 +102,7 @@
         "fatload_dev=usb\0"\
         "fs_type=""rootfstype=ramfs""\0"\
         "initargs="\
-            "init=/init console=ttyS0,921600 no_console_suspend earlycon=aml-uart,0xfe07a000 "\
+            "init=/init" CONFIG_KNL_LOG_LEVEL "console=ttyS0,921600 no_console_suspend earlycon=aml-uart,0xfe07a000 "\
             "ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 "\
             "\0"\
         "upgrade_check="\
@@ -114,7 +114,8 @@
             "if itest ${upgrade_step} == 3; then run init_display;run storeargs; run update; fi;"\
             "\0"\
         "storeargs="\
-            "setenv bootargs ${initargs} ${fs_type} otg_device=${otg_device} "\
+            "get_bootloaderversion;" \
+            "setenv bootargs ${initargs} otg_device=${otg_device} "\
                 "logo=${display_layer},loaded,${fb_addr} vout=${outputmode},${vout_init} panel_type=${panel_type} "\
                 "hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} "\
                 "hdmichecksum=${hdmichecksum} dolby_vision_on=${dolby_vision_on} " \
@@ -122,7 +123,7 @@
                 "frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} cvbsmode=${cvbsmode} "\
                 "osd_reverse=${osd_reverse} video_reverse=${video_reverse} irq_check_en=${Irq_check_en}  "\
                 "androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
-            "setenv bootargs ${bootargs} androidboot.hardware=amlogic;"\
+            "setenv bootargs ${bootargs} androidboot.bootloader=${bootloader_version} androidboot.hardware=amlogic;"\
             "run cmdline_keys;"\
             "\0"\
         "switch_bootmode="\
@@ -143,6 +144,7 @@
             "\0" \
         "storeboot="\
             "run get_os_type;"\
+	    "run storage_param;"\
             "if test ${os_type} = rtos; then "\
                 "setenv loadaddr ${loadaddr_rtos};"\
                 "store read ${loadaddr} ${boot_part} 0 0x400000;"\
@@ -150,18 +152,12 @@
             "else if test ${os_type} = kernel; then "\
                 "get_system_as_root_mode;"\
                 "echo system_mode in storeboot: ${system_mode};"\
-                "get_valid_slot;"\
                 "get_avb_mode;"\
                 "echo active_slot in storeboot: ${active_slot};"\
                 "if test ${system_mode} = 1; then "\
                     "setenv bootargs ${bootargs} ro rootwait skip_initramfs;"\
                 "else "\
-                    "if test ${vendor_boot_mode} = true; then "\
-                        "echo come to vendor_boot true;"\
-                        "setenv bootargs ${bootargs} androidboot.force_normal_boot=1;"\
-                    "else "\
-                        "setenv bootargs ${bootargs} ${fs_type};"\
-                    "fi;"\
+                    "setenv bootargs ${bootargs} androidboot.force_normal_boot=1;"\
                 "fi;"\
                 "if test ${active_slot} != normal; then "\
                     "setenv bootargs ${bootargs} androidboot.slot_suffix=${active_slot};"\
@@ -184,6 +180,7 @@
             "if fatload ${fatload_dev} 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
             "if fatload ${fatload_dev} 0 ${loadaddr} recovery.img; then "\
                 "if fatload ${fatload_dev} 0 ${dtb_mem_addr} dtb.img; then echo ${fatload_dev} dtb.img loaded; fi;"\
+                "setenv bootargs ${bootargs} ${fs_type};"\
                 "bootm ${loadaddr};fi;"\
             "\0"\
         "recovery_from_udisk="\
@@ -195,13 +192,17 @@
             "if mmcinfo; then run recovery_from_fat_dev; fi;"\
             "\0"\
         "recovery_from_flash="\
-            "get_valid_slot;"\
             "echo active_slot: ${active_slot};"\
             "setenv loadaddr ${loadaddr_kernel};"\
             "if test ${active_slot} = normal; then "\
-                "setenv bootargs ${bootargs} aml_dt=${aml_dt} recovery_part={recovery_part} recovery_offset={recovery_offset};"\
-                "if imgread dtb recovery ${dtb_mem_addr}; then "\
-                    "else echo restore dtb; run common_dtb_load;"\
+                "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${recovery_part} recovery_offset=${recovery_offset};"\
+                "if test ${upgrade_step} == 3; then "\
+                    "if ext4load mmc 1:2 ${dtb_mem_addr} /recovery/dtb.img; then echo cache dtb.img loaded; fi;"\
+                    "if ext4load mmc 1:2 ${loadaddr} /recovery/recovery.img; then echo cache recovery.img loaded; wipeisb; bootm ${loadaddr}; fi;"\
+                "else "\
+                    "if imgread dtb recovery ${dtb_mem_addr}; then "\
+                        "else echo restore dtb; run common_dtb_load;"\
+                    "fi;"\
                 "fi;"\
                 "if imgread kernel ${recovery_part} ${loadaddr} ${recovery_offset}; then bootm ${loadaddr}; fi;"\
             "else "\
@@ -211,7 +212,7 @@
                     "if imgread kernel ${boot_part} ${loadaddr}; then bootm ${loadaddr}; fi;"\
                 "else "\
                     "if test ${vendor_boot_mode} = true; then "\
-                        "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${boot_part} recovery_offset=${recovery_offset};"\
+                        "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${boot_part} recovery_offset=${recovery_offset} androidboot.slot_suffix=${active_slot};"\
                         "if imgread kernel ${boot_part} ${loadaddr}; then bootm ${loadaddr}; fi;"\
                     "else "\
                         "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${recovery_part} recovery_offset=${recovery_offset} androidboot.slot_suffix=${active_slot};"\
@@ -224,8 +225,12 @@
             "get_avb_mode;"\
             "get_valid_slot;"\
             "if test ${vendor_boot_mode} = true; then "\
-                "setenv loadaddr_kernel 0x2080000;"\
-                "setenv dtb_mem_addr 0x1f00000;"\
+                "setenv loadaddr_kernel 0x3080000;"\
+                "setenv dtb_mem_addr 0x1000000;"\
+            "fi;"\
+            "if test ${active_slot} != normal; then "\
+                "echo ab mode, read dtb from kernel;"\
+                "setenv common_dtb_load ""imgread dtb ${boot_part} ${dtb_mem_addr}"";"\
             "fi;"\
             "\0"\
         "init_display="\
@@ -248,9 +253,13 @@
             "else "\
                 "setenv reboot_mode_android ""normal"";"\
                 "run storeargs;"\
-                "hdmitx hpd;hdmitx get_preferred_mode;hdmitx get_parse_edid;dovi process;osd open;osd clear;imgread pic logo bootup $loadaddr;bmp display $bootup_offset;bmp scale;vout output ${outputmode};dovi set;dovi pkg;vpp hdrpkt;"\
+                "hdmitx hpd;hdmitx get_preferred_mode;hdmitx get_parse_edid;setenv dolby_status 0;setenv dolby_vision_on 0;osd open;osd clear;imgread pic logo bootup $loadaddr;bmp display $bootup_offset;bmp scale;vout output ${outputmode};vpp hdrpkt;"\
             "fi;fi;"\
             "\0"\
+	"storage_param="\
+	    "store param;"\
+	    "setenv bootargs ${bootargs} ${mtdbootparts}; "\
+	    "\0"\
         "cmdline_keys="\
             "setenv usid 1234567890; setenv region_code US;"\
             "if keyman init 0x1234; then "\
@@ -458,11 +467,14 @@
 
 //use sha2 command
 #define CONFIG_CMD_SHA2
+#define CONFIG_CMD_STARTDSP
 
 //use hardware sha2
 //#define CONFIG_AML_HW_SHA2
 
-/* #define CONFIG_MULTI_DTB    1 */
+#define CONFIG_MULTI_DTB    1
+/*#define CONFIG_AUTO_ADAPT_DDR_DTB  1 */
+
 
 /* support secure boot */
 #define CONFIG_AML_SECURE_UBOOT   1
@@ -480,6 +492,8 @@
 #endif /* CONFIG_AML_SECURE_UBOOT */
 
 #define CONFIG_FIP_IMG_SUPPORT  1
+
+#define BL32_SHARE_MEM_SIZE  0x800000
 
 #endif
 

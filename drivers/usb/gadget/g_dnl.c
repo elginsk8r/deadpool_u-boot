@@ -43,9 +43,19 @@
 
 #define DRIVER_VERSION		"usb_dnl 2.0"
 
+#ifdef CONFIG_PRODUCT_NAME
+static const char product[] = CONFIG_PRODUCT_NAME;
+#else
 static const char product[] = "USB download gadget";
+#endif
+
 static char g_dnl_serial[MAX_STRING_SERIAL];
+
+#ifdef CONFIG_VENDOR_NAME
+const static char manufacturer[] = CONFIG_VENDOR_NAME;
+#else
 static const char manufacturer[] = "Amlogic";
+#endif
 
 void g_dnl_set_serialnumber(char *s)
 {
@@ -62,7 +72,7 @@ static struct usb_device_descriptor device_desc = {
 	.bDeviceSubClass = 0, /*0x02:CDC-modem , 0x00:CDC-serial*/
 
 	.idVendor = 0x18d1,
-	.idProduct = 0x0d02,
+	.idProduct = 0x4ee0,
 	/* .iProduct = DYNAMIC */
 	/* .iSerialNumber = DYNAMIC */
 	.bNumConfigurations = 1,

@@ -36,6 +36,7 @@ enum boot_type_e {
 #define RSV_ENV "env"
 #define RSV_DTB "dtb"
 #define RSV_BBT "bbt"
+#define RSV_DDR_PARA "ddr_para"
 
 #define DISCRETE_BOOTLOADER 1
 #define COMPACT_BOOTLOADER 0
@@ -50,18 +51,8 @@ struct nand_startup_parameter {
 	int page0_disable;
 };
 
-#define IS_FEAT_DIS_EMMC_USER()			(0)
-#define IS_FEAT_DIS_EMMC_BOOT_0()		(0)
-#define IS_FEAT_DIS_EMMC_BOOT_1()		(0)
-#define IS_FEAT_EN_4BL2_SNOR()			(0)
-#define IS_FEAT_DIS_NBL2_SNOR()			(0)
-#define IS_FEAT_EN_8BL2_SNAND()			(0)
-#define IS_FEAT_DIS_NBL2_SNAND()		(0)
-#define IS_FEAT_DIS_8BL2_NAND()			(0)
-#define IS_FEAT_DIS_NBL2_NAND()			(1)
-
 #define BL2E_STORAGE_PARAM_SIZE		(0x80)
-#define BOOT_FIRST_BLOB_SIZE        (254*1024)
+//#define BOOT_FIRST_BLOB_SIZE        (166*1024)
 #define BOOT_FILLER_SIZE            (4*1024)
 #define BOOT_RESERVED_SIZE          (4*1024)
 #define BOOT_RANDOM_NONCE           (16)
@@ -79,12 +70,7 @@ struct nand_startup_parameter {
 #define BOOT_AREA_DDRFIP            (3)
 #define BOOT_AREA_DEVFIP            (4)
 #define BOOT_AREA_INVALID           (MAX_BOOT_AREA_ENTRIES)
-/* boot area entry name */
-#define BAE_BB1ST                   "1STBLOB"
-#define BAE_BL2E                    "BL2E"
-#define BAE_BL2X                    "BL2X"
-#define BAE_DDRFIP                  "DDRFIP"
-#define BAE_DEVFIP                  "DEVFIP"
+
 typedef struct boot_area_entry {
     /* name */
     char name[11];
@@ -167,7 +153,9 @@ struct storage_t {
 	int (*boot_write)(const char *part_name,
 			  u8 cpy, size_t size, void *source);
 	int (*boot_erase)(const char *part_name, u8 cpy);
-
+	int (*gpt_read)(void *dest);
+	int (*gpt_write)(void *source);
+	int (*gpt_erase)(void);
 	u32 (*get_rsv_size)(const char *rsv_name);
 	int (*read_rsv)(const char *rsv_name, size_t size, void *buf);
 	int (*write_rsv)(const char *rsv_name, size_t size, void *buf);
@@ -495,4 +483,21 @@ int store_rsv_erase(const char *name);
  *          other = fail
  */
 int store_rsv_protect(const char *name, bool ops);
+
+/**
+ * @usage: get bootloader mode for current storage
+ *
+ * @return: result of the operation
+ *          0 = COMPACT_BOOTLOADER
+ *          1 = DISCRETE_BOOTLOADER
+ */
+int store_get_device_bootloader_mode(void);
+
+int sheader_need(void);
+void sheader_load(void *addr);
+
+int store_gpt_read(void *buf);
+int store_gpt_write(void *buf);
+int store_gpt_erase(void);
+
 #endif/* __STORAGE_H__ */

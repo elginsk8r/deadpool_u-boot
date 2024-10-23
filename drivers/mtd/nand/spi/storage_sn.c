@@ -13,12 +13,11 @@
 #include <linux/mtd/partitions.h>
 #include <amlogic/storage.h>
 #include <amlogic/aml_mtd.h>
+#include <linux/mtd/spinand.h>
+#include <dm/pinctrl.h>
 
 
 static struct storage_t *snand_storage;
-#ifdef CONFIG_MTD_LOGIC_MAP
-extern void mtd_store_init_map(void);
-#endif
 extern void mtd_store_set(struct mtd_info *mtd, int dev);
 extern void mtd_store_mount_ops(struct storage_t *store);
 extern int spinand_add_partitions(struct mtd_info *mtd,
@@ -57,6 +56,7 @@ int spinand_fit_storage(struct mtd_info *info, char *name, u8 *id)
 {
 	struct storage_t *spi_nand = NULL;
 	struct mtd_info *mtd = info;
+	int ret = 0;
 
 	if (get_snand_storage())
 		return 0;
@@ -75,18 +75,15 @@ int spinand_fit_storage(struct mtd_info *info, char *name, u8 *id)
 	spi_nand->info.write_unit = mtd->writesize;
 	spi_nand->info.erase_unit = mtd->erasesize;
 	spi_nand->info.caps = mtd->size;
-#ifdef CONFIG_DISCRETE_BOOTLOADER
 	spi_nand->info.mode = 1;
-#else
-	spi_nand->info.mode = 0;
-#endif
+
 	set_snand_storage(spi_nand);
 	mtd_store_mount_ops(spi_nand);
+	ret = store_register(spi_nand);
+	if (ret)
+		return ret;
 	mtd_store_set(mtd, 0);
-#ifdef CONFIG_MTD_LOGIC_MAP
-	mtd_store_init_map();
-#endif
-	return store_register(spi_nand);
+	return ret;
 }
 
 int spi_nand_pre(void)
@@ -101,20 +98,30 @@ int spi_nand_pre(void)
 
 int spi_nand_probe(u32 init_flag)
 {
+	struct spinand_device *spinand_dev;
 	struct storage_t *spi_nand = get_snand_storage();
 	const struct mtd_partition *spinand_partitions;
 	struct mtd_info *mtd;
 	int partition_count, ret;
 	static int probe_flag;
 
+	/* Maybe pinmux be modified by emmc, set again here */
+	extern struct mtd_info *mtd_store_get(int dev);
+	mtd = mtd_store_get(0);
+	spinand_dev = mtd_to_spinand(mtd);
+	//dm_spi_claim_bus(spinand_dev->slave->dev);
+	ret = pinctrl_select_state(spinand_dev->slave->dev->parent, "default");
+	if (ret) {
+		pr_err("select state %s failed\n", "default");
+		return 1;
+	}
+
 	if (probe_flag)
 		return 0;
 
 #ifdef CONFIG_AML_MTDPART
-	extern const struct mtd_partition *get_partition_table(int *partitions);
-	extern struct mtd_info *mtd_store_get(int dev);
-	spinand_partitions = get_partition_table(&partition_count);
-	mtd = mtd_store_get(0);
+	extern const struct mtd_partition *get_spinand_partition_table(int *partitions);
+	spinand_partitions = get_spinand_partition_table(&partition_count);
 	ret = spinand_add_partitions(mtd, spinand_partitions,
 						partition_count);
 	if (ret) {

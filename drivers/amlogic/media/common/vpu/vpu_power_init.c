@@ -75,48 +75,52 @@ void vpu_power_on(void)
 
 	/* power up memories */
 	ctrl_table = vpu_conf.data->mem_pd_table;
-	i = 0;
-	while (i < VPU_MEM_PD_CNT_MAX) {
-		if (ctrl_table[i].reg == VPU_REG_END)
-			break;
-		_reg = ctrl_table[i].reg;
-		_start = ctrl_table[i].bit;
-		_end = ctrl_table[i].len + ctrl_table[i].bit;
-		for (j = _start; j < _end; j+=2) {
-			vpu_hiu_setb(_reg, 0, j, 2);
+	if (ctrl_table) {
+		i = 0;
+		while (i < VPU_MEM_PD_CNT_MAX) {
+			if (ctrl_table[i].reg == VPU_REG_END)
+				break;
+			_reg = ctrl_table[i].reg;
+			_start = ctrl_table[i].bit;
+			_end = ctrl_table[i].len + ctrl_table[i].bit;
+			for (j = _start; j < _end; j+=2) {
+				vpu_hiu_setb(_reg, 0, j, 2);
+				udelay(5);
+			}
+			i++;
+		}
+		for (i = 8; i < 16; i++) {
+			vpu_hiu_setb(HHI_MEM_PD_REG0, 0, i, 1);
 			udelay(5);
 		}
-		i++;
+		udelay(20);
 	}
-	for (i = 8; i < 16; i++) {
-		vpu_hiu_setb(HHI_MEM_PD_REG0, 0, i, 1);
-		udelay(5);
-	}
-	udelay(20);
 
 	/* Reset VIU + VENC */
 	/* Reset VENCI + VENCP + VADC + VENCL */
 	/* Reset HDMI-APB + HDMI-SYS + HDMI-TX + HDMI-CEC */
 	reset_table = vpu_conf.data->reset_table;
-	i = 0;
-	while (i < VPU_RESET_CNT_MAX) {
-		if (reset_table[i].reg == VPU_REG_END)
-			break;
-		_reg = reset_table[i].reg;
-		mask = reset_table[i].mask;
-		vpu_cbus_clr_mask(_reg, mask);
-		i++;
-	}
-	udelay(5);
-	/* release Reset */
-	i = 0;
-	while (i < VPU_RESET_CNT_MAX) {
-		if (reset_table[i].reg == VPU_REG_END)
-			break;
-		_reg = reset_table[i].reg;
-		mask = reset_table[i].mask;
-		vpu_cbus_set_mask(_reg, mask);
-		i++;
+	if (reset_table) {
+		i = 0;
+		while (i < VPU_RESET_CNT_MAX) {
+			if (reset_table[i].reg == VPU_REG_END)
+				break;
+			_reg = reset_table[i].reg;
+			mask = reset_table[i].mask;
+			vpu_cbus_clr_mask(_reg, mask);
+			i++;
+		}
+		udelay(5);
+		/* release Reset */
+		i = 0;
+		while (i < VPU_RESET_CNT_MAX) {
+			if (reset_table[i].reg == VPU_REG_END)
+				break;
+			_reg = reset_table[i].reg;
+			mask = reset_table[i].mask;
+			vpu_cbus_set_mask(_reg, mask);
+			i++;
+		}
 	}
 
 	/* Remove VPU_HDMI ISO */
@@ -146,39 +150,43 @@ void vpu_power_off(void)
 
 	/* Enable Isolation */
 	ctrl_table = vpu_conf.data->iso_table;
-	i = 0;
-	while (i < VPU_ISO_CNT_MAX) {
-		if (ctrl_table[i].reg == VPU_REG_END)
-			break;
-		_reg = ctrl_table[i].reg;
-		_val = 1;
-		_start = ctrl_table[i].bit;
-		_len = ctrl_table[i].len;
-		vpu_ao_setb(_reg, _val, _start, _len);
-		i++;
+	if (ctrl_table) {
+		i = 0;
+		while (i < VPU_ISO_CNT_MAX) {
+			if (ctrl_table[i].reg == VPU_REG_END)
+				break;
+			_reg = ctrl_table[i].reg;
+			_val = 1;
+			_start = ctrl_table[i].bit;
+			_len = ctrl_table[i].len;
+			vpu_ao_setb(_reg, _val, _start, _len);
+			i++;
+		}
+		udelay(20);
 	}
-	udelay(20);
 
 	/* power down memories */
 	ctrl_table = vpu_conf.data->mem_pd_table;
-	i = 0;
-	while (i < VPU_MEM_PD_CNT_MAX) {
-		if (ctrl_table[i].reg == VPU_REG_END)
-			break;
-		_reg = ctrl_table[i].reg;
-		_start = ctrl_table[i].bit;
-		_end = ctrl_table[i].len + ctrl_table[i].bit;
-		for (j = _start; j < _end; j+=2) {
-			vpu_hiu_setb(_reg, 0x3, j, 2);
+	if (ctrl_table) {
+		i = 0;
+		while (i < VPU_MEM_PD_CNT_MAX) {
+			if (ctrl_table[i].reg == VPU_REG_END)
+				break;
+			_reg = ctrl_table[i].reg;
+			_start = ctrl_table[i].bit;
+			_end = ctrl_table[i].len + ctrl_table[i].bit;
+			for (j = _start; j < _end; j+=2) {
+				vpu_hiu_setb(_reg, 0x3, j, 2);
+				udelay(5);
+			}
+			i++;
+		}
+		for (i = 8; i < 16; i++) {
+			vpu_hiu_setb(HHI_MEM_PD_REG0, 0x1, i, 1);
 			udelay(5);
 		}
-		i++;
+		udelay(20);
 	}
-	for (i = 8; i < 16; i++) {
-		vpu_hiu_setb(HHI_MEM_PD_REG0, 0x1, i, 1);
-		udelay(5);
-	}
-	udelay(20);
 
 	/* Power down VPU domain */
 	ctrl_table = vpu_conf.data->power_table;
@@ -205,8 +213,22 @@ void vpu_power_off(void)
 void vpu_power_on_new(void)
 {
 #ifdef CONFIG_SECURE_POWER_CONTROL
-	if (vpu_conf.data->pwrctrl_id < VPU_PWR_ID_INVALID)
-		pwr_ctrl_psci_smc(vpu_conf.data->pwrctrl_id, 1);
+	unsigned int pwr_id;
+	int i = 0;
+
+	if (!vpu_conf.data->pwrctrl_id_table)
+		return;
+
+	while (i < VPU_PWR_ID_MAX) {
+		pwr_id = vpu_conf.data->pwrctrl_id_table[i];
+		if (pwr_id == VPU_PWR_ID_END)
+			break;
+#ifdef VPU_DEBUG_PRINT
+		VPUPR("%s: pwr_id=%d\n", __func__, pwr_id);
+#endif
+		pwr_ctrl_psci_smc(pwr_id, 1);
+		i++;
+	}
 	VPUPR("%s\n", __func__);
 #else
 	VPUERR("%s: no CONFIG_SECURE_POWER_CONTROL\n", __func__);
@@ -216,9 +238,23 @@ void vpu_power_on_new(void)
 void vpu_power_off_new(void)
 {
 #ifdef CONFIG_SECURE_POWER_CONTROL
+	unsigned int pwr_id;
+	int i = 0;
+
 	VPUPR("%s\n", __func__);
-	if (vpu_conf.data->pwrctrl_id < VPU_PWR_ID_INVALID)
-		pwr_ctrl_psci_smc(vpu_conf.data->pwrctrl_id, 0);
+	if (!vpu_conf.data->pwrctrl_id_table)
+		return;
+
+	while (i < VPU_PWR_ID_MAX) {
+		pwr_id = vpu_conf.data->pwrctrl_id_table[i];
+		if (pwr_id == VPU_PWR_ID_END)
+			break;
+#ifdef VPU_DEBUG_PRINT
+		VPUPR("%s: pwr_id=%d\n", __func__, pwr_id);
+#endif
+		pwr_ctrl_psci_smc(pwr_id, 0);
+		i++;
+	}
 #else
 	VPUERR("%s: no CONFIG_SECURE_POWER_CONTROL\n", __func__);
 #endif

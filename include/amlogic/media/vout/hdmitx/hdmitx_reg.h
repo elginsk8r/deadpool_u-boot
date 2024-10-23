@@ -49,6 +49,10 @@
 
 /* intr_maskn: MASK_N, one bit per interrupt source.
  *     1=Enable interrupt source; 0=Disable interrupt source. Default 0.
+ * [  8] hdcp_topology_err
+ * [  7] rxsense_fall
+ * [  6] rxsense_rise
+ * [  5] err_i2c_timeout
  * [  4] hdcp22_rndnum_err
  * [  3] nonce_rfrsh_rise
  * [  2] hpd_fall_intr
@@ -76,7 +80,7 @@
  *     3'b010=Output PRBS data; 3'b100=Output shift pattern.         Default 0.
  * Bit 11: 9 RW shift_pttn_repeat: 0=New pattern every clk cycle; 1=New pattern
  *     every 2 clk cycles; ...; 7=New pattern every 8 clk cycles.  Default 0.
- * Bit 8 RW shift_pttn_en: 1= Eanble shift pattern generator; 0=Disable.
+ * Bit 8 RW shift_pttn_en: 1= Enable shift pattern generator; 0=Disable.
  *     Default 0.
  * Bit 4: 3 RW prbs_pttn_mode: 0=PRBS11; 1=PRBS15; 2=PRBS7; 3=PRBS31. Default 0.
  * Bit 2: 1 RW prbs_pttn_width: 0=idle; 1=output 8-bit pattern;
@@ -142,20 +146,25 @@
 #define HDMITX_TOP_INFILTER                     (TOP_OFFSET_MASK + 0x01D)
 #define HDMITX_TOP_NSEC_SCRATCH                 (TOP_OFFSET_MASK + 0x01E)
 #define HDMITX_TOP_SEC_SCRATCH                  (TOP_SEC_OFFSET_MASK + 0x01F)
-#define HDMITX_TOP_EMP_CNTL0                  (TOP_OFFSET_MASK + 0x020)
-#define HDMITX_TOP_EMP_CNTL1                  (TOP_OFFSET_MASK + 0x021)
-#define HDMITX_TOP_EMP_MEMADDR_START                  (TOP_OFFSET_MASK + 0x022)
-#define HDMITX_TOP_EMP_STAT0                  (TOP_OFFSET_MASK + 0x023)
-#define HDMITX_TOP_EMP_STAT1                  (TOP_OFFSET_MASK + 0x024)
-#define HDMITX_TOP_AXI_ASYNC_CNTL0                  (TOP_OFFSET_MASK + 0x025)
-#define HDMITX_TOP_AXI_ASYNC_CNTL1                  (TOP_OFFSET_MASK + 0x026)
-#define HDMITX_TOP_AXI_ASYNC_STAT0                  (TOP_OFFSET_MASK + 0x027)
-#define HDMITX_TOP_I2C_BUSY_CNT_MAX                  (TOP_OFFSET_MASK + 0x028)
-#define HDMITX_TOP_I2C_BUSY_CNT_STAT                  (TOP_OFFSET_MASK + 0x029)
-#define HDMITX_TOP_HDCP22_BSOD                  (TOP_OFFSET_MASK + 0x02A)
-#define HDMITX_TOP_DDC_CNTL                  (TOP_OFFSET_MASK + 0x02B)
-#define HDMITX_TOP_REVOCMEM_ADDR_S                  (TOP_OFFSET_MASK + 0x2000 >> 2)
-#define HDMITX_TOP_REVOCMEM_ADDR_E                  (TOP_OFFSET_MASK + 0x365E >> 2)
+#define HDMITX_TOP_EMP_CNTL0                    (TOP_OFFSET_MASK + 0x020)
+#define HDMITX_TOP_EMP_CNTL1                    (TOP_OFFSET_MASK + 0x021)
+#define HDMITX_TOP_EMP_MEMADDR_START            (TOP_OFFSET_MASK + 0x022)
+#define HDMITX_TOP_EMP_STAT0                    (TOP_OFFSET_MASK + 0x023)
+#define HDMITX_TOP_EMP_STAT1                    (TOP_OFFSET_MASK + 0x024)
+#define HDMITX_TOP_AXI_ASYNC_CNTL0              (TOP_OFFSET_MASK + 0x025)
+#define HDMITX_TOP_AXI_ASYNC_CNTL1              (TOP_OFFSET_MASK + 0x026)
+#define HDMITX_TOP_AXI_ASYNC_STAT0              (TOP_OFFSET_MASK + 0x027)
+#define HDMITX_TOP_I2C_BUSY_CNT_MAX             (TOP_OFFSET_MASK + 0x028)
+#define HDMITX_TOP_I2C_BUSY_CNT_STAT            (TOP_OFFSET_MASK + 0x029)
+#define HDMITX_TOP_HDCP22_BSOD                  (TOP_SEC_OFFSET_MASK + 0x02A)
+#define HDMITX_TOP_DDC_CNTL                     (TOP_OFFSET_MASK + 0x02B)
+#define HDMITX_TOP_DISABLE_NULL                 (TOP_OFFSET_MASK + 0x030)
+#define HDMITX_TOP_HDCP14_UNENCRYPT             (TOP_OFFSET_MASK + 0x031)
+#define HDMITX_TOP_MISC_CNTL                    (TOP_OFFSET_MASK + 0x032)
+#define HDMITX_TOP_HDCP22_MIN_SIZE		(TOP_OFFSET_MASK + 0x035)
+
+#define HDMITX_TOP_REVOCMEM_ADDR_S              (TOP_OFFSET_MASK + 0x2000 >> 2)
+#define HDMITX_TOP_REVOCMEM_ADDR_E              (TOP_OFFSET_MASK + 0x365E >> 2)
 
 #define HDMITX_TOP_DONT_TOUCH0                  (TOP_OFFSET_MASK + 0x0FE)
 #define HDMITX_TOP_DONT_TOUCH1                  (TOP_OFFSET_MASK + 0x0FF)
@@ -418,12 +427,25 @@
 /* [  0] V0l */
 #define HDMITX_DWC_FC_AUDSV                     (DWC_OFFSET_MASK + 0x1065)
 #define HDMITX_DWC_FC_AUDSU                     (DWC_OFFSET_MASK + 0x1066)
+/* bit5:4  CSB 41:40 */
+/* bit0  CSB 2 */
 #define HDMITX_DWC_FC_AUDSCHNLS0                (DWC_OFFSET_MASK + 0x1067)
+/* bit7:0  CSB 15:8 */
 #define HDMITX_DWC_FC_AUDSCHNLS1                (DWC_OFFSET_MASK + 0x1068)
+/* bit6:4  CSB 5:3 */
+/* bit3:0  CSB 17:16 */
 #define HDMITX_DWC_FC_AUDSCHNLS2                (DWC_OFFSET_MASK + 0x1069)
+/* bit7:4 CSB 22:21 2nd right sub */
+/* bit3:0 CSB 22:21 1st right sub */
 #define HDMITX_DWC_FC_AUDSCHNLS3                (DWC_OFFSET_MASK + 0x106A)
+/* bit?? CSB 22:21 4th right sub */
+/* bit?? CSB 22:21 3rd right sub */
 #define HDMITX_DWC_FC_AUDSCHNLS4                (DWC_OFFSET_MASK + 0x106B)
+/* bit7:4 CSB 22:21 2nd left sub */
+/* bit3:0 CSB 22:21 1st left sub */
 #define HDMITX_DWC_FC_AUDSCHNLS5                (DWC_OFFSET_MASK + 0x106C)
+/* bit?? CSB 22:21 4th left sub */
+/* bit?? CSB 22:21 3rd left sub */
 #define HDMITX_DWC_FC_AUDSCHNLS6                (DWC_OFFSET_MASK + 0x106D)
 #define HDMITX_DWC_FC_AUDSCHNLS7                (DWC_OFFSET_MASK + 0x106E)
 #define HDMITX_DWC_FC_AUDSCHNLS8                (DWC_OFFSET_MASK + 0x106F)
@@ -491,13 +513,14 @@
 #define HDMITX_DWC_FC_DATAUTO1                  (DWC_OFFSET_MASK + 0x10B4)
 #define HDMITX_DWC_FC_DATAUTO2                  (DWC_OFFSET_MASK + 0x10B5)
 #define HDMITX_DWC_FC_DATMAN                    (DWC_OFFSET_MASK + 0x10B6)
+/* [  6] drm_auto: insert on Vsync */
 /* [  5] nvbi_auto: insert on Vsync */
 /* [  4] amp_auto: insert on Vsync */
 /* [  3] avi_auto: insert on Vsync */
 /* [  2] gcp_auto: insert on Vsync */
 /* [  1] audi_auto: insert on Vsync */
 /* [  0] acr_auto: insert on CTS update. Assert this bit later to avoid
- * inital packets with false CTS value
+ * initial packets with false CTS value
  */
 #define HDMITX_DWC_FC_DATAUTO3                  (DWC_OFFSET_MASK + 0x10B7)
 #define HDMITX_DWC_FC_RDRB0                     (DWC_OFFSET_MASK + 0x10B8)
@@ -527,6 +550,7 @@
 /* [  1] AVI_int_mask */
 /* [  0] GCP_int_mask */
 #define HDMITX_DWC_FC_MASK1                     (DWC_OFFSET_MASK + 0x10D6)
+/* [  2] Mask bit for FC_INT2.DRM interrupt bit */
 /* [  1] LowPriority_fifo_full */
 /* [  0] HighPriority_fifo_full */
 #define HDMITX_DWC_FC_MASK2                     (DWC_OFFSET_MASK + 0x10DA)
@@ -537,6 +561,7 @@
 /* [  0] scrambler_en. Only update this bit once we've sent SCDC message*/
 #define HDMITX_DWC_FC_SCRAMBLER_CTRL            (DWC_OFFSET_MASK + 0x10E1)
 #define HDMITX_DWC_FC_MULTISTREAM_CTRL          (DWC_OFFSET_MASK + 0x10E2)
+/* [  7] drm_tx_en */
 /* [  6] nvbi_tx_en */
 /* [  5] amp_tx_en */
 /* [  4] aut_tx_en */
@@ -745,7 +770,6 @@
   /* [  7] sw_audio_fifo_rst */
   /* [  5] 0=select SPDIF; 1=select I2S. */
   /* [3:0] i2s_in_en: enable it later in test.c */
-
 #define HDMITX_DWC_AUD_CONF0                    (DWC_OFFSET_MASK + 0x3100)
 /* [4:0] i2s_width */
 /* [7:5] i2s_mode: 0=standard I2S mode */
@@ -791,6 +815,7 @@
 /* [  1] tmdsclk_disable */
 /* [  0] pixelclk_disable */
 #define HDMITX_DWC_MC_CLKDIS                    (DWC_OFFSET_MASK + 0x4001)
+#define HDMITX_DWC_MC_CLKDIS_SC2                (DWC_SEC_OFFSET_MASK + 0x4001)
 /*
  * [  7] gpaswrst_req: 0=generate reset pulse; 1=no reset.
  * [  6] cecswrst_req: 0=generate reset pulse; 1=no reset.
@@ -875,22 +900,25 @@
 /* [  1] Rsvd for read-only ksv_mem_access */
 /* [  0] ksv_mem_request */
 #define HDMITX_DWC_A_KSVMEMCTRL                 (DWC_OFFSET_MASK + 0x5016)
+#define HDMITX_DWC_A_BSTATUS_HI                 (DWC_OFFSET_MASK + 0x5017)
+#define HDMITX_DWC_A_BSTATUS_LO                 (DWC_OFFSET_MASK + 0x5018)
 
-#define HDMITX_DWC_HDCP_BSTATUS_0               (DWC_OFFSET_MASK + 0x5020)
-#define HDMITX_DWC_HDCP_BSTATUS_1               (DWC_OFFSET_MASK + 0x5021)
-#define HDMITX_DWC_HDCP_M0_0                    (DWC_OFFSET_MASK + 0x5022)
-#define HDMITX_DWC_HDCP_M0_1                    (DWC_OFFSET_MASK + 0x5023)
-#define HDMITX_DWC_HDCP_M0_2                    (DWC_OFFSET_MASK + 0x5024)
-#define HDMITX_DWC_HDCP_M0_3                    (DWC_OFFSET_MASK + 0x5025)
-#define HDMITX_DWC_HDCP_M0_4                    (DWC_OFFSET_MASK + 0x5026)
-#define HDMITX_DWC_HDCP_M0_5                    (DWC_OFFSET_MASK + 0x5027)
-#define HDMITX_DWC_HDCP_M0_6                    (DWC_OFFSET_MASK + 0x5028)
-#define HDMITX_DWC_HDCP_M0_7                    (DWC_OFFSET_MASK + 0x5029)
-#define HDMITX_DWC_HDCP_KSV                     (DWC_OFFSET_MASK + 0x502A)
-#define HDMITX_DWC_HDCP_VH                      (DWC_OFFSET_MASK + 0x52A5)
-#define HDMITX_DWC_HDCP_REVOC_SIZE_0            (DWC_OFFSET_MASK + 0x52B9)
-#define HDMITX_DWC_HDCP_REVOC_SIZE_1            (DWC_OFFSET_MASK + 0x52BA)
-#define HDMITX_DWC_HDCP_REVOC_LIST              (DWC_OFFSET_MASK + 0x52BB)
+#define HDMITX_DWC_HDCP_BSTATUS_0               (TOP_OFFSET_MASK + 0x2000)
+#define HDMITX_DWC_HDCP_BSTATUS_1               (TOP_OFFSET_MASK + 0x2001)
+#define HDMITX_DWC_HDCP_M0_0                    (TOP_OFFSET_MASK + 0x2002)
+#define HDMITX_DWC_HDCP_M0_1                    (TOP_OFFSET_MASK + 0x2003)
+#define HDMITX_DWC_HDCP_M0_2                    (TOP_OFFSET_MASK + 0x2004)
+#define HDMITX_DWC_HDCP_M0_3                    (TOP_OFFSET_MASK + 0x2005)
+#define HDMITX_DWC_HDCP_M0_4                    (TOP_OFFSET_MASK + 0x2006)
+#define HDMITX_DWC_HDCP_M0_5                    (TOP_OFFSET_MASK + 0x2007)
+#define HDMITX_DWC_HDCP_M0_6                    (TOP_OFFSET_MASK + 0x2008)
+#define HDMITX_DWC_HDCP_M0_7                    (TOP_OFFSET_MASK + 0x2009)
+#define HDMITX_DWC_HDCP_KSV                     (TOP_OFFSET_MASK + 0x200A)
+#define HDMITX_DWC_HDCP_VH                      (TOP_OFFSET_MASK + 0x2285)
+#define HDMITX_DWC_HDCP_REVOC_SIZE_0            (TOP_OFFSET_MASK + 0x2299)
+#define HDMITX_DWC_HDCP_REVOC_SIZE_1            (TOP_OFFSET_MASK + 0x229A)
+#define HDMITX_DWC_HDCP_REVOC_LIST              (TOP_OFFSET_MASK + 0x229B)
+#define HDMITX_DWC_HDCP_REVOC_LIST_END          (TOP_OFFSET_MASK + 0x365E)
 
 /* HDCP BKSV Registers */
 #define HDMITX_DWC_HDCPREG_BKSV0                (DWC_OFFSET_MASK + 0x7800)
@@ -931,7 +959,6 @@
 #define HDMITX_DWC_HDCP22REG_MASK               (DWC_OFFSET_MASK + 0x790C)
 #define HDMITX_DWC_HDCP22REG_STAT               (DWC_OFFSET_MASK + 0x790D)
 #define HDMITX_DWC_HDCP22REG_MUTE               (DWC_OFFSET_MASK + 0x790E)
-
 
 /* ********** CEC related ********** */
 

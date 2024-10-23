@@ -12,10 +12,6 @@
 #include "aml_nand.h"
 #include <dm/device.h>
 
-static struct storage_t *slcnand_storage;
-#ifdef CONFIG_MTD_LOGIC_MAP
-extern void mtd_store_init_map(void);
-#endif
 extern void mtd_store_mount_ops(struct storage_t* store);
 struct aml_pre_scan *pre_scan;
 
@@ -61,16 +57,10 @@ int slcnand_fit_storage(void)
 	slc_nand->info.erase_unit = type->erasesize;
 	slc_nand->info.caps = ((type->chipsize) << 20);
 	printf("cap: 0x%llx\n", slc_nand->info.caps);
-#ifdef CONFIG_DISCRETE_BOOTLOADER
 	slc_nand->info.mode = 1;
-#else
-	slc_nand->info.mode = 0;
-#endif
+
 	mtd_store_mount_ops(slc_nand);
 
-#ifdef CONFIG_MTD_LOGIC_MAP
-	mtd_store_init_map();
-#endif
 	return store_register(slc_nand);
 }
 

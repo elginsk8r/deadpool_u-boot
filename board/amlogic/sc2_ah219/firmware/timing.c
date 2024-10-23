@@ -359,14 +359,16 @@ __attribute__ ((section(".misc_param"))) = {
 	{PADCTRL_PIN_MUX_REGI,	(0x3 << 4),		(0xf << 4),	0, 0, 0},
 };
 
-
+#define DEV_FIP_SIZE 0x300000
+#define DDR_FIP_SIZE 0x40000
 #ifdef CONFIG_MTD_SPI_NAND
 /* for spinand storage parameter */
 storage_parameter_t __store_para __attribute__ ((section(".store_param"))) = {
 	.common				= {
 		.version = 0x01,
-		.device_fip_container_size = 0x300000,
+		.device_fip_container_size = DEV_FIP_SIZE,
 		.device_fip_container_copies = 4,
+		.ddr_fip_container_size = DDR_FIP_SIZE,
 	},
 	.nand				= {
 		.version = 0x01,
@@ -385,23 +387,24 @@ storage_parameter_t __store_para __attribute__ ((section(".store_param"))) = {
 storage_parameter_t __store_para __attribute__ ((section(".store_param"))) = {
 	.common				= {
 		.version = 0x01,
-		.device_fip_container_size = 0x300000,
+		.device_fip_container_size = DEV_FIP_SIZE,
 		.device_fip_container_copies = 4,
+		.ddr_fip_container_size = DDR_FIP_SIZE,
 	},
 	.nand				= {
 		.version = 0x01,
 		.bbt_pages = 0x01,
-		.bbt_start_block = 0x20,
+		.bbt_start_block = 20,
 		.discrete_mode = 1,
 		.setup_data.nand_setup_data = (2 << 20) |               \
 					(0 << 19) |                     \
 					(1 << 17) |                     \
-					(4 << 14) |                     \
+					(1 << 14) |                     \
 					(0 << 13) |                     \
 					(64 << 6) |                     \
 					(4 << 0),
 		.reserved_area_blk_cnt = 48,
-		.page_per_block = 128,
+		.page_per_block = 64,
 		.use_param_page_list = 0,
 	},
 };

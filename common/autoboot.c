@@ -216,7 +216,7 @@ static int __abortboot(int bootdelay)
 #ifdef CONFIG_MENUPROMPT
 	printf(CONFIG_MENUPROMPT);
 #else
-	pr_info("Hit any key to stop autoboot: %2d ", bootdelay);
+	printf("Hit any key to stop autoboot: %2d ", bootdelay);
 #endif
 
 	/*
@@ -224,7 +224,7 @@ static int __abortboot(int bootdelay)
 	 */
 	if (tstc()) {	/* we got a key press	*/
 		(void) getc();  /* consume input	*/
-		pr_info("\b\b\b 0");
+		puts("\b\b\b 0");
 		abort = 1;	/* don't auto boot	*/
 	}
 

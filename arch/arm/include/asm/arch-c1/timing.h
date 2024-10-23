@@ -396,9 +396,9 @@ typedef struct pll_set{
 	unsigned	int		nCFGTAddr;
 	/* align 8Byte */
 
-	unsigned	int		sys_pll_cntl[9];
+	unsigned	int		sys_pll_cntl[8];
 	unsigned	int		ddr_pll_cntl[8];
-	unsigned	int		fix_pll_cntl[10];
+	unsigned	int		fix_pll_cntl[8];
 }__attribute__ ((packed)) pll_set_t;
 
 typedef struct dmem_cfg {

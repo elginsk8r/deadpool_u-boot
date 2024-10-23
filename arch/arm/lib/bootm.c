@@ -31,7 +31,6 @@
 #include <asm/armv7.h>
 #endif
 #include <asm/setup.h>
-#include <time_logging.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -87,7 +86,7 @@ __weak void board_quiesce_devices(void)
  */
 static void announce_and_cleanup(int fake)
 {
-	pr_notice("\nStarting kernel ...%s\n\n", fake ?
+	printf("\nStarting kernel ...%s\n\n", fake ?
 		"(fake run for tracing)" : "");
 	bootstage_mark_name(BOOTSTAGE_ID_BOOTM_HANDOFF, "start_kernel");
 #ifdef CONFIG_BOOTSTAGE_FDT
@@ -333,18 +332,8 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 	debug("## Transferring control to Linux (at address %lx)...\n",
 		(ulong) kernel_entry);
 	bootstage_mark(BOOTSTAGE_ID_RUN_OS);
-	announce_and_cleanup(fake);
 
-	/*
-	 * log boot time, format: go/freertos-gnq
-	 * Byte offset (starting from 0xfff62800): Data description
-	 * 0x0 Number of TE entries for bl2
-	 * 0x4 Up to 15 TE timestamp entries, 4B each
-	 * ...
-	 * 0x40 Number of TE entries for uboot
-	 * 0x44 Up to 15 TE timestamp entries, 4B each
-	 */
-	logging_set_entry(LOG_KERN_JUMP);
+	announce_and_cleanup(fake);
 
 	if (!fake) {
 #ifdef CONFIG_ARMV8_PSCI
@@ -377,12 +366,14 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 		}
 #endif
 #endif
+		extern uint32_t get_time(void);
+		printf("uboot time: %u us\n", get_time());
 		if (images->os.arch == IH_ARCH_ARM) {
 			printf("boot 32bit kernel\n");
 			jump_to_a32_kernel(images->ep, machid, (unsigned long)images->ft_addr);
 		}
 		else {
-			pr_notice("boot 64bit kernel\n");
+			printf("boot 64bit kernel\n");
 			kernel_entry(images->ft_addr, NULL, NULL, NULL);
 		}
 	}

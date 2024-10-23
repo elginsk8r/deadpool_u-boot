@@ -206,28 +206,37 @@ static int aml_nand_add_partition(struct aml_nand_chip *aml_chip)
 		parts = get_aml_mtd_partition();
 		nr = get_aml_partition_count();
 		adjust_offset = 1024 * mtd->writesize + reserved_part_blk_num * mtd->erasesize;
-#ifdef CONFIG_DISCRETE_BOOTLOADER
-		if (cpu_id.family_id == MESON_CPU_MAJOR_ID_SC2) {
-			fip_part_size = g_ssp.boot_entry[BOOT_AREA_DEVFIP].size * CONFIG_TPL_COPY_NUM;
+
+		if (store_get_device_bootloader_mode() != DISCRETE_BOOTLOADER)
+			goto _COMPAT_BOOTLOADER;
+
+		if ((cpu_id.family_id == MESON_CPU_MAJOR_ID_SC2) ||
+		    (cpu_id.family_id == MESON_CPU_MAJOR_ID_S4)) {
+			fip_part_size = g_ssp.boot_entry[BOOT_AREA_DEVFIP].size * CONFIG_NAND_TPL_COPY_NUM;
 			adjust_offset = g_ssp.boot_entry[BOOT_AREA_DEVFIP].offset + fip_part_size;
 			internal_part_count = 4;
 		} else {
-			fip_part_size = CONFIG_TPL_SIZE_PER_COPY * CONFIG_TPL_COPY_NUM;
+			fip_part_size = CONFIG_TPL_SIZE_PER_COPY * CONFIG_NAND_TPL_COPY_NUM;
 			internal_part_count = 1;
 		}
 
 		for (i = 0; i < internal_part_count; i++) {
 			temp_parts = parts + i;
-			if (cpu_id.family_id == MESON_CPU_MAJOR_ID_SC2) {
+			if ((cpu_id.family_id == MESON_CPU_MAJOR_ID_SC2) ||
+			    (cpu_id.family_id == MESON_CPU_MAJOR_ID_S4)) {
 				temp_parts->offset = g_ssp.boot_entry[i + 1].offset;
-				temp_parts->size = g_ssp.boot_entry[i + 1].size * g_ssp.boot_bakups;
+				if (i == internal_part_count -1)
+					temp_parts->size = fip_part_size;
+				else
+					temp_parts->size = g_ssp.boot_entry[i + 1].size * g_ssp.boot_bakups;
 			} else {
 				temp_parts->offset = adjust_offset;
 				temp_parts->size = fip_part_size;
 				adjust_offset += fip_part_size;
 			}
 		}
-#endif
+
+_COMPAT_BOOTLOADER:
 		for (i = internal_part_count; i < nr; i++) {
 			temp_parts = parts + i;
 			if (mtd->size < adjust_offset) {
@@ -889,7 +898,7 @@ int aml_nand_erase_cmd(struct mtd_info *mtd, int page)
 		return 1;
 	/* fixme, skip bootloader */
 	if (page < 1024)
-		return 1;
+		return 0;
 	/* Send commands to erase a block */
 	valid_page_num = (mtd->writesize >> chip->page_shift);
 
@@ -1659,7 +1668,8 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 	if ((cpu_id.family_id == MESON_CPU_MAJOR_ID_AXG) ||
 	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_TXHD)||
 	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_C1) ||
-	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_C2))
+	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_C2) ||
+	    (cpu_id.family_id == MESON_CPU_MAJOR_ID_S4))
 		aml_chip->bch_info = NAND_ECC_BCH8_1K;
 
 	chip->options = 0;
@@ -1858,6 +1868,7 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 #endif
 		meson_rsv_check(aml_chip->rsv->key);
 		meson_rsv_check(aml_chip->rsv->dtb);
+		meson_rsv_check(aml_chip->rsv->ddr_para);
 	}
 
 	if (aml_nand_add_partition(aml_chip) != 0) {
@@ -1931,7 +1942,6 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 	offset = mtd->erasesize;
 	offset *= start_blk;
 	for (i=0; i < controller->chip_num; i++) {
-	//if (aml_chip->valid_chip[i]) {
 		for (read_cnt = 0; read_cnt < 3; read_cnt++) {
 			if (read_cnt == 2) {
 				if (aml_chip->mfr_type == NAND_MFR_AMD)
@@ -1940,8 +1950,9 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 					break;
 		    } else {
 				if ((aml_chip->mfr_type == NAND_MFR_SANDISK) ||
-					(aml_chip->mfr_type == 0xc8) ||
-					(aml_chip->mfr_type == 0xc2)) {
+					(aml_chip->mfr_type == NAND_ID_ESMT) ||
+					(aml_chip->mfr_type == NAND_MFR_MACRONIX) ||
+					aml_get_samsung_fbbt_flag()) {
 					addr = offset + read_cnt*mtd->writesize;
 				} else
 					addr = offset +
@@ -2052,27 +2063,6 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 				//printk("col0_oob =%x\n",col0_oob);
 			}
 
-	if ((aml_chip->mfr_type == 0xC8 ) ||
-		(aml_chip->mfr_type == 0xC2)) {
-		if (col0_oob != 0xFF) {
-			printk("detect factory Bad block:%llx blk:%d chip:%d\n",
-				(uint64_t)addr, start_blk, i);
-			bad_blk_cnt++;
-			aml_chip->block_status[start_blk] = NAND_FACTORY_BAD;
-			break;
-		}
-	}
-
-	if (aml_chip->mfr_type  == NAND_MFR_AMD ) {
-		if (col0_oob != 0xFF) {
-			printk("detect factory Bad block:%llx blk:%d chip:%d\n",
-				(uint64_t)addr, start_blk, i);
-			bad_blk_cnt++;
-			aml_chip->block_status[start_blk] = NAND_FACTORY_BAD;
-			break;
-		}
-	}
-
 	if ((col0_oob == 0xFF))
 		continue;
 
@@ -2081,25 +2071,19 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 
 		if (aml_chip->mfr_type  == NAND_MFR_DOSILICON ||
 		    aml_chip->mfr_type  == NAND_MFR_ATO ||
-			aml_chip->mfr_type  == NAND_MFR_HYNIX) {
-			if (col0_oob != 0xFF) {
-				pr_info("detect a fbb:%llx blk=%d chip=%d\n",
-					(uint64_t)addr, start_blk, i);
-				bad_blk_cnt++;
-				aml_chip->block_status[start_blk] =
-					NAND_FACTORY_BAD;
-				break;
-			}
-		}
-
-		if (aml_chip->mfr_type  == 0xef ) {
-			if (col0_oob != 0xFF) {
-				printk("detect factory Bad block:%llx blk=%d chip=%d\n",
-					(uint64_t)addr, start_blk, i);
-				bad_blk_cnt++;
-				aml_chip->block_status[start_blk] = NAND_FACTORY_BAD;
-				break;
-			}
+		    aml_chip->mfr_type  == NAND_MFR_HYNIX ||
+		    aml_chip->mfr_type  == NAND_ID_WINBOND ||
+		    aml_chip->mfr_type == NAND_ID_ESMT ||
+		    aml_chip->mfr_type == NAND_MFR_MACRONIX ||
+		    aml_chip->mfr_type  == NAND_MFR_AMD ||
+		    aml_get_samsung_fbbt_flag()) {
+			printk("col0_data =%x col0_oob =%x\n",col0_data,col0_oob);
+			printk("detect a fbb:%llx blk=%d chip=%d\n",
+				(uint64_t)addr, start_blk, i);
+			bad_blk_cnt++;
+			aml_chip->block_status[start_blk] =
+				NAND_FACTORY_BAD;
+			break;
 		}
 
 		if ((aml_chip->mfr_type  == NAND_MFR_SANDISK) ) {
@@ -2150,7 +2134,6 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 		}
 	}
 		}
-		//}
 	}
 	} while((++start_blk) < total_blk);
 

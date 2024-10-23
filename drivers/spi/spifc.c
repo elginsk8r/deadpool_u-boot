@@ -269,32 +269,10 @@ static int spifc_user_cmd_din(struct spifc_priv *priv,
 
 static int spifc_claim_bus(struct udevice *dev)
 {
-	struct udevice *bus = dev->parent;
-	struct spifc_priv *priv = dev_get_priv(bus);
-	int ret;
-
-	ret = pinctrl_select_state(bus, "default");
-	if (ret) {
-		pr_err("%s %d ret %d\n", __func__, __LINE__, ret);
-		return ret;
-	}
-
-	dm_gpio_free(bus, &priv->cs_gpios);
-	ret = gpio_request_by_name(bus, "cs-gpios",
-				   0, &priv->cs_gpios, 0);
-	if (ret) {
-		pr_err("%s %d request gpio error!\n", __func__, __LINE__);
-		return ret;
-	}
-	if (!dm_gpio_is_valid(&priv->cs_gpios)) {
-		pr_err("%s %d cs pin gpio invalid!\n", __func__, __LINE__);
-		return 1;
-	}
-	ret = dm_gpio_set_dir_flags(&priv->cs_gpios, GPIOD_IS_OUT);
-	if (ret)
-		pr_err("%s %d set dir error!\n", __func__, __LINE__);
-
-	return ret;
+	/* Deleted invalid gpio operations, otherwise it
+	 * will seriously reduce the read and write speed
+	 */
+	return 0;
 }
 
 static int spifc_release_bus(struct udevice *dev)
@@ -448,6 +426,15 @@ static int spifc_probe(struct udevice *bus)
 	struct spifc_priv *priv = dev_get_priv(bus);
 	int ret = 0;
 
+	/* In consideration of compatibility with other storage media,
+	 * reset pinmux to spifc here.
+	 */
+	ret = pinctrl_select_state(bus, "default");
+	if (ret) {
+		pr_err("select state %s failed\n", "default");
+		return ret;
+	}
+
 	priv->regs = (struct spifc_regs *)plat->reg;
 #if defined(CONFIG_CLK) && (CONFIG_CLK)
 	if (clk_get_by_name(bus, "core", &priv->core))
@@ -471,7 +458,7 @@ static int spifc_probe(struct udevice *bus)
 	if (ret)
 		pr_err("%s %d set dir error!\n", __func__, __LINE__);
 
-	return ret;
+	return dm_gpio_set_value(&priv->cs_gpios, 1);
 }
 
 static int spifc_ofdata_to_platdata(struct udevice *bus)

@@ -13,9 +13,7 @@
  */
 
 #define AML_VCCK_INIT_VOLTAGE	  939	    //VCCK power up voltage
-#define AML_VDDEE_INIT_VOLTAGE    801       //VDDEE power up voltage
-/*if CONFIG_PDVFS_ENABLE is defined, AML_VCCK_INIT_VOLTAGE will be invalid*/
-#define CONFIG_PDVFS_ENABLE
+#define AML_VDDEE_INIT_VOLTAGE    801       // VDDEE power up voltage
 
 /* SMP Definitinos */
 #define CPU_RELEASE_ADDR		secondary_boot_func
@@ -66,7 +64,6 @@
         "loadaddr_rtos=0x00001000\0"\
         "loadaddr_kernel=0x01080000\0"\
         "otg_device=1\0" \
-        "charger_type=1\0" \
         "panel_type=lcd_1\0" \
         "outputmode=1080p60hz\0" \
         "hdmimode=1080p60hz\0" \
@@ -113,13 +110,14 @@
             "if itest ${upgrade_step} == 3; then run storeargs; run update; fi;"\
             "\0"\
         "storeargs="\
-            "setenv bootargs ${initargs} ${fs_type} otg_device=${otg_device} charger_type=${charger_type} "\
+            "get_bootloaderversion;" \
+            "setenv bootargs ${initargs} ${fs_type} otg_device=${otg_device} "\
                 "logo=${display_layer},loaded,${fb_addr} vout=${outputmode},enable panel_type=${panel_type} "\
                 "hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} "\
                 "frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} cvbsmode=${cvbsmode} "\
                 "osd_reverse=${osd_reverse} video_reverse=${video_reverse} irq_check_en=${Irq_check_en}  "\
                 "androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
-            "setenv bootargs ${bootargs} androidboot.hardware=amlogic;"\
+            "setenv bootargs ${bootargs} androidboot.bootloader=${bootloader_version} androidboot.hardware=amlogic;"\
             "run cmdline_keys;"\
             "\0"\
         "switch_bootmode="\
@@ -198,7 +196,7 @@
                 "fi;"\
             "fi;"\
             "setenv bootargs ${bootargs} androidboot.wificountrycode=${region_code};"\
-            "setenv bootargs ${bootargs} androidboot.serialno=${usid} charger_type=${charger_type};"\
+            "setenv bootargs ${bootargs} androidboot.serialno=${usid};"\
             "setenv serial ${usid}; setenv serial# ${usid};"\
             "\0"\
 
@@ -411,6 +409,8 @@
 #endif /* CONFIG_AML_SECURE_UBOOT */
 
 #define CONFIG_FIP_IMG_SUPPORT  1
+
+#define BL32_SHARE_MEM_SIZE  0x100000
 
 #endif
 

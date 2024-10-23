@@ -67,8 +67,8 @@
 #define CPU_ID_REG		SYSCTRL_SEC_STATUS_REG0
 #define PACKAGE_ID_MASK 	0xFF
 
-/*A1 SoC has problem to support AES for secure boot, here just disable it*/
-#define CONFIG_AML_CRYPTO_AES 1
+/*C1 SoC secure boot solution default not support AES algorithm*/
+//#define CONFIG_AML_CRYPTO_AES 1
 
 
 /*Flag for enable AES key generate to EFUSE pattern, with this flag only

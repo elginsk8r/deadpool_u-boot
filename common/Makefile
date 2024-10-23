@@ -131,6 +131,7 @@ obj-y += cli.o
 obj-$(CONFIG_FSL_DDR_INTERACTIVE) += cli_simple.o cli_readline.o
 obj-$(CONFIG_DFU_OVER_USB) += dfu.o
 obj-y += command.o
+obj-$(CONFIG_MESON_LEDS_STATE_CONTROL) += cmd_leds_state.o
 obj-$(CONFIG_$(SPL_TPL_)LOG) += log.o
 obj-$(CONFIG_$(SPL_TPL_)LOG_CONSOLE) += log_console.o
 obj-y += s_record.o
@@ -140,5 +141,4 @@ obj-$(CONFIG_$(SPL_TPL_)YMODEM_SUPPORT) += xyzModem.o
 obj-$(CONFIG_AVB_VERIFY) += avb_verify.o
 obj-$(CONFIG_MDUMP_COMPRESS) += ramdump.o
 
-obj-y += led.o
-obj-${CONFIG_SCHUMACHER_SSR} += ssr.o
+obj-y += blxx2bl33_param.o

@@ -198,7 +198,7 @@ static int print_cpuinfo(void)
 
 static int announce_dram_init(void)
 {
-	pr_notice("DRAM:  ");
+	puts("DRAM:  ");
 	return 0;
 }
 
@@ -725,8 +725,8 @@ static int setup_reloc(void)
 #endif
 	memcpy(gd->new_gd, (char *)gd, sizeof(gd_t));
 
-	pr_info("Relocation Offset is: %08lx\n", gd->reloc_off);
-	pr_info("Relocating to %08lx, new gd at %08lx, sp at %08lx\n",
+	printf("Relocation Offset is: %08lx\n", gd->reloc_off);
+	printf("Relocating to %08lx, new gd at %08lx, sp at %08lx\n",
 	      gd->relocaddr, (ulong)map_to_sysmem(gd->new_gd),
 	      gd->start_addr_sp);
 

@@ -10,10 +10,17 @@
 #include <linux/libfdt.h>
 #include <asm/arch/bl31_apis.h>
 #include <amlogic/aml_efuse.h>
+#include <part_efi.h>
+#include <blk.h>
+#include <compiler.h>
+#include <mmc.h>
+#include <emmc_partitions.h>
 
 #ifdef CONFIG_MULTI_DTB
 	extern unsigned long get_multi_dt_entry(unsigned long fdt_addr);
 #endif
+
+#define GPT_SPACE 0X2000
 
 struct partitions_data{
 	int nr;
@@ -21,11 +28,15 @@ struct partitions_data{
 };
 
 struct partitions *part_table = NULL;
-static int parts_total_num;
+int parts_total_num;
 int has_boot_slot = 0;
 int has_system_slot = 0;
 bool dynamic_partition = false;
 bool vendor_boot_partition = false;
+bool is_partition_checked = false;
+#if CONFIG_IS_ENABLED(EFI_PARTITION)
+bool gpt_partition;
+#endif
 
 int get_partitions_table(struct partitions **table)
 {
@@ -44,8 +55,6 @@ struct partitions *get_partitions(void)
 {
 	return part_table;
 }
-
-
 
 void free_partitions(void)
 {
@@ -94,6 +103,90 @@ int check_valid_dts(unsigned char *buffer)
 	return ret;
 }
 
+#if CONFIG_IS_ENABLED(EFI_PARTITION)
+int parse_gpt(struct blk_desc *dev_desc, void *buf)
+{
+	gpt_header *gpt_h;
+	gpt_entry *gpt_e;
+	size_t efiname_len, dosname_len;
+	int parts_num = 0;
+	int i, k;
+
+	/* determine start of GPT Header in the buffer */
+	gpt_h = buf + (GPT_PRIMARY_PARTITION_TABLE_LBA *
+			dev_desc->blksz);
+
+	/* determine start of GPT Entries in the buffer */
+	gpt_e = buf + (le64_to_cpu(gpt_h->partition_entry_lba) *
+			dev_desc->blksz);
+
+	parts_num = le32_to_cpu(gpt_h->num_partition_entries);
+	if (parts_num > 0) {
+		part_table = (struct partitions *)
+			malloc(sizeof(struct partitions) * parts_num);
+		if (!part_table) {
+			printf("%s part_table alloc _err\n", __func__);
+			return -1;
+		}
+		memset(part_table, 0, sizeof(struct partitions) * parts_num);
+		parts_total_num = parts_num;
+	}
+
+	dynamic_partition = false;
+	env_set("partition_mode", "normal");
+	vendor_boot_partition = false;
+	env_set("vendor_boot_mode", "false");
+
+	for (i = 0; i < parts_num; i++) {
+		if (!is_pte_valid(&gpt_e[i])) {
+			free(part_table);
+			return -1;
+		}
+
+		part_table[i].offset = le64_to_cpu(gpt_e[i].starting_lba << 9ULL);
+		part_table[i].size = ((le64_to_cpu(gpt_e[i].ending_lba) + 1) -
+				le64_to_cpu(gpt_e[i].starting_lba)) << 9ULL;
+		/* mask flag */
+		part_table[i].mask_flags =
+			(uint32_t)le64_to_cpu(gpt_e[i].attributes.fields.type_guid_specific);
+		/* partition name */
+		efiname_len = sizeof(gpt_e[i].partition_name) / sizeof(efi_char16_t);
+		dosname_len = sizeof(part_table[i].name);
+
+		memset(part_table[i].name, 0, sizeof(part_table[i].name));
+		for (k = 0; k < min(dosname_len, efiname_len); k++)
+			part_table[i].name[k] = (char)gpt_e[i].partition_name[k];
+
+		if (strcmp(part_table[i].name, "boot_a") == 0) {
+			has_boot_slot = 1;
+			printf("set has_boot_slot = 1\n");
+		} else if (strcmp(part_table[i].name, "boot") == 0) {
+			has_boot_slot = 0;
+			printf("set has_boot_slot = 0\n");
+		}
+
+		if (strcmp(part_table[i].name, "system_a") == 0)
+			has_system_slot = 1;
+		else if (strcmp(part_table[i].name, "system") == 0)
+			has_system_slot = 0;
+
+		if (strcmp(part_table[i].name, "super") == 0) {
+			dynamic_partition = true;
+			env_set("partition_mode", "dynamic");
+			printf("enable dynamic_partition\n");
+		}
+
+		if (strncmp(part_table[i].name, "vendor_boot", 11) == 0) {
+			vendor_boot_partition = true;
+			env_set("vendor_boot_mode", "true");
+			printf("enable vendor_boot\n");
+		}
+	}
+	is_partition_checked = false;
+	return 0;
+}
+#endif
+
 int get_partition_from_dts(unsigned char *buffer)
 {
 	char *dt_addr;
@@ -106,12 +199,31 @@ int get_partition_from_dts(unsigned char *buffer)
 	const char *umask;
 	int index;
 	int ret = -1;
+#if CONFIG_IS_ENABLED(EFI_PARTITION)
+	struct blk_desc *dev_desc;
 
-	if ( buffer == NULL)
+	if (!buffer)
 		goto _err;
 
+	dev_desc = (struct blk_desc *)malloc(sizeof(struct blk_desc));
+	if (!dev_desc)
+		goto _err;
+
+	dev_desc->blksz = MMC_BLOCK_SIZE;
+	dev_desc->lba = GPT_SPACE;
+
+	if (!is_valid_gpt_buf(dev_desc, buffer)) {
+		if (!parse_gpt(dev_desc, buffer)) {
+			gpt_partition = true;
+			free(dev_desc);
+			return 0;
+		}
+	}
+	free(dev_desc);
+#endif
+
 	ret = check_valid_dts(buffer);
-	pr_debug("%s() %d: ret %d\n",__func__, __LINE__, ret);
+	printf("%s() %d: ret %d\n",__func__, __LINE__, ret);
 	if ( ret < 0 )
 	{
 		printf("%s() %d: ret %d\n",__func__, __LINE__, ret);
@@ -130,14 +242,13 @@ int get_partition_from_dts(unsigned char *buffer)
 		goto _err;
 	}
 	parts_num = (int *)fdt_getprop(dt_addr, nodeoffset, "parts", NULL);
-	pr_debug("parts: %d\n",be32_to_cpup((u32*)parts_num));
+	printf("parts: %d\n",be32_to_cpup((u32*)parts_num));
 
 	if (parts_num > 0)
 	{
 		part_table = (struct partitions *)malloc(sizeof(struct partitions)*(be32_to_cpup((u32*)parts_num)));
 		if (!part_table) {
-			printk("%s part_table alloc _err\n",__func__);
-			//kfree(data);
+			printf("%s part_table alloc _err\n", __func__);
 			return -1;
 		}
 		memset(part_table, 0, sizeof(struct partitions)*(be32_to_cpup((u32*)parts_num)));
@@ -175,15 +286,15 @@ int get_partition_from_dts(unsigned char *buffer)
 			memcpy(part_table[index].name, uname, strlen(uname));
 		part_table[index].size = ((unsigned long)be32_to_cpup((u32*)usize) << 32) | (unsigned long)be32_to_cpup((((u32*)usize)+1));
 		part_table[index].mask_flags = be32_to_cpup((u32*)umask);
-		pr_debug("%02d:%10s\t%016llx %01x\n", index, uname, part_table[index].size, part_table[index].mask_flags);
+		printf("%02d:%10s\t%016llx %01x\n", index, uname, part_table[index].size, part_table[index].mask_flags);
 
 		if (strcmp(uname, "boot_a") == 0) {
 			has_boot_slot = 1;
-			pr_info("set has_boot_slot = 1\n");
+			printf("set has_boot_slot = 1\n");
 		}
 		else if (strcmp(uname, "boot") == 0) {
 			has_boot_slot = 0;
-			pr_info("set has_boot_slot = 0\n");
+			printf("set has_boot_slot = 0\n");
 		}
 		if (strcmp(uname, "system_a") == 0)
 			has_system_slot = 1;
@@ -202,6 +313,8 @@ int get_partition_from_dts(unsigned char *buffer)
 			printf("enable vendor_boot\n");
 		}
 	}
+	/*enable mmc_device_init when dtb is update from ddr*/
+	is_partition_checked = false;
 	return 0;
 
 _err:

@@ -13,9 +13,7 @@
  */
 
 #define AML_VCCK_INIT_VOLTAGE	  939	    //VCCK power up voltage
-#define AML_VDDEE_INIT_VOLTAGE    801       //VDDEE power up voltage
-/*if CONFIG_PDVFS_ENABLE is defined, AML_VCCK_INIT_VOLTAGE will be invalid*/
-#define CONFIG_PDVFS_ENABLE
+#define AML_VDDEE_INIT_VOLTAGE    801       // VDDEE power up voltage
 
 /* SMP Definitinos */
 #define CPU_RELEASE_ADDR		secondary_boot_func
@@ -110,13 +108,14 @@
             "if itest ${upgrade_step} == 3; then run storeargs; run update; fi;"\
             "\0"\
         "storeargs="\
+            "get_bootloaderversion;" \
             "setenv bootargs ${initargs} ${fs_type} otg_device=${otg_device} "\
                 "logo=${display_layer},loaded,${fb_addr} vout=${outputmode},enable panel_type=${panel_type} "\
                 "hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} "\
                 "frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} cvbsmode=${cvbsmode} "\
                 "osd_reverse=${osd_reverse} video_reverse=${video_reverse} irq_check_en=${Irq_check_en}  "\
                 "androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
-            "setenv bootargs ${bootargs} androidboot.hardware=amlogic;"\
+            "setenv bootargs ${bootargs} androidboot.bootloader=${bootloader_version} androidboot.hardware=amlogic;"\
             "run cmdline_keys;"\
             "\0"\
         "switch_bootmode="\
@@ -404,6 +403,8 @@
 #endif /* CONFIG_AML_SECURE_UBOOT */
 
 #define CONFIG_FIP_IMG_SUPPORT  1
+
+#define BL32_SHARE_MEM_SIZE  0x100000
 
 #endif
 

@@ -250,38 +250,4 @@ unsigned int usb_get_device_mode_phy_base(void);
 void usb_phy_tuning_reset(void);
 void usb_device_mode_init(void);
 
-/******************************************************/
-/*            bc regist list                          */
-/******************************************************/
-typedef struct bc_reg_list {
-	volatile uint32_t bc_ctrl;
-	volatile uint32_t bc_status;
-	volatile uint32_t bc_otp;
-	volatile uint32_t bc_reg0;
-	volatile uint32_t bc_reg1;
-	volatile uint32_t bc_cnt_l;
-	volatile uint32_t bc_cnt_h;
-} bc_reg_list_t;
-
-typedef union bc_ctrl {
-	uint32_t d32;
-	struct {
-		unsigned bc_det_clean:1;
-		unsigned bc_int_clean:1;
-		unsigned bc_en:1;
-		unsigned reserved:29;
-	} b;
-} bc_ctrl_t;
-
-typedef union bc_status {
-	uint32_t d32;
-	struct {
-		unsigned bc_det_end:1;
-		unsigned port_status:4;
-		unsigned bc_state:3;
-		unsigned analog_out_signal:8;
-		unsigned reserved:16;
-	} b;
-} bc_status_t;
-
 #endif

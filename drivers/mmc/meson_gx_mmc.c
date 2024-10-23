@@ -107,7 +107,7 @@ static void meson_mmc_config_clock(struct meson_host *host)
 	struct mmc *mmc = host->mmc;
 	uint32_t clk = 0, clk_src = 0, clk_div = 0;
 	uint32_t co_phase = 0, tx_phase = 0;
-	uint32_t meson_mmc_clk = 0;
+	uint32_t meson_mmc_clk = 0, cfg = 0;
 
 	if (!mmc->clock)
 		return;
@@ -115,23 +115,27 @@ static void meson_mmc_config_clock(struct meson_host *host)
 	if (mmc->clock > 12000000) {
 		clk = 1000000000;
 		clk_src = 1;
+		if (host->src_clk != 0) {
+			clk = host->src_clk;
+			clk_src = 0;
+		}
 		clk_disable(&host->xtal);
 		clk_set_parent(&host->mux, &host->div2);
 		clk_set_rate(&host->div, clk);
+		cfg = meson_read(mmc, MESON_SD_EMMC_CFG);
+		cfg |= CFG_AUTO_CLK;
+		meson_write(mmc, cfg, MESON_SD_EMMC_CFG);
 	} else {
 		clk = 24000000;
 		clk_src = 0;
 		clk_enable(&host->xtal);
 		clk_set_rate(&host->div, clk);
 	}
-	clk_div = (clk / mmc->clock) + (!!(clk % mmc->clock));
-
-	//printf("sd_emmc_clk_ctrl:0x%x\n", readl(((0x0038<<2) + 0xfe000800)));
-	//printf("sd_emmc_clk_ctrl1:0x%x\n", readl(((0x0048<<2) + 0xfe000800)));
 
 	clk_div = clk / mmc->clock;
 	if (clk % mmc->clock)
 		clk_div++;
+	mmc->clock = clk / clk_div;
 	if (mmc->ddr_mode) {
 		clk_div /= 2;
 		pr_info("DDR: \n");
@@ -172,6 +176,7 @@ static void meson_mmc_config_clock(struct meson_host *host)
 			tx_phase = dev_read_u32_default(mmc->dev, "init_tx_phase", 0);
 			break;
 	}
+
 	meson_mmc_clk =((0 << Cfg_irq_sdio_sleep_ds) |
 					(0 << Cfg_irq_sdio_sleep) |
 					(1 << Cfg_always_on) |
@@ -451,7 +456,9 @@ static void mmc_setup_desc(struct udevice *dev, struct mmc_cmd *cmd,
 	}
 
 	meson_mmc_cmd = &(desc_cur->cmd_info);
-	*meson_mmc_cmd |= CMD_CFG_TIMEOUT_4S;
+	/* It takes longer to erase large amounts of data */
+	if (cmd->cmdidx != MMC_CMD_ERASE)
+		*meson_mmc_cmd |= CMD_CFG_TIMEOUT_4S;
 	*meson_mmc_cmd |= CMD_CFG_END_OF_CHAIN;
 }
 
@@ -515,11 +522,11 @@ static int meson_dm_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	ret = meson_mmc_desc_transfer(dev, cmd, data);
 #endif
 
-	/* use 10s timeout */
+	/* use 30s timeout */
 	start = get_timer(0);
 	do {
 		status = meson_read(mmc, MESON_SD_EMMC_STATUS);
-	} while(!(status & STATUS_END_OF_CHAIN) && get_timer(start) < 10000);
+	} while(!(status & STATUS_END_OF_CHAIN) && get_timer(start) < 30000);
 
 	meson_mmc_read_response(mmc, cmd);
 
@@ -539,6 +546,12 @@ static int meson_dm_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 void meson_hw_reset(struct udevice *dev)
 {
 	struct meson_host *host = dev_get_priv(dev);
+	u32 cfg = 0;
+
+	/* send the initialization stream: 74 clock cycles */
+	cfg = meson_read(host->mmc, MESON_SD_EMMC_CFG);
+	cfg &= ~CFG_AUTO_CLK;
+	meson_write(host->mmc, cfg, MESON_SD_EMMC_CFG);
 
 	if (aml_card_type_mmc(host)) {
 		dm_gpio_set_value(&host->gpio_reset, 0);
@@ -737,7 +750,7 @@ int meson_execute_tuning(struct udevice *dev, uint opcode)
 	if (host->blk_test == NULL)
 		return -EINVAL;
 
-	pr_info("%s: tuning start:\n", mmc->cfg->name);
+	printf("%s: tuning start:\n", mmc->cfg->name);
 	meson_write(mmc, 0, MESON_SD_EMMC_ADJUST);
 	old_dly = meson_read(mmc, MESON_SD_EMMC_DELAY1);
 	d1_dly = (old_dly & DLY_D1_MASK) >> Dly_d1;
@@ -854,7 +867,7 @@ tuning:
 		meson_write(mmc, dly, MESON_SD_EMMC_DELAY1);
 		goto tuning;
 	} else
-		pr_info("%s: best_win_start =%d, best_win_size =%d\n",
+		printf("%s: best_win_start =%d, best_win_size =%d\n",
 				mmc->cfg->name, best_win_start, best_win_size);
 
 	adj_delay = best_win_start + (best_win_size - 1) / 2
@@ -944,6 +957,8 @@ static int meson_mmc_ofdata_to_platdata(struct udevice *dev)
 	ret = mmc_of_parse(dev, cfg);
 	if (ret)
 		return ret;
+
+	host->src_clk = dev_read_u32_default(dev, "source-clock", 0);
 
 	dev->name = dev_read_string(dev, "pinname");
 	if (dev_read_bool(dev, "non-removable"))
@@ -1051,7 +1066,7 @@ static int meson_mmc_probe(struct udevice *dev)
 	val &= ~CFG_RC_CC_MASK;
 	val |= CFG_RC_CC_16;
 	meson_write(mmc, val, MESON_SD_EMMC_CFG);
-	printf("[%s]%s: probe success!\n", __func__, mmc->cfg->name);
+	printf("[%s]%s: Controller probe success!\n", __func__, mmc->cfg->name);
 
 	return 0;
 err:

@@ -46,20 +46,20 @@ void clk_util_set_dsp_clk(uint32_t id, uint32_t freq_sel)
 
 
 	control = readl(addr);
-	pr_info("CLKTREE_DSP_CLK_CTRL0  value 0x%x \n",control);
+	printf("CLKTREE_DSP_CLK_CTRL0  value 0x%x \n",control);
 
 	switch (freq_sel)
 	{
-		case 1  : clk_sel = 3; clk_div =0; pr_info ("CLK_UTIL:dsp[%d]:fclk5:400MHz\n" ,id); break;
-		case 2  : clk_sel = 1; clk_div =1; pr_info ("CLK_UTIL:dsp[%d]:fclk2/2:500MHz\n" ,id); break;
+		case 1  : clk_sel = 3; clk_div =0; printf ("CLK_UTIL:dsp[%d]:fclk5:400MHz\n" ,id); break;
+		case 2  : clk_sel = 1; clk_div =1; printf ("CLK_UTIL:dsp[%d]:fclk2/2:500MHz\n" ,id); break;
 		//case 3  : clk_sel = 1; clk_div =0; printf ("CLK_UTIL:dsp[%d]:fclk/3:667MHz\n" ,id); break;
-		case 4  : clk_sel = 2; clk_div =1; pr_info ("CLK_UTIL:dsp[%d]:fclk3/2:333MHz\n" ,id); break;
-		case 5  : clk_sel = 1; clk_div =3; pr_info ("CLK_UTIL:dsp[%d]:fclk2/4:250MHz\n",id); break;
-		case 6  : clk_sel = 3; clk_div =1; pr_info ("CLK_UTIL:dsp[%d]:fclk5/2:200MHz\n",id); break;
-		case 7  : clk_sel = 3; clk_div =3; pr_info ("CLK_UTIL:dsp[%d]:fclk5/4:100MHz\n",id); break;
-		case 8  : clk_sel = 0; clk_div =0; pr_info ("CLK_UTIL:dsp[%d]:oscin:24MHz\n",id); break;
-		case 10 : clk_sel = 0; clk_div =7; pr_info ("CLK_UTIL:dsp[%d]:oscin/8:3MHz\n",id); break;
-		default : clk_sel = 3; clk_div =0; pr_info ("CLK_UTIL:dsp[%d]:fclk5:400MHz\n" ,id); break;
+		case 4  : clk_sel = 2; clk_div =1; printf ("CLK_UTIL:dsp[%d]:fclk3/2:333MHz\n" ,id); break;
+		case 5  : clk_sel = 1; clk_div =3; printf ("CLK_UTIL:dsp[%d]:fclk2/4:250MHz\n",id); break;
+		case 6  : clk_sel = 3; clk_div =1; printf ("CLK_UTIL:dsp[%d]:fclk5/2:200MHz\n",id); break;
+		case 7  : clk_sel = 3; clk_div =3; printf ("CLK_UTIL:dsp[%d]:fclk5/4:100MHz\n",id); break;
+		case 8  : clk_sel = 0; clk_div =0; printf ("CLK_UTIL:dsp[%d]:oscin:24MHz\n",id); break;
+		case 10 : clk_sel = 0; clk_div =7; printf ("CLK_UTIL:dsp[%d]:oscin/8:3MHz\n",id); break;
+		default : clk_sel = 3; clk_div =0; printf ("CLK_UTIL:dsp[%d]:fclk5:400MHz\n" ,id); break;
 	}
 
 	if (control & (1 << 15)) {  //if sync_mux ==1, sel mux 0
@@ -67,55 +67,48 @@ void clk_util_set_dsp_clk(uint32_t id, uint32_t freq_sel)
 	} else {
 		control = (control & ~( ( 1<<15) | (0x3ff<<16) | (0x7 <<26) ) ) | (1<<13)| (1<<29) | (clk_div<<16) | (clk_sel<<26) | (1<<15);
 	}
-	pr_info("CLKTREE_DSP_CLK_CTRL0  value 0x%x \n",control);
+	printf("CLKTREE_DSP_CLK_CTRL0  value 0x%x \n",control);
 	writel(control,addr);
-	pr_info("CLKTREE_DSP_CLK_CTRL0  value 0x%x \n",readl(addr));
+	printf("CLKTREE_DSP_CLK_CTRL0  value 0x%x \n",readl(addr));
 
 }
 
 void dsp_clk_init(unsigned int dspid,  uint32_t freq_sel) {
-	clk_util_set_dsp_clk(dspid, freq_sel);
+	clk_util_set_dsp_clk(dspid,freq_sel);
 }
 
 void dsp_power_set(unsigned int dspid,  uint32_t powerflag) {
-	pr_info("power DSP, Audio \n");
-	power_set_dsp(dspid, powerflag);
-	if (powerflag) {
-		power_set_ctl(PDID_ACODEC, powerflag);//audio
-		power_set_ctl(PDID_AUDIO, powerflag);//audio
-		power_set_ctl(PDID_PDM, powerflag);//pdm
-	}
+	power_set_dsp(dspid,powerflag);
 }
 
 
 static int do_dspset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	unsigned long addr;
 	unsigned int dspid;
 	uint32_t freq_sel;
 	uint32_t powerflag;
 	int ret=0;
 	if (argc <= 1) {
-		pr_err("plese input dsp boot args:id, addrss, clk!\n");
+		printf("plese input dsp boot args:id, addrss, clk!\n");
 		return CMD_RET_USAGE;
 	}
 	dspid = simple_strtoul(argv[1], NULL, 16);
 	freq_sel = simple_strtoul(argv[2], NULL, 16);
 	powerflag = simple_strtoul(argv[3], NULL, 16);
-	pr_info("dsp%d boot \n",dspid);
-	pr_info("dsp clk num:%d\n",freq_sel);
+	printf("dsp%d boot \n",dspid);
+	printf("dsp clk num:%d\n",freq_sel);
 	if (powerflag == 1)
-		pr_info("power on dsp init \n");
+		printf("power on dsp init \n");
 	else
-		pr_info("power off dsp init \n");
+		printf("power off dsp init \n");
 
 //	writel32(readl(CLKTREE_SYS_CLK_EN0) | (1<<30),CLKTREE_SYS_CLK_EN0);
 //	printf("CLKTREE_SYS_CLK_EN0  value 0x%x \n",readl(CLKTREE_SYS_CLK_EN0));
 
 	dsp_clk_init(dspid, freq_sel);
-	udelay(20);
-	dsp_power_set(dspid,  powerflag);
-	pr_info("dsp init CLK, power over! \n");
+	udelay(10);
+	dsp_power_set(dspid,  powerflag) ;
+	printf("dsp init CLK, power over! \n");
 
 	return ret;
 }

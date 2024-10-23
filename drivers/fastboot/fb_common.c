@@ -16,6 +16,11 @@
 #include <emmc_partitions.h>
 #include <amlogic/storage.h>
 
+#ifndef getenv
+#define getenv env_get
+#define setenv env_set
+#endif//#ifndef getenv
+
 #define CONFIG_FASTBOOT_MAX_DOWN_SIZE        0x8000000
 
 /**
@@ -120,6 +125,7 @@ int check_lock(void)
 		info->lock_critical_state = (int)(lock_s[5] - '0');
 		info->lock_bootloader = (int)(lock_s[6] - '0');
 
+		extern void dump_lock_info(LockData_t* info);
 		dump_lock_info(info);
 	} else
 		return 0;
@@ -142,7 +148,7 @@ int get_mergestatus(struct misc_virtual_ab_message *message)
 	char *partition = "misc";
 	char vab_buf[1024] = {0};
 
-	if (store_read((unsigned char *)partition,
+	if (store_read((const char *)partition,
 		SYSTEM_SPACE_OFFSET_IN_MISC, 1024, (unsigned char *)vab_buf) < 0) {
 		printf("failed to store read %s.\n", partition);
 		return -1;
@@ -151,7 +157,7 @@ int get_mergestatus(struct misc_virtual_ab_message *message)
 	run_command("get_valid_slot", 0);
 	int current_slot = 0;
 	char *slot;
-	slot = getenv("slot-suffixes");
+	slot = env_get("slot-suffixes");
 	if (strcmp(slot, "0") == 0) {
 		current_slot = 0;
 	} else if (strcmp(slot, "1") == 0) {
@@ -176,7 +182,7 @@ int set_mergestatus_cancel(struct misc_virtual_ab_message *message)
 	char *partition = "misc";
 	char vab_buf[1024] = {0};
 
-	if (store_read((unsigned char *)partition,
+	if (store_read((const char *)partition,
 		SYSTEM_SPACE_OFFSET_IN_MISC, 1024, (unsigned char *)vab_buf) < 0) {
 		printf("failed to store read %s.\n", partition);
 		return -1;
@@ -188,7 +194,7 @@ int set_mergestatus_cancel(struct misc_virtual_ab_message *message)
 		message->merge_status = CANCELLED;
 		printf("set message.merge_status CANCELLED\n");
 	}
-	store_write((unsigned char *)partition, SYSTEM_SPACE_OFFSET_IN_MISC, 1024, (unsigned char *)vab_buf);
+	store_write((const char *)partition, SYSTEM_SPACE_OFFSET_IN_MISC, 1024, (unsigned char *)vab_buf);
 	return 0;
 }
 

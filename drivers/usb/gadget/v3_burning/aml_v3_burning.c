@@ -11,8 +11,8 @@
 #define BOOT_DEVICE_USB                 5
 #endif// #ifndef BOOT_DEVICE_USB
 extern void serial_initialize(void);
-
 extern void board_init_mem(void);
+extern int aml_v3_usbburning(unsigned timeout, unsigned pcToolWaitTime);
 
 unsigned _get_romcode_boot_id(void)
 {
@@ -58,6 +58,7 @@ static int is_bl1_usb_protocol_DNL(void)
 #endif// #ifdef SYSCTRL_SEC_STATUS_REG1
 }
 
+
 int aml_v3_factory_usb_burning(int flag, bd_t* bis)
 {
     if (!is_boot_device_usb()) return 1;
@@ -79,11 +80,11 @@ int aml_v3_factory_usb_burning(int flag, bd_t* bis)
 #endif
     //pull down and sleep in bl2-->tpl,
     //to improve pc compatibility
-    f_dwc_otg_pullup(0);
+    /*f_dwc_otg_pullup(0);*/
     udelay(2*1000*1000);
 
     v3tool_work_mode_set(V3TOOL_WORK_MODE_USB_PRODUCE);
     optimus_clear_ovd_register();//clear OVD register for normal reboot
-    return run_command("adnl", 0);
+    return aml_v3_usbburning(0, 0);
 }
 

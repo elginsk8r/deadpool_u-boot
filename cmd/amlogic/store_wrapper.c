@@ -15,28 +15,30 @@
 //change part logic offset to physical address for mtd, not changed if not MTD
 static int mtd_find_phy_off_by_lgc_off(const char* partName, const loff_t logicAddr, loff_t* phyAddr)
 {
-	struct mtd_info * mtdPartInf = NULL;
-	loff_t off = 0;
-	static struct {
-		loff_t lastblkPhyOff;
-		loff_t lastblkLgcOff;
-		char   partName[64];
-	}_map4SpeedUp = {0};
-	int canSpeedUp = 0;
-
 	if (!(BOOT_NAND_MTD == store_get_type() || BOOT_SNAND == store_get_type())) {
 		*phyAddr = logicAddr;
 		return 0;
 	}
-
+#ifndef CONFIG_CMD_MTD
+	MsgP("Exception, boottype is MTD or snand, BUT CMD_MTD not defined\n");
+#else
+#ifndef CONFIG_USB_GADGET_CRG
+	struct mtd_info * mtdPartInf = NULL;
 	mtdPartInf = get_mtd_device_nm(partName);
+#endif
 	if (IS_ERR(mtdPartInf)) {
 		errorP("device(%s) is err\n", partName);
 		return CMD_RET_FAILURE;
 	}
 	const unsigned eraseSz = mtdPartInf->erasesize;
 	const unsigned offsetInBlk = logicAddr & (eraseSz - 1);
-
+	loff_t off = 0;
+	int canSpeedUp = 0;
+	static struct {
+		loff_t lastblkPhyOff;
+		loff_t lastblkLgcOff;
+		char   partName[64];
+	}_map4SpeedUp = {0};
 	if ( !strcmp(partName, _map4SpeedUp.partName) && logicAddr >= _map4SpeedUp.lastblkLgcOff) {
 		canSpeedUp = 1;
 	} else {
@@ -55,6 +57,7 @@ static int mtd_find_phy_off_by_lgc_off(const char* partName, const loff_t logicA
 		off = _map4SpeedUp.lastblkPhyOff;
 	}
 	for (; off < mtdPartInf->size; off += eraseSz, _map4SpeedUp.lastblkPhyOff += eraseSz) {
+#ifndef CONFIG_USB_GADGET_CRG
 		if (mtd_block_isbad(mtdPartInf, off)) {
 			MsgP("bad blk at  %08llx\n", (unsigned long long)off);
 		} else {
@@ -65,8 +68,9 @@ static int mtd_find_phy_off_by_lgc_off(const char* partName, const loff_t logicA
 			}
 			_map4SpeedUp.lastblkLgcOff += eraseSz;
 		}
+#endif
 	}
-
+#endif// #ifndef CONFIG_CMD_MTD
 	return __LINE__;
 }
 
@@ -96,6 +100,11 @@ u64 store_logic_cap(const char* partName)
 	if (!(BOOT_NAND_MTD == store_get_type() || BOOT_SNAND == store_get_type())) {
 		return store_part_size(partName);
 	}
+
+#ifndef CONFIG_CMD_MTD
+	MsgP("Exception, boottype is MTD or snand, BUT CMD_MTD not defined\n");
+	return 0;
+#else
 	//get mtd part logic size (i.e, not including the bad blocks)
 	struct mtd_info * mtdPartInf = NULL;
 	uint64_t partSzLgc = 0;
@@ -116,5 +125,23 @@ u64 store_logic_cap(const char* partName)
 		}
 	}
 	return partSzLgc;
+#endif// #ifndef CONFIG_CMD_MTD
+}
+
+int store_gpt_ops(size_t sz, void *buf, int isWr)
+{
+	int ret = 0;
+
+	if (!sz || sz >= 0x100000) {
+		errorP("sz 0x%zx to large\n", sz);
+		return -__LINE__;
+	}
+
+	if (isWr)
+		ret = store_gpt_write(buf);
+	else
+		ret = store_gpt_read(buf);
+
+	return ret;
 }
 

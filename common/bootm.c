@@ -20,7 +20,6 @@
 #include <lzma/LzmaTypes.h>
 #include <lzma/LzmaDec.h>
 #include <lzma/LzmaTools.h>
-#include <time_logging.h>
 #include <android_image.h>
 #include <amlogic/storage.h>
 #if defined(CONFIG_CMD_USB)
@@ -264,8 +263,6 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 static int read_fdto_partition(void)
 {
 	char cmd[128];
-	int ret = 0;
-	u64 tmp = 0;
 	void *dtbo_mem_addr = NULL;
 	char dtbo_partition[32];
 	char *s1;
@@ -325,25 +322,107 @@ static int read_fdto_partition(void)
 #ifdef CONFIG_OF_LIBFDT_OVERLAY
 static int get_fdto_totalsize(u32 *tz)
 {
-	unsigned long long dtbo_mem_addr = NULL;
+#ifdef CONFIG_CMD_DTIMG
+	unsigned long long dtbo_mem_addr = 0x0;
+#endif
 	int ret;
 
 	ret = read_fdto_partition();
 	if (ret != 0)
 		return ret;
 
-	dtbo_mem_addr = simple_strtoul(env_get("dtbo_mem_addr"), NULL, 16);
 #ifdef CONFIG_CMD_DTIMG
+	dtbo_mem_addr = simple_strtoul(env_get("dtbo_mem_addr"), NULL, 16);
 	*tz = android_dt_get_totalsize(dtbo_mem_addr);
 #endif
 	return 0;
 }
 #endif
 
+static void add_boot_args(const char *varname, const int varvalue)
+{
+	// Build cmdline.
+	int ret;
+	char cmdline[/* max= */ 256];
+	ret = snprintf(cmdline, sizeof(cmdline), "%s=%d", varname, varvalue);
+	if (ret < 0 || ret >= sizeof(cmdline)) {
+		puts("Error: build cmdline in add_boot_args failed!\n");
+		return;
+	}
+
+	// Add boot args.
+	char *bootargs = env_get("bootargs");
+	int newbootargs_size = bootargs
+	        ? strlen(bootargs) + 1 /* space */ + strlen(cmdline) + 1 /* null */
+	        : strlen(cmdline) + 1 /* null */;
+	char *newbootargs = malloc(newbootargs_size);
+	if (!newbootargs) {
+		puts("Error: malloc in add_boot_args failed!\n");
+		return;
+	}
+
+	if (bootargs) {
+		snprintf(newbootargs, newbootargs_size, "%s %s", bootargs, cmdline);
+	} else {
+		snprintf(newbootargs, newbootargs_size, "%s", cmdline);
+	}
+
+	env_set("bootargs", newbootargs);
+	free(newbootargs);
+}
+
+#ifdef CONFIG_OF_LIBFDT_OVERLAY
+static int find_dtbo_idx(const int board_id)
+{
+	unsigned long long dtbo_mem_addr = env_get_hex("dtbo_mem_addr", 0x0);
+
+	if (dtbo_mem_addr == 0x0) {
+		printf("No valid dtbo image found\n");
+		return -1;
+	}
+
+#ifdef CONFIG_CMD_DTIMG
+	if (!android_dt_check_header(dtbo_mem_addr)) {
+		printf("Error: DTBO image header is incorrect\n");
+		return -1;
+	}
+#endif
+
+	const struct dt_table_header *hdr;
+	u32 entry_count, entries_offset, entry_size;
+	u32 i;
+
+	hdr = map_sysmem(dtbo_mem_addr, sizeof(*hdr));
+	entry_count = fdt32_to_cpu(hdr->dt_entry_count);
+	entries_offset = fdt32_to_cpu(hdr->dt_entries_offset);
+	entry_size = fdt32_to_cpu(hdr->dt_entry_size);
+
+	unmap_sysmem(hdr);
+
+	printf("Read board id from dtbo...\n");
+	for (i = 0; i < entry_count; ++i) {
+		const ulong e_addr = dtbo_mem_addr + entries_offset + i * entry_size;
+		const struct dt_table_entry *entry;
+
+		entry = map_sysmem(e_addr, sizeof(*entry));
+		int dtbo_board_id = fdt32_to_cpu(entry->id);
+
+		unmap_sysmem(entry);
+
+		if (dtbo_board_id == board_id) {
+			printf("Find dtbo index %d for board id %d\n", i, board_id);
+			return i;
+		}
+	}
+	printf("Can't find dtbo index for board id %d\n", board_id);
+	return -1;
+}
+#endif
+
 #ifdef CONFIG_OF_LIBFDT_OVERLAY
 static int do_fdt_overlay(void)
 {
-	unsigned long long dtbo_mem_addr = NULL;
+	unsigned long long dtbo_mem_addr = 0x0;
 	int dtbo_num = 0;
 	int i;
 	char cmd[128];
@@ -369,9 +448,9 @@ static int do_fdt_overlay(void)
 		(const struct dt_table_header *)dtbo_mem_addr)->dt_entry_count);
 	printf("find %d dtbos\n", dtbo_num);
 
-	dtbo_idx = env_get("androidboot.dtbo_idx");
+	dtbo_idx = env_get("dtbo_idx");
 	if (!dtbo_idx) {
-		printf("No androidboot.dtbo_idx configured\n");
+		printf("No dtbo_idx configured\n");
 		printf("And no dtbos will be applied\n");
 		return -1;
 	}
@@ -449,7 +528,7 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 	images.ft_addr = (char *)map_sysmem(dtb_mem_addr, 0);
 	images.ft_len = fdt_get_header(dtb_mem_addr, totalsize);
 #endif /* CONFIG_DTB_MEM_ADDR */
-	pr_info("load dtb from 0x%lx ......\n", (unsigned long)(images.ft_addr));
+	printf("load dtb from 0x%lx ......\n", (unsigned long)(images.ft_addr));
 #ifdef CONFIG_MULTI_DTB
 	extern unsigned long get_multi_dt_entry(unsigned long fdt_addr);
 	/* update dtb address, compatible with single dtb and multi dtbs */
@@ -480,11 +559,26 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 	}
 	set_working_fdt_addr(map_to_sysmem(images.ft_addr));
 
+	int board_id = env_get_ulong("board_id", 10, -1);
+	if (board_id >= 0) {
+		// Add board id to sys properties.
+		add_boot_args("androidboot.board_id", board_id);
+	}
+
 #ifdef CONFIG_OF_LIBFDT_OVERLAY
 	if (get_fdto_totalsize(&fdto_totalsize) == 0)
 		fdt_set_totalsize(images.ft_addr, fdt_get_header(images.ft_addr,
 				  totalsize) + fdto_totalsize);
 	images.ft_len = fdt_get_header(images.ft_addr, totalsize);
+
+	int dtbo_idx = 0; // Default.
+	int board_dtbo_idx = find_dtbo_idx(board_id);
+	if (board_dtbo_idx >= 0) {
+		dtbo_idx = board_dtbo_idx;
+	}
+
+	add_boot_args("androidboot.dtbo_idx", dtbo_idx);
+	env_set_ulong("dtbo_idx", dtbo_idx);
 	do_fdt_overlay();
 #endif
 #endif
@@ -537,12 +631,10 @@ static void print_decomp_msg(int comp_type, int type, bool is_xip)
 {
 	const char *name = genimg_get_type_name(type);
 
-#ifdef BL33_DEBUG_PRINT
 	if (comp_type == IH_COMP_NONE)
 		printf("   %s %s ... ", is_xip ? "XIP" : "Loading", name);
 	else
 		printf("   Uncompressing %s ... ", name);
-#endif
 }
 
 /**
@@ -586,9 +678,7 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 		       uint unc_len, ulong *load_end)
 {
 	int ret = 0;
-	size_t size = 0;
 
-	const char *type_name = genimg_get_type_name(type);
 	*load_end = load;
 	print_decomp_msg(comp, type, load == image_start);
 
@@ -640,7 +730,8 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 #endif /* CONFIG_LZMA */
 #ifdef CONFIG_LZO
 	case IH_COMP_LZO: {
-		size = unc_len;
+		const char *type_name = genimg_get_type_name(type);
+		size_t size = unc_len;
 		printf("   Uncompressing %s ... ", type_name);
 		ret = lzop_decompress(image_buf, image_len, load_buf, &size);
 		image_len = size;
@@ -649,7 +740,7 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 #endif /* CONFIG_LZO */
 #ifdef CONFIG_LZ4
 	case IH_COMP_LZ4: {
-		size = unc_len;
+		size_t size = unc_len;
 
 		ret = ulz4fn(image_buf, image_len, load_buf, &size);
 		image_len = size;
@@ -665,9 +756,7 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 		return handle_decomp_error(comp, image_len, unc_len, ret);
 	*load_end = load + image_len;
 
-#ifdef BL33_DEBUG_PRINT
 	puts("OK\n");
-#endif
 
 	return 0;
 }
@@ -690,17 +779,6 @@ static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 
 	load_buf = map_sysmem(load, 0);
 	image_buf = map_sysmem(os.image_start, image_len);
-
-	/*
-	 * log boot time, format: go/freertos-gnq
-	 * Byte offset (starting from 0xfff62800): Data description
-	 * 0x0 Number of TE entries for bl2
-	 * 0x4 Up to 15 TE timestamp entries, 4B each
-	 * ...
-	 * 0x40 Number of TE entries for uboot
-	 * 0x44 Up to 15 TE timestamp entries, 4B each
-	 */
-	logging_set_entry(LOG_BEFORE_DECOMP);
 	err = bootm_decomp_image(os.comp, load, os.image_start, os.type,
 				 load_buf, image_buf, image_len,
 				 CONFIG_SYS_BOOTM_LEN, &load_end);
@@ -708,7 +786,6 @@ static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 		bootstage_error(BOOTSTAGE_ID_DECOMP_IMAGE);
 		return err;
 	}
-	logging_set_entry(LOG_AFTER_DECOMP);
 
 	flush_len = load_end - load;
 	if (flush_start < load)
@@ -1081,7 +1158,7 @@ static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
 
 	char *avb_s;
 	avb_s = env_get("avb2");
-	pr_info("avb2: %s\n", avb_s);
+	printf("avb2: %s\n", avb_s);
 	if (strcmp(avb_s, "1") != 0) {
 #ifdef CONFIG_AML_ANTIROLLBACK
 		boot_img_hdr_t **tmp_img_hdr = (boot_img_hdr_t **)&buf;
@@ -1164,7 +1241,7 @@ static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
 #endif
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	case IMAGE_FORMAT_ANDROID:
-		pr_info("## Booting Android Image at 0x%08lx ...\n", img_addr);
+		printf("## Booting Android Image at 0x%08lx ...\n", img_addr);
 		if (!android_image_need_move(&img_addr, buf))
 			buf = map_sysmem(img_addr, 0);
 		else

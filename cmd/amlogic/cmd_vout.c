@@ -46,9 +46,6 @@ static int do_vout_list(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv
 #ifdef CONFIG_AML_HDMITX
 	struct hdmitx_dev *hdmitx_device = hdmitx_get_hdev();
 #endif
-#ifdef CONFIG_AML_LCD
-	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
-#endif
 
 #ifdef CONFIG_AML_HDMITX
 	if (!hdmitx_device) {
@@ -66,14 +63,7 @@ static int do_vout_list(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv
 
 #ifdef CONFIG_AML_LCD
 	printf("\nvalid lcd mode:\n");
-	if (lcd_drv) {
-		if (lcd_drv->list_support_mode)
-			lcd_drv->list_support_mode();
-		else
-			printf("no lcd list_support_mode\n");
-	} else {
-		printf("no lcd driver\n");
-	}
+	aml_lcd_driver_list_support_mode();
 #endif
 
 	return CMD_RET_SUCCESS;
@@ -83,12 +73,14 @@ static int do_vout_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv
 {
 	char *mode;
 	unsigned int frac;
+#if defined(CONFIG_AML_CVBS) || defined(CONFIG_AML_HDMITX) || defined(CONFIG_AML_LCD)
+	unsigned int mux_sel = VIU_MUX_MAX, venc_sel = VIU_MUX_MAX;
+#endif
 #ifdef CONFIG_AML_HDMITX
 	char str[64];
-	int venc_sel;
 #endif
 #ifdef CONFIG_AML_LCD
-	struct aml_lcd_drv_s *lcd_drv = NULL;
+	unsigned int venc_index;
 #endif
 
 	if (argc != 2)
@@ -99,13 +91,15 @@ static int do_vout_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv
 		printf("cmd_vout: mode malloc falied, exit\n");
 		return CMD_RET_FAILURE;
 	}
-	memset(mode, 0, sizeof(mode));
+	memset(mode, 0, (sizeof(char) * 64));
 	sprintf(mode, "%s", argv[1]);
 	frac = vout_parse_vout_name(mode);
 
 #ifdef CONFIG_AML_CVBS
-	if (cvbs_outputmode_check(mode, frac) == 0) {
-		vout_viu_mux(VOUT_VIU1_SEL, VIU_MUX_ENCI);
+	mux_sel = cvbs_outputmode_check(mode, frac);
+	venc_sel = mux_sel & 0xf;
+	if (venc_sel == VIU_MUX_ENCI) {
+		vout_viu_mux(VOUT_VIU1_SEL, mux_sel);
 #ifdef CONFIG_AML_VPP
 		vpp_matrix_update(VPP_CM_YUV);
 #endif
@@ -119,9 +113,10 @@ static int do_vout_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv
 
 #ifdef CONFIG_AML_HDMITX
 	if (frac == 0) { /* remove frac support in outputmode */
-		venc_sel = hdmi_outputmode_check(mode, frac);
+		mux_sel = hdmi_outputmode_check(mode, frac);
+		venc_sel = mux_sel & 0xf;
 		if (venc_sel < VIU_MUX_MAX) {
-			vout_viu_mux(VOUT_VIU1_SEL, venc_sel);
+			vout_viu_mux(VOUT_VIU1_SEL, mux_sel);
 #ifdef CONFIG_AML_VPP
 			vpp_matrix_update(VPP_CM_YUV);
 #endif
@@ -142,42 +137,68 @@ static int do_vout_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv
 #endif
 
 #ifdef CONFIG_AML_LCD
-	lcd_drv = aml_lcd_get_driver();
-	if (lcd_drv) {
-		if (lcd_drv->lcd_outputmode_check) {
-			if (lcd_drv->lcd_outputmode_check(mode, frac) == 0) {
-				vout_viu_mux(VOUT_VIU1_SEL, VIU_MUX_ENCL);
+	mux_sel = aml_lcd_driver_outputmode_check(mode, frac);
+	venc_sel = mux_sel & 0xf;
+	venc_index = (mux_sel >> 4) & 0xf;
+	if (venc_sel == VIU_MUX_ENCL) {
+		vout_viu_mux(VOUT_VIU1_SEL, mux_sel);
 #ifdef CONFIG_AML_VPP
-				vpp_matrix_update(VPP_CM_RGB);
+		vpp_matrix_update(VPP_CM_RGB);
 #endif
-				if (lcd_drv->lcd_enable) {
-					lcd_drv->lcd_enable(mode, frac);
-					free(mode);
-					run_command("setenv vout_init enable", 0);
-					return CMD_RET_SUCCESS;
-				} else
-					printf("no lcd enable\n");
-			}
-		}
-	} else {
-		printf("no lcd driver\n");
+		aml_lcd_driver_enable(venc_index, mode, frac);
+		free(mode);
+		run_command("setenv vout_init enable", 0);
+		return CMD_RET_SUCCESS;
 	}
 #endif
 
+	printf("outputmode[%s] is invalid\n", argv[1]);
+	do { (void)frac; } while(0);
+
 	free(mode);
 	return CMD_RET_FAILURE;
+}
+
+static int do_vout2_list(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
+{
+#ifdef CONFIG_AML_HDMITX
+	struct hdmitx_dev *hdmitx_device = hdmitx_get_hdev();
+#endif
+
+#ifdef CONFIG_AML_HDMITX
+	if (!hdmitx_device) {
+		printf("\nerror: hdmitx device is null\n");
+	} else {
+		printf("\nvalid hdmi mode:\n");
+		hdmitx_device->hwop.list_support_modes();
+	}
+#endif
+
+#ifdef CONFIG_AML_CVBS
+	printf("\nvalid cvbs mode:\n");
+	cvbs_show_valid_vmode();
+#endif
+
+#ifdef CONFIG_AML_LCD
+	printf("\nvalid lcd mode:\n");
+	aml_lcd_driver_list_support_mode();
+#endif
+
+	return CMD_RET_SUCCESS;
 }
 
 static int do_vout2_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
 	char *mode;
 	unsigned int frac;
+#if defined(CONFIG_AML_CVBS) || defined(CONFIG_AML_HDMITX) || defined(CONFIG_AML_LCD)
+	unsigned int mux_sel = VIU_MUX_MAX, venc_sel = VIU_MUX_MAX;
+#endif
 #ifdef CONFIG_AML_HDMITX20
 	char str[64];
-	int venc_sel;
 #endif
 #ifdef CONFIG_AML_LCD
-	struct aml_lcd_drv_s *lcd_drv = NULL;
+	unsigned int venc_index;
 #endif
 
 	if (argc != 2)
@@ -188,12 +209,14 @@ static int do_vout2_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const arg
 		printf("cmd_vout: mode malloc falied, exit\n");
 		return CMD_RET_FAILURE;
 	}
-	memset(mode, 0, sizeof(mode));
+	memset(mode, 0, (sizeof(char) * 64));
 	sprintf(mode, "%s", argv[1]);
 	frac = vout_parse_vout_name(mode);
 
 #ifdef CONFIG_AML_CVBS
-	if (cvbs_outputmode_check(mode, frac) == 0) {
+	mux_sel = cvbs_outputmode_check(mode, frac);
+	venc_sel = mux_sel & 0xf;
+	if (venc_sel == VIU_MUX_ENCI) {
 		if (cvbs_set_vmode(mode) == 0) {
 			free(mode);
 			return CMD_RET_SUCCESS;
@@ -203,7 +226,8 @@ static int do_vout2_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const arg
 
 #ifdef CONFIG_AML_HDMITX20
 	if (frac == 0) { /* remove frac support in outputmode */
-		venc_sel = hdmi_outputmode_check(mode, frac);
+		mux_sel = hdmi_outputmode_check(mode, frac);
+		venc_sel = mux_sel & 0xf;
 		if (venc_sel < VIU_MUX_MAX) {
 			/* //remove frac support in outputmode
 			 *if (frac)
@@ -221,22 +245,18 @@ static int do_vout2_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const arg
 #endif
 
 #ifdef CONFIG_AML_LCD
-	lcd_drv = aml_lcd_get_driver();
-	if (lcd_drv) {
-		if (lcd_drv->lcd_outputmode_check) {
-			if (lcd_drv->lcd_outputmode_check(mode, frac) == 0) {
-				if (lcd_drv->lcd_enable) {
-					lcd_drv->lcd_enable(mode, frac);
-					free(mode);
-					return CMD_RET_SUCCESS;
-				} else
-					printf("no lcd enable\n");
-			}
-		}
-	} else {
-		printf("no lcd driver\n");
+	mux_sel = aml_lcd_driver_outputmode_check(mode, frac);
+	venc_sel = mux_sel & 0xf;
+	venc_index = (mux_sel >> 4) & 0xf;
+	if (venc_sel == VIU_MUX_ENCL) {
+		aml_lcd_driver_enable(venc_index, mode, frac);
+		free(mode);
+		return CMD_RET_SUCCESS;
 	}
 #endif
+
+	printf("outputmode[%s] is invalid\n", argv[1]);
+	do { (void)frac; } while(0);
 
 	free(mode);
 	return CMD_RET_FAILURE;
@@ -246,11 +266,11 @@ static int do_vout2_prepare(cmd_tbl_t *cmdtp, int flag, int argc, char *const ar
 {
 	char *mode;
 	unsigned int frac;
-#ifdef CONFIG_AML_HDMITX20
-	int venc_sel;
+#if defined(CONFIG_AML_CVBS) || defined(CONFIG_AML_HDMITX) || defined(CONFIG_AML_LCD)
+	unsigned int mux_sel = VIU_MUX_MAX, venc_sel = VIU_MUX_MAX;
 #endif
 #ifdef CONFIG_AML_LCD
-	struct aml_lcd_drv_s *lcd_drv = NULL;
+	unsigned int venc_index;
 #endif
 
 	if (argc != 2)
@@ -261,13 +281,15 @@ static int do_vout2_prepare(cmd_tbl_t *cmdtp, int flag, int argc, char *const ar
 		printf("cmd_vout: mode malloc falied, exit\n");
 		return CMD_RET_FAILURE;
 	}
-	memset(mode, 0, sizeof(mode));
+	memset(mode, 0, (sizeof(char) * 64));
 	sprintf(mode, "%s", argv[1]);
 	frac = vout_parse_vout_name(mode);
 
 #ifdef CONFIG_AML_CVBS
-	if (cvbs_outputmode_check(mode, frac) == 0) {
-		vout_viu_mux(VOUT_VIU2_SEL, VIU_MUX_ENCI);
+	mux_sel = cvbs_outputmode_check(mode, frac);
+	venc_sel = mux_sel & 0xf;
+	if (venc_sel == VIU_MUX_ENCI) {
+		vout_viu_mux(VOUT_VIU2_SEL, mux_sel);
 #ifdef CONFIG_AML_VPP
 		vpp_viu2_matrix_update(VPP_CM_YUV);
 #endif
@@ -277,9 +299,10 @@ static int do_vout2_prepare(cmd_tbl_t *cmdtp, int flag, int argc, char *const ar
 #endif
 
 #ifdef CONFIG_AML_HDMITX20
-	venc_sel = hdmi_outputmode_check(mode, frac);
+	mux_sel = hdmi_outputmode_check(mode, frac);
+	venc_sel = mux_sel & 0xf;
 	if (venc_sel < VIU_MUX_MAX) {
-		vout_viu_mux(VOUT_VIU2_SEL, venc_sel);
+		vout_viu_mux(VOUT_VIU2_SEL, mux_sel);
 #ifdef CONFIG_AML_VPP
 		vpp_viu2_matrix_update(VPP_CM_YUV);
 #endif
@@ -289,26 +312,21 @@ static int do_vout2_prepare(cmd_tbl_t *cmdtp, int flag, int argc, char *const ar
 #endif
 
 #ifdef CONFIG_AML_LCD
-	lcd_drv = aml_lcd_get_driver();
-	if (lcd_drv) {
-		if (lcd_drv->lcd_outputmode_check) {
-			if (lcd_drv->lcd_outputmode_check(mode, frac) == 0) {
-				vout_viu_mux(VOUT_VIU2_SEL, VIU_MUX_ENCL);
+	mux_sel = aml_lcd_driver_outputmode_check(mode, frac);
+	venc_sel = mux_sel & 0xf;
+	venc_index = (mux_sel >> 4) & 0xf;
+	if (venc_sel == VIU_MUX_ENCL) {
+		vout_viu_mux(VOUT_VIU2_SEL, mux_sel);
 #ifdef CONFIG_AML_VPP
-				vpp_viu2_matrix_update(VPP_CM_YUV);
+		vpp_viu2_matrix_update(VPP_CM_RGB);
 #endif
-				if (lcd_drv->lcd_prepare) {
-					lcd_drv->lcd_prepare(mode, frac);
-					free(mode);
-					return CMD_RET_SUCCESS;
-				} else
-					printf("no lcd prepare\n");
-			}
-		}
-	} else {
-		printf("no lcd driver\n");
+		aml_lcd_driver_prepare(venc_index, mode, frac);
+		free(mode);
+		return CMD_RET_SUCCESS;
 	}
 #endif
+
+	do { (void)frac; } while(0);
 
 	free(mode);
 	return CMD_RET_FAILURE;
@@ -354,7 +372,7 @@ U_BOOT_CMD(vout, CONFIG_SYS_MAXARGS, 1, do_vout,
 );
 
 static cmd_tbl_t cmd_vout2_sub[] = {
-	U_BOOT_CMD_MKENT(list, 1, 1, do_vout_list, "", ""),
+	U_BOOT_CMD_MKENT(list, 1, 1, do_vout2_list, "", ""),
 	U_BOOT_CMD_MKENT(prepare, 3, 1, do_vout2_prepare, "", ""),
 	U_BOOT_CMD_MKENT(output, 3, 1, do_vout2_output, "", ""),
 	U_BOOT_CMD_MKENT(info, 1, 1, do_vout_info, "", ""),

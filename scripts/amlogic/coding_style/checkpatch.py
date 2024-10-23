@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import json
 import logging
@@ -283,12 +283,12 @@ def check_fp(fp):
         for f in file_sections:
             assert isinstance(f, ChangedFile)
             if f.comments:
-                print f.filename
+                print(f.filename)
                 pprint.pprint(f.comments)
-                print "---"
+                print("---")
     json_ret = file_comments_to_review(file_sections)
     if json_ret:
-        print json_ret
+        print(json_ret)
         return 0
     else:
         return 1
@@ -304,7 +304,7 @@ def file_comments_to_array(changed_file):
     """
     ret = []
     assert isinstance(changed_file, ChangedFile)
-    for line, msg in changed_file.comments.iteritems():
+    for line, msg in changed_file.comments.items():
         ret.append({"line": line,
                     "message": msg})
     return ret

@@ -11,6 +11,7 @@
 #include <fs.h>
 #include <version.h>
 #include <partition_table.h>
+#include <amlogic/storage.h>
 
 static void getvar_version(char *var_parameter, char *response);
 static void getvar_bootloader_version(char *var_parameter, char *response);
@@ -35,14 +36,6 @@ static void getvar_product(char *var_parameter, char *response);
 static void getvar_current_slot(char *var_parameter, char *response);
 static void getvar_slot_suffixes(char *var_parameter, char *response);
 static void getvar_has_slot(char *var_parameter, char *response);
-#ifdef CONFIG_G_AB_SYSTEM
-static void getvar_slot_successful(char *var_parameter, char *response);
-static void getvar_slot_unbootable(char *var_parameter, char *response);
-static void getvar_slot_retry_count(char *var_parameter, char *response);
-#endif
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
-static void getvar_partition_type(char *part_name, char *response);
-#endif
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void getvar_partition_type(char *part_name, char *response);
 static void getvar_partition_size(char *part_name, char *response);
@@ -132,17 +125,6 @@ static const struct {
 	}, {
 		.variable = "has-slot",
 		.dispatch = getvar_has_slot
-#ifdef CONFIG_G_AB_SYSTEM
-	}, {
-		.variable = "slot-successful",
-		.dispatch = getvar_slot_successful
-	}, {
-		.variable = "slot-unbootable",
-		.dispatch = getvar_slot_unbootable
-	}, {
-		.variable = "slot-retry-count",
-		.dispatch = getvar_slot_retry_count
-#endif
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	}, {
 		.variable = "partition-type",
@@ -168,7 +150,7 @@ static void getvar_bootloader_version(char *var_parameter, char *response)
 {
 	char s_version[32];
 	strncpy(s_version, "01.01.", 6);
-	strcat(s_version, U_BOOT_BUILD_DATE);
+	strcat(s_version, U_BOOT_DATE_TIME);
 	printf("s_version: %s\n", s_version);
 	if (busy_flag == 1) {
 		fastboot_response("INFOversion-bootloader: ", response, "%s", s_version);
@@ -243,12 +225,12 @@ static void getvar_unlocked(char *var_parameter, char *response)
 {
 	if (check_lock()) {
 		if (busy_flag == 1)
-			fastboot_busy("secure: no", response);
+			fastboot_busy("unlocked: no", response);
 		else
 			fastboot_okay("no", response);
 	} else {
 		if (busy_flag == 1)
-			fastboot_busy("secure: yes", response);
+			fastboot_busy("unlocked: yes", response);
 		else
 			fastboot_okay("yes", response);
 	}
@@ -271,23 +253,10 @@ static void getvar_is_userspace(char *var_parameter, char *response)
 
 static void getvar_super_partition_name(char *var_parameter, char *response)
 {
-	char *slot_name;
-	slot_name = env_get("slot-suffixes");
-	char name[64];
-	if (has_boot_slot == 0) {
-		strncpy(name, "super-partition-name: super", 64);
-	} else {
-		printf("slot-suffixes: %s\n", slot_name);
-		if (strcmp(slot_name, "0") == 0) {
-			strncpy(name, "super-partition-name: super_a", 64);
-		} else if (strcmp(slot_name, "1") == 0) {
-			strncpy(name, "super-partition-name: super_b", 64);
-		}
-	}
 	if (busy_flag == 1)
-		fastboot_busy(name, response);
+		fastboot_busy("super-partition-name: super", response);
 	else
-		fastboot_okay(name, response);
+		fastboot_okay("super", response);
 }
 
 static void getvar_is_logical(char *var_parameter, char *response)
@@ -302,6 +271,7 @@ static void getvar_is_logical(char *var_parameter, char *response)
 			|| (strcmp(var_parameter, "odm") == 0) || (strcmp(var_parameter, "product") == 0)
 			|| (strcmp(var_parameter, "system_ext") == 0) || (strcmp(var_parameter, "dtbo") == 0)
 			|| (strcmp(var_parameter, "boot") == 0) || (strcmp(var_parameter, "recovery") == 0)
+			|| (strcmp(var_parameter, "oem") == 0) || (strcmp(var_parameter, "vbmeta_system") == 0)
 			|| (strcmp(var_parameter, "vendor_boot") == 0) || (strcmp(var_parameter, "vbmeta") == 0)) {
 			if (strcmp(slot_name, "0") == 0) {
 				strcat(name, "_a");
@@ -346,9 +316,6 @@ static void getvar_is_logical(char *var_parameter, char *response)
 
 static void getvar_slot_count(char *var_parameter, char *response)
 {
-#ifdef CONFIG_G_AB_SYSTEM
-	fastboot_okay("2", response);
-#else
 	if (has_boot_slot == 1) {
 		if (busy_flag == 1)
 			fastboot_busy("slot-count: 2", response);
@@ -361,7 +328,6 @@ static void getvar_slot_count(char *var_parameter, char *response)
 		else
 			fastboot_okay("0", response);
 	}
-#endif
 }
 
 static void getvar_downloadsize(char *var_parameter, char *response)
@@ -420,11 +386,6 @@ static void getvar_current_slot(char *var_parameter, char *response)
 	slot = env_get("slot-suffixes");
 	printf("slot-suffixes: %s\n", slot);
 	/* A/B not implemented, for now always return _a */
-#ifdef CONFIG_G_AB_SYSTEM
-	const char *s = env_get("active_slot");
-	printf("active_slot: %s\n", s);
-	fastboot_okay(s, response);
-#else
 	if (busy_flag == 1) {
 		if (strcmp(slot, "0") == 0)
 			fastboot_busy("current-slot: a", response);
@@ -437,7 +398,6 @@ static void getvar_current_slot(char *var_parameter, char *response)
 		else if (strcmp(slot, "1") == 0)
 			fastboot_okay("b", response);
 	}
-#endif
 }
 
 static void getvar_snapshot_update_status(char *var_parameter, char *response)
@@ -499,124 +459,64 @@ static void getvar_slot_suffixes(char *var_parameter, char *response)
 
 static void getvar_has_slot(char *part_name, char *response)
 {
-#ifdef CONFIG_G_AB_SYSTEM
-	if (part_name && (!strcmp(part_name, "boot") ||
-			  !strcmp(part_name, "system") ||
-			  !strcmp(part_name, "tpl") ||
-			  !strcmp(part_name, "rtos")))
-#else
-	if (part_name && (!strcmp(part_name, "boot") ||
-			  !strcmp(part_name, "system")))
-#endif
-		fastboot_okay("yes", response);
-	else
-		fastboot_okay("no", response);
-}
-
-#ifdef CONFIG_G_AB_SYSTEM
-static void getvar_slot_successful(char *var_parameter, char *response)
-{
-	char str[128];
-	int ret;
-
-	if (var_parameter && (!strcmp(var_parameter, "a") ||
-			  !strcmp(var_parameter, "b"))) {
-		sprintf(str, "get_slot_state %s successful", var_parameter);
-		printf("command:    %s\n", str);
-		ret = run_command(str, 0);
-		printf("ret = %d\n", ret);
-		if (ret == 0)
-			fastboot_okay("no", response);
-		else
-			fastboot_okay("yes", response);
-	} else {
-		fastboot_okay("unknow slot", response);
-	}
-}
-
-static void getvar_slot_unbootable(char *var_parameter, char *response)
-{
-	char str[128];
-	int ret;
-
-	if (var_parameter && (!strcmp(var_parameter, "a") ||
-			  !strcmp(var_parameter, "b"))) {
-		sprintf(str, "get_slot_state %s unbootable", var_parameter);
-		printf("command:    %s\n", str);
-		ret = run_command(str, 0);
-		printf("ret = %d\n", ret);
-		if (ret == 0)
-			fastboot_okay("yes", response);
+	if (has_boot_slot == 0) {
+		if (busy_flag == 1)
+			fastboot_response("INFOhas-slot:", response, "%s: no", part_name);
 		else
 			fastboot_okay("no", response);
 	} else {
-		fastboot_okay("unknow slot", response);
-	}
-}
-
-static void getvar_slot_retry_count(char *var_parameter, char *response)
-{
-	char str[128];
-	char str_num[12];
-	char *retry_count;
-	int ret;
-
-	if (var_parameter && (!strcmp(var_parameter, "a") ||
-			  !strcmp(var_parameter, "b"))) {
-		sprintf(str, "get_slot_state %s retry-count", var_parameter);
-		printf("command:    %s\n", str);
-		ret = run_command(str, 0);
-		printf("ret = %d\n", ret);
-
-		retry_count = env_get("cur_retry_count");
-		strcpy(str_num, retry_count);
-		fastboot_okay(str_num, response);
-	} else {
-		fastboot_okay("unknow slot", response);
-	}
-}
+		if ((strcmp(part_name, "system") == 0) || (strcmp(part_name, "vendor") == 0)
+			|| (strcmp(part_name, "odm") == 0) || (strcmp(part_name, "product") == 0)
+			|| (strcmp(part_name, "system_ext") == 0) || (strcmp(part_name, "dtbo") == 0)
+			|| (strcmp(part_name, "boot") == 0) || (strcmp(part_name, "recovery") == 0)
+			|| (strcmp(part_name, "vendor_boot") == 0) || (strcmp(part_name, "vbmeta") == 0)
+			|| (strcmp(part_name, "vbmeta_system") == 0)
+#if CONFIG_IS_ENABLED(CHROMECAST_AB)
+			|| (strcmp(part_name, "bootloader") == 0)
 #endif
+			|| (strcmp(part_name, "odm_ext") == 0) || (strcmp(part_name, "oem") == 0)){
+			if (busy_flag == 1)
+				fastboot_response("INFOhas-slot:", response, "%s: yes", part_name);
+			else
+				fastboot_okay("yes", response);
+		} else {
+			if (busy_flag == 1)
+				fastboot_response("INFOhas-slot:", response, "%s: no", part_name);
+			else
+				fastboot_okay("no", response);
+		}
+	}
+}
 
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void getvar_partition_type(char *part_name, char *response)
 {
-	/*int r;
+	int r;
+	char name[32] = {0};
+	u64 rc = 0;
+
+	if (strcmp(part_name, "userdata") == 0 || strcmp(part_name, "data") == 0) {
+		rc = store_part_size("userdata");
+		if (-1 == rc)
+			strlcpy(name, "data", sizeof(name));
+		else
+			strlcpy(name, "userdata", sizeof(name));
+	} else {
+		strlcpy(name, part_name, sizeof(name));
+	}
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 	struct blk_desc *dev_desc;
 	disk_partition_t part_info;
 
-	r = fastboot_mmc_get_part_info(part_name, &dev_desc, &part_info,
+	r = fastboot_mmc_get_part_info(name, &dev_desc, &part_info,
 				       response);
+#endif
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_NAND)
+	struct part_info *part_info;
+
+	r = fastboot_nand_get_part_info(name, &part_info, response);
+#endif
 	if (r >= 0) {
-		r = fs_set_blk_dev_with_part(dev_desc, r);
-		if (r < 0) {
-			if (busy_flag == 1)
-				fastboot_response("INFOpartition-type:", response, "%s: failed to set partition", part_name);
-			else
-				fastboot_fail("failed to set partition", response);
-		} else {
-			if (busy_flag == 1)
-				fastboot_busy(fs_get_type_name(), response);
-			else
-				fastboot_okay(fs_get_type_name(), response);
-		}
-	}*/
-	if ((strcmp(part_name, "system") == 0) || (strcmp(part_name, "vendor") == 0)
-			|| (strcmp(part_name, "odm") == 0) || (strcmp(part_name, "product") == 0)
-			|| (strcmp(part_name, "system_ext") == 0) || (strcmp(part_name, "dtbo") == 0)
-			|| (strcmp(part_name, "metadata") == 0) || (strcmp(part_name, "vbmeta") == 0)
-			|| (strcmp(part_name, "data") == 0) || (strcmp(part_name, "userdata") == 0)){
-		if (busy_flag == 1)
-			fastboot_response("INFOpartition-type:", response, "%s: ext4", part_name);
-		else
-			fastboot_okay("ext4", response);
-	} else if (strcmp(part_name, "cache") == 0) {
-		if (has_boot_slot == 0) {
-			if (busy_flag == 1)
-				fastboot_response("INFOpartition-type:", response, "%s: ext4", part_name);
-			else
-				fastboot_okay("ext4", response);
-		}
-	} else {
 		if (busy_flag == 1)
 			fastboot_response("INFOpartition-type:", response, "%s: raw", part_name);
 		else
@@ -628,14 +528,18 @@ static void getvar_partition_size(char *part_name, char *response)
 {
 	int r;
 	size_t size;
-	char name[32];
+	char name[32] = {0};
+	u64 rc = 0;
 
-	if (strcmp(part_name, "userdata") == 0 && !vendor_boot_partition)
-		strncpy(name, "data", 4);
-	else if (strcmp(part_name, "data") == 0 && vendor_boot_partition)
-		strncpy(name, "userdata", 8);
-	else
+	if (strcmp(part_name, "userdata") == 0 || strcmp(part_name, "data") == 0) {
+		rc = store_part_size("userdata");
+		if (-1 == rc)
+			strncpy(name, "data", 4);
+		else
+			strncpy(name, "userdata", 8);
+	} else {
 		strncpy(name, part_name, 32);
+	}
 
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 	struct blk_desc *dev_desc;
@@ -655,11 +559,11 @@ static void getvar_partition_size(char *part_name, char *response)
 #endif
 	if (r >= 0) {
 		if (busy_flag == 1) {
-			char name[64];
-			strncpy(name, "INFOpartition-size:", 64);
-			strcat(name, part_name);
-			strcat(name, ": ");
-			fastboot_response(name, response, "0x%016zx", size);
+			char all_name[64];
+			strncpy(all_name, "INFOpartition-size:", 64);
+			strcat(all_name, name);
+			strcat(all_name, ": ");
+			fastboot_response(all_name, response, "0x%016zx", size);
 		}
 		else
 			fastboot_response("OKAY", response, "0x%016zx", size);

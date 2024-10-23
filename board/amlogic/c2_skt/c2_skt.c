@@ -101,6 +101,30 @@ void board_init_mem(void) {
 	}
 }
 
+/* set dts props */
+void aml_config_dtb(void)
+{
+	cpu_id_t cpuid = get_cpu_id();
+	if (MESON_CPU_MAJOR_ID_C2 != cpuid.family_id)
+		return;
+
+	run_command("fdt address $dtb_mem_addr", 0);
+	printf("%s %d\n", __func__, __LINE__);
+	if (cpuid.chip_rev == 0xA) {
+		printf("%s %d\n", __func__, __LINE__);
+		run_command("fdt rm /soc/emmc mmc-hs400-1_8v", 0);
+		run_command("fdt rm /soc/emmc fixed-emmc-driver-type", 0);
+		run_command("fdt print /soc/emmc", 0);
+	} else {
+		printf("%s %d\n", __func__, __LINE__);
+		run_command("fdt set /soc/bus/pinctrl/emmc/mux drive-strength <4>", 0);
+		run_command("fdt set /soc/bus/pinctrl/emmc/mux1 drive-strength <4>", 0);
+		run_command("fdt set /soc/bus/pinctrl/emmc_clk_gate/mux drive-strength <4>", 0);
+		run_command("fdt print /soc/bus/pinctrl/emmc", 0);
+		run_command("fdt print /soc/bus/pinctrl/emmc_clk_gate", 0);
+	}
+}
+
 int board_init(void)
 {
 	printf("board init\n");
@@ -145,6 +169,7 @@ int board_late_init(void)
 
 #endif
 
+	aml_config_dtb();
 	return 0;
 }
 
@@ -271,7 +296,7 @@ static const struct mtd_partition spinand_partitions[] = {
 		.size = MTDPART_SIZ_FULL,
 	}
 };
-struct mtd_partition *get_partition_table(int *partitions)
+struct mtd_partition *get_spinand_partition_table(int *partitions)
 {
 	*partitions = ARRAY_SIZE(spinand_partitions);
 	return spinand_partitions;
@@ -298,7 +323,7 @@ static const struct mtd_partition spiflash_partitions[] = {
 		.size = MTDPART_SIZ_FULL,
 	}
 };
-const struct mtd_partition *get_partition_table(int *partitions)
+const struct mtd_partition *get_spiflash_partition_table(int *partitions)
 {
 	*partitions = ARRAY_SIZE(spiflash_partitions);
 	return spiflash_partitions;

@@ -10,11 +10,21 @@
 #include <amlogic/auge_sound.h>
 #include "hdmitx_drv.h"
 
-/* TODO */
+#ifdef CONFIG_VENDOR_NAME
+const static char *vend_name = CONFIG_VENDOR_NAME; /* Max 8 bytes */
+#else
 const static char *vend_name = "Amlogic"; /* Max 8 bytes */
+#endif
+
+#ifdef CONFIG_PRODUCT_NAME
+const static char *prod_desc = CONFIG_PRODUCT_NAME; /* Max 16 bytes */
+#else
 const static char *prod_desc = "MBox Meson Ref"; /* Max 16 bytes */
+#endif
 
 static struct hdmitx_dev hdmitx_device;
+
+DECLARE_GLOBAL_DATA_PTR;
 
 struct hdmitx_dev *hdmitx_get_hdev(void)
 {
@@ -43,13 +53,24 @@ static void hdelay(int us)
 #define mdelay(i)   hdelay(i)
 #define msleep(i)   hdelay(i)
 
-static void hdmitx_set_hw(struct hdmitx_dev *hdev);
+static int hdmitx_set_hw(struct hdmitx_dev *hdev);
 static int hdmitx_set_audmode(struct hdmitx_dev *hdev);
 
 /*Internal functions:*/
 static void hdmitx_csc_config (unsigned char input_color_format,
 	unsigned char output_color_format,
 	unsigned char color_depth);
+
+#define DUMP_SECTION(_a, _b) \
+	do { \
+		typeof(_a) a = (_a); \
+		typeof(_b) b = (_b); \
+		for (reg_adr = (a); \
+		     reg_adr < (b) + 1; reg_adr++) { \
+			reg_val = hdmitx_rd_reg(reg_adr); \
+			printf("[0x%x]: 0x%x\n", reg_adr, reg_val); \
+		} \
+	} while (0)
 
 static void dump_regs(void)
 {
@@ -88,18 +109,38 @@ static void dump_regs(void)
 		reg_val = hd_read_reg(ladr);
 		printk("[0x%08x] = 0x%X\n", hd_get_paddr(ladr), reg_val);
 	}
-	for (reg_adr = HDMITX_TOP_SW_RESET; reg_adr < HDMITX_TOP_DONT_TOUCH1 + 1; reg_adr++) {
-		reg_val = hdmitx_rd_reg(reg_adr);
-		printk("TOP[0x%x]: 0x%x\n", reg_adr, reg_val);
-	}
-	for (reg_adr = HDMITX_DWC_DESIGN_ID; reg_adr < HDMITX_DWC_I2CM_SCDC_UPDATE1 + 1; reg_adr++) {
-		if ((reg_adr > (DWC_OFFSET_MASK + 0x5016)) && (reg_adr < (DWC_OFFSET_MASK + 0x7800)))
-			reg_val = 0;//hdmitx_rd_reg(reg_adr);
-		else
-			reg_val = hdmitx_rd_reg(reg_adr);
-		if (reg_val)
-			printk("hdmitx: [0x%x]: 0x%x\n", reg_adr, reg_val);
-	}
+
+	printf("\n--------HDMITX registers--------\n");
+
+	DUMP_SECTION(HDMITX_TOP_SW_RESET, HDMITX_TOP_STAT0);
+	DUMP_SECTION(HDMITX_TOP_SKP_CNTL_STAT, HDMITX_TOP_DUK_3);
+	DUMP_SECTION(HDMITX_TOP_INFILTER, HDMITX_TOP_NSEC_SCRATCH);
+	DUMP_SECTION(HDMITX_TOP_SEC_SCRATCH, HDMITX_TOP_SEC_SCRATCH);
+	DUMP_SECTION(HDMITX_TOP_EMP_CNTL0, HDMITX_TOP_I2C_BUSY_CNT_STAT);
+	DUMP_SECTION(HDMITX_TOP_HDCP22_BSOD, HDMITX_TOP_HDCP22_BSOD);
+	DUMP_SECTION(HDMITX_TOP_DDC_CNTL, HDMITX_TOP_HDCP22_MIN_SIZE);
+	DUMP_SECTION(HDMITX_DWC_DESIGN_ID, HDMITX_DWC_CONFIG3_ID);
+	DUMP_SECTION(HDMITX_DWC_IH_FC_STAT0, HDMITX_DWC_IH_MUTE);
+	DUMP_SECTION(HDMITX_DWC_TX_INVID0, HDMITX_DWC_TX_BCBDATA1);
+	DUMP_SECTION(HDMITX_DWC_VP_STATUS, HDMITX_DWC_VP_MASK);
+	DUMP_SECTION(HDMITX_DWC_FC_INVIDCONF, HDMITX_DWC_FC_DBGTMDS2);
+	DUMP_SECTION(HDMITX_DWC_PHY_CONF0, HDMITX_DWC_I2CM_PHY_SDA_HOLD);
+	DUMP_SECTION(HDMITX_DWC_AUD_CONF0, HDMITX_DWC_AUD_INT1);
+	DUMP_SECTION(HDMITX_DWC_AUD_N1, HDMITX_DWC_AUD_INPUTCLKFS);
+	DUMP_SECTION(HDMITX_DWC_AUD_SPDIF0, HDMITX_DWC_AUD_SPDIFINT1);
+	DUMP_SECTION(HDMITX_DWC_MC_CLKDIS, HDMITX_DWC_MC_CLKDIS);
+	DUMP_SECTION(HDMITX_DWC_MC_CLKDIS_SC2, HDMITX_DWC_MC_CLKDIS_SC2);
+	DUMP_SECTION(HDMITX_DWC_MC_SWRSTZREQ, HDMITX_DWC_MC_LOCKONCLOCK);
+	DUMP_SECTION(HDMITX_DWC_CSC_CFG, HDMITX_DWC_CSC_LIMIT_DN_LSB);
+	DUMP_SECTION(HDMITX_DWC_A_HDCPCFG0, HDMITX_DWC_A_HDCPCFG1);
+	DUMP_SECTION(HDMITX_DWC_A_HDCPOBS0, HDMITX_DWC_A_BSTATUS_LO);
+	DUMP_SECTION(HDMITX_DWC_HDCPREG_BKSV0, HDMITX_DWC_HDCPREG_RMLSTS);
+	DUMP_SECTION(HDMITX_DWC_HDCPREG_SEED0, HDMITX_DWC_HDCPREG_DPK6);
+	DUMP_SECTION(HDMITX_DWC_HDCP22REG_ID, HDMITX_DWC_HDCP22REG_ID);
+	DUMP_SECTION(HDMITX_DWC_HDCP22REG_CTRL, HDMITX_DWC_HDCP22REG_CTRL);
+	DUMP_SECTION(HDMITX_DWC_HDCP22REG_CTRL1, HDMITX_DWC_HDCP22REG_MUTE);
+	DUMP_SECTION(HDMITX_DWC_CEC_CTRL, HDMITX_DWC_CEC_WAKEUPCTRL);
+	DUMP_SECTION(HDMITX_DWC_I2CM_SLAVE, HDMITX_DWC_I2CM_SCDC_UPDATE1);
 }
 
 static void hdmitx_hw_init(void)
@@ -146,6 +187,13 @@ static void hdmitx_hw_init(void)
 	hdmitx_wr_reg(HDMITX_DWC_MC_LOCKONCLOCK, 0xff);
 
 	hdmitx_wr_reg(HDMITX_DWC_MC_CLKDIS, 0x00);
+	/*disable null package*/
+	if (hdmitx_find_vendor_null_pkt(&hdmitx_device)) {
+		printf("special TV, need enable NULL packet\n");
+		hdmitx_wr_reg(HDMITX_TOP_DISABLE_NULL, 0x6);
+	} else {
+		hdmitx_wr_reg(HDMITX_TOP_DISABLE_NULL, 0x7);
+	}
 }
 
 /*
@@ -287,6 +335,7 @@ static struct hdmi_support_mode gxbb_modes[] = {
 	{HDMI_3840x2160p50_16x9, "2160p50hz420", 1},
 	{HDMI_4096x2160p50_256x135, "smpte50hz420", 1},
 	{HDMI_4096x2160p60_256x135, "smpte60hz420", 1},
+	{HDMI_1920x1080p120_16x9, "1080p120hz", 0},
 	{HDMI_1920x1080p60_16x9, "1080p60hz", 0},
 	{HDMI_1920x1080p50_16x9, "1080p50hz", 0},
 	{HDMI_1920x1080p30_16x9, "1080p30hz", 0},
@@ -306,10 +355,10 @@ static struct hdmi_support_mode gxbb_modes[] = {
 	{HDMI_720x480i60_4x3, "480i60hz_4x3", 0},
 	{HDMIV_1440x2560p60hz, "1440x2560p60hz", 0},
 	{HDMIV_3440x1440p60hz, "3440x1440p60hz", 0},
-	{HDMIV_2400x1200p90hz, "2400x1200p90hz", 0},
 	{HDMIV_1280x1024p60hz, "1280x1024p60hz", 0},
 	{HDMIV_1680x1050p60hz, "1680x1050p60hz", 0},
 	{HDMIV_1024x600p60hz, "1024x600p60hz", 0},
+	{HDMIV_2560x1440p60hz, "2560x1440p60hz", 0},
 };
 
 static void hdmitx_list_support_modes(void)
@@ -352,14 +401,64 @@ void hdmitx_set_div40(bool div40)
 	set_tmds_clk_div40(div40);
 }
 
+static void hdmitx_load_dts_config(struct hdmitx_dev *hdev)
+{
+	const void *dt_blob;
+	int node;
+	char *propdata;
+	int ret;
+
+	hdev->limit_res_1080p = 0;
+	dt_blob = gd->fdt_blob;
+	if (dt_blob == NULL) {
+		printf("ERR: hdmitx: dt_blob is null\n");
+		return;
+	}
+
+	ret = fdt_check_header(dt_blob);
+	if (ret < 0) {
+		printf("ERR: hdmitx: check dts: %s\n", fdt_strerror(ret));
+		return;
+	}
+
+	node = fdt_path_offset(dt_blob, "/amhdmitx");
+	if (node < 0) {
+		printf("ERR: hdmitx: not find /amhdmitx node: %s\n", fdt_strerror(node));
+		return;
+	}
+
+	propdata = (char *)fdt_getprop(dt_blob, node, "res_1080p", NULL);
+	if (propdata) {
+		if (!strcmp(propdata, "0"))
+			hdev->limit_res_1080p = 0;
+		else
+			hdev->limit_res_1080p = 1;
+	} else {
+		hdev->limit_res_1080p = 0;
+	}
+	printf("limit_res_1080p: %d\n", hdev->limit_res_1080p);
+}
+
 void hdmitx_init(void)
 {
 	struct hdmitx_dev *hdev = hdmitx_get_hdev();
-	char *dongle_mode = NULL;
+	char *dongle_mode = env_get("dongle_mode");
+	char *edid_check = env_get("edid_check");
 
-	dongle_mode = env_get("dongle_mode");
 	if (dongle_mode && (dongle_mode[0] == '1'))
 		hdev->dongle_mode = 1;
+
+	if (edid_check && edid_check[0] != '\0') {
+		int tmp = edid_check[0] - '0';
+
+		if (tmp >= 0 && tmp <= 3)
+			hdev->edid_check = tmp;
+		else
+			hdev->edid_check = 0;
+	} else {
+		hdev->edid_check = 0;
+	}
+
 	hdev->hwop.get_hpd_state = hdmitx_get_hpd_state;
 	hdev->hwop.read_edid = hdmitx_read_edid;
 	hdev->hwop.turn_off = hdmitx_turnoff;
@@ -369,22 +468,20 @@ void hdmitx_init(void)
 	hdev->hwop.test_prbs = hdmitx_test_prbs;
 	hdev->hwop.set_div40 = hdmitx_set_div40;
 	hdev->hwop.output_blank = hdmitx_output_blank;
+	hdmitx_load_dts_config(hdev);
 }
 
-void hdmi_tx_set(struct hdmitx_dev *hdev)
+int hdmi_tx_set(struct hdmitx_dev *hdev)
 {
+	int ret = 0;
+
 	unsigned char checksum[11];
-	char *p_tmp;
 	aml_audio_init();  /* Init audio hw firstly */
 	hdmitx_hw_init();
 	ddc_init_();
-	hdmitx_set_hw(hdev);
+	ret = hdmitx_set_hw(hdev);
 	/* add audio */
 	hdmitx_set_audmode(hdev);
-	//kernel will determine output mode on its own
-	p_tmp = env_get("outputmode");
-	if (NULL != p_tmp)
-		env_set("hdmimode", p_tmp);
 
 	/* null char needed to terminate the string
 	   otherwise garbage in checksum logopara */
@@ -394,7 +491,7 @@ void hdmi_tx_set(struct hdmitx_dev *hdev)
 	printf("hdmi_tx_set: save mode: %s, attr: %s, hdmichecksum: %s\n",
 		env_get("outputmode"), env_get("colorattribute"), env_get("hdmichecksum"));
 	run_command("saveenv", 0);
-	return;
+	return ret;
 
 #if 0
 	hdmi_tx_gate(vic);
@@ -406,7 +503,12 @@ void hdmi_tx_set(struct hdmitx_dev *hdev)
 #endif
 }
 
-int hdmi_outputmode_check(char *mode, unsigned int frac)
+/***********************************************
+ * parameters:  mode, such as 720p60hz, 1080p50hz...
+ *              frac, 1=59.94/29.97hz.
+ * return:      viu_mux
+ ************************************************/
+unsigned int hdmi_outputmode_check(char *mode, unsigned int frac)
 {
 	int i, ret = 0xff;
 
@@ -418,14 +520,14 @@ int hdmi_outputmode_check(char *mode, unsigned int frac)
 	}
 
 	if (ret) {
-		printf("hdmitx: outputmode[%s] is invalid\n", mode);
-		return ret;
+		//printf("hdmitx: outputmode[%s] is invalid\n", mode);
+		return VIU_MUX_MAX;
 	}
 
 	if (frac) {
 		if (hdmitx_likely_frac_rate_mode(mode) == 0) {
 			printf("hdmitx: outputmode[%s] don't support frac\n", mode);
-			return ret;
+			return VIU_MUX_MAX;
 		}
 	}
 
@@ -442,7 +544,7 @@ static int hdmitx_set_audmode(struct hdmitx_dev *hdev)
 	unsigned int data32;
 	unsigned int aud_n_para;
 
-	pr_info("hdmtix: set audio\n");
+	pr_info("hdmitx: set audio\n");
 	hdmitx_set_reg_bits(HDMITX_TOP_CLK_CNTL, 3, 2, 2);
 	hdmitx_set_reg_bits(HDMITX_DWC_FC_PACKET_TX_EN, 1, 0, 1);
 	hdmitx_set_reg_bits(HDMITX_DWC_FC_PACKET_TX_EN, 1, 3, 1);
@@ -617,7 +719,8 @@ static signed int to_signed(unsigned int a);
  *0:TMDS_CLK_rate=TMDS_Character_rate; 1:TMDS_CLK_rate=TMDS_Character_rate/4,
  *for TMDS_Character_rate>340Mcsc.
  */
-static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
+static void config_hdmi20_tx(struct hdmitx_dev *hdev, enum hdmi_vic vic,
+	struct hdmi_format_para *para,
 	unsigned char   color_depth, unsigned char input_color_format,
 	unsigned char   input_color_range, unsigned char   output_color_format,
 	unsigned char   output_color_range)
@@ -695,20 +798,10 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 	data32 |= (((output_color_format==HDMI_COLOR_FORMAT_422)?
 		HDMI_COLOR_DEPTH_24B : color_depth)   << 4);  /*[7:4] color_depth*/
 	data32 |= (0 << 0);
-	if ((data32 & 0xf0) == 0x40 )
+	/* HDMI1.4 CTS7-19 */
+	if ((data32 & 0xf0) == 0x40)
 		data32 &= ~(0xf << 4);
 	hdmitx_wr_reg(HDMITX_DWC_VP_PR_CD, data32);
-	if (output_color_format == HDMI_COLOR_FORMAT_422) {
-		switch (color_depth) {
-		case HDMI_COLOR_DEPTH_24B:
-			tmp = 4;
-			break;
-		default:
-			tmp = 0;
-			break;
-		}
-		hdmitx_set_reg_bits(HDMITX_DWC_VP_PR_CD, tmp, 4, 4);
-	}
 
 	/* Video Packet Stuffing */
 	data32  = 0;
@@ -817,7 +910,7 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 
 	/* Frame Composer configuration */
 
-	/* Video definitions, as per output video(for packet gen/schedulling) */
+	/* Video definitions, as per output video(for packet gen/scheduling) */
 
 	data32  = 0;
 	data32 |= (1 << 7);
@@ -828,6 +921,8 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 	data32 |= (!(para->progress_mode) << 1);
 	data32 |= (!(para->progress_mode) << 0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_INVIDCONF,  data32);
+	if (!hdev->RXCap.IEEEOUI) /* DVI devices */
+		hdmitx_set_reg_bits(HDMITX_DWC_FC_INVIDCONF, 0, 3, 1);
 
 	data32  = GET_TIMING(h_active)&0xff;
 	hdmitx_wr_reg(HDMITX_DWC_FC_INHACTV0,   data32);
@@ -886,7 +981,8 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 	data32  = 0;
 	data32 |= (((output_color_format>>2)&0x1) << 7);
 	data32 |= (1 << 6);
-	data32 |= (0 << 4);
+	/* underscan */
+	data32 |= (2 << 4);
 	data32 |= (0 << 2);
 	data32 |= (0x2 << 0);    /* FIXED YCBCR 444 */
 	hdmitx_wr_reg(HDMITX_DWC_FC_AVICONF0, data32);
@@ -909,6 +1005,12 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 
 	hdmitx_wr_reg(HDMITX_DWC_FC_AVICONF1, 0x8);
 	hdmitx_wr_reg(HDMITX_DWC_FC_AVICONF2, 0);
+	/* refer to 861-H, Page 83, A Source shall always explicitly signal
+	 * the RGB Quantization Range as either Limited Range (Q=1)or Full
+	 * Range (Q=2).
+	 */
+	if (output_color_format == HDMI_COLOR_FORMAT_RGB)
+		hdmitx_set_reg_bits(HDMITX_DWC_FC_AVICONF2, 1, 2, 2);
 
 	/* set Aspect Ratio in AVIInfo */
 	switch (para->vic) {
@@ -1022,7 +1124,7 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 	hdmitx_wr_reg(HDMITX_DWC_FC_CTRLQHIGH,  15);
 	hdmitx_wr_reg(HDMITX_DWC_FC_CTRLQLOW, 3);
 
-	/* packet scheduller configuration for SPD, VSD, ISRC1/2, ACP. */
+	/* packet scheduler configuration for SPD, VSD, ISRC1/2, ACP. */
 	data32  = 0;
 	data32 |= (0 << 4);
 	data32 |= (0 << 3);
@@ -1030,16 +1132,16 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 	data32 |= (0 << 1);
 	data32 |= (0 << 0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_DATAUTO0, data32);
-	hdmitx_set_spdinfo();
 	hdmitx_wr_reg(HDMITX_DWC_FC_DATAUTO1, 0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_DATAUTO2, 0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_DATMAN, 0);
+	hdmitx_set_spdinfo();
 
-	/* packet scheduller configuration for AVI, GCP, AUDI, ACR. */
+	/* packet scheduler configuration for AVI, GCP, AUDI, ACR. */
 	data32  = 0;
 	data32 |= (0 << 5);
 	data32 |= (0 << 4);
-	data32 |= (0 << 3);
+	data32 |= (1 << 3);
 	data32 |= (1 << 2);
 	data32 |= (1 << 1);
 	data32 |= (0 << 0);
@@ -1050,9 +1152,8 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB3,  0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB4,  0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB5,  0);
-	/* AVI info usb RDRB mode and place in line 10*/
 	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB6,  0);
-	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB7,  0x1a);
+	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB7,  0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB8,  0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB9,  0);
 	hdmitx_wr_reg(HDMITX_DWC_FC_RDRB10, 0);
@@ -1067,7 +1168,7 @@ static void config_hdmi20_tx ( enum hdmi_vic vic, struct hdmi_format_para *para,
 	data32 |= (1 << 2);
 	data32 |= (1 << 1);
 	data32 |= (1 << 0);
-	hdmitx_wr_reg(HDMITX_DWC_FC_PACKET_TX_EN, data32);
+	hdmitx_set_reg_bits(HDMITX_DWC_FC_PACKET_TX_EN, data32, 0, 4);
 
 	/* For 3D video */
 	data32  = 0;
@@ -1256,27 +1357,30 @@ static void hdmitx_set_pll(struct hdmitx_dev *hdev)
  */
 static void enc_vpu_bridge_reset(int mode)
 {
-    unsigned int wr_clk = 0;
+	unsigned int wr_clk = 0;
 
-    wr_clk = (hd_read_reg(P_VPU_HDMI_SETTING) & 0xf00) >> 8;
-    if (mode) {
-        hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 0, 2);  /*[    0] src_sel_enci: Disable ENCP output to HDMI*/
-        hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 8, 4);  /*[    0] src_sel_enci: Disable ENCP output to HDMI*/
-        mdelay(1);
-        hd_set_reg_bits(P_VPU_HDMI_SETTING, wr_clk, 8, 4);
-        mdelay(1);
-        hd_set_reg_bits(P_VPU_HDMI_SETTING, 2, 0, 2);  /*[    0] src_sel_enci: Enable ENCP output to HDMI*/
-    } else {
-        hd_write_reg(P_ENCI_VIDEO_EN, 0);
-        hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 0, 2);  /*[    0] src_sel_enci: Disable ENCI output to HDMI*/
-        hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 8, 4);  /*[    0] src_sel_enci: Disable ENCP output to HDMI*/
-        mdelay(1);
-        hd_write_reg(P_ENCI_VIDEO_EN, 1);
-        mdelay(1);
-        hd_set_reg_bits(P_VPU_HDMI_SETTING, wr_clk, 8, 4);
-        mdelay(1);
-        hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 0, 2);  /*[    0] src_sel_enci: Enable ENCI output to HDMI*/
-    }
+	wr_clk = (hd_read_reg(P_VPU_HDMI_SETTING) & 0xf00) >> 8;
+	if (mode) {
+		hd_write_reg(P_ENCP_VIDEO_EN, 0);
+		hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 0, 2);
+		hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 8, 4);
+		mdelay(1);
+		hd_set_reg_bits(P_VPU_HDMI_SETTING, wr_clk, 8, 4);
+		mdelay(1);
+		hd_set_reg_bits(P_VPU_HDMI_SETTING, 2, 0, 2);
+		mdelay(1);
+		hd_write_reg(P_ENCP_VIDEO_EN, 1);
+	} else {
+		hd_write_reg(P_ENCI_VIDEO_EN, 0);
+		hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 0, 2);
+		hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 8, 4);
+		mdelay(1);
+		hd_set_reg_bits(P_VPU_HDMI_SETTING, wr_clk, 8, 4);
+		mdelay(1);
+		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 0, 2);
+		mdelay(1);
+		hd_write_reg(P_ENCI_VIDEO_EN, 1);
+	}
 }
 
 static void hdmi_tvenc1080i_set(enum hdmi_vic vic)
@@ -1414,8 +1518,6 @@ static void hdmi_tvenc1080i_set(enum hdmi_vic vic)
 		(0 << 8) |
 		(0 << 12)
 	);
-	hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
-
 }
 
 static bool is_hdmi4k_420(enum hdmi_vic vic)
@@ -1615,8 +1717,6 @@ static void hdmi_tvenc4k2k_set(enum hdmi_vic vic)
 		hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 8, 1);
 		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 20, 1);
 	}
-
-	hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 }
 
 static void hdmi_tvenc480i_set(enum hdmi_vic vic)
@@ -1794,7 +1894,6 @@ static void hdmi_tvenc480i_set(enum hdmi_vic vic)
 		(1 << 8) |
 		(1 << 12)
 	);
-	hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 0, 1);
 }
 
 static void hdmi_tvenc_set_def(enum hdmi_vic vic)
@@ -1998,7 +2097,6 @@ static void hdmi_tvenc_set_def(enum hdmi_vic vic)
 			(1 << 8) |
 			(1 << 12)
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 0, 1);
 		break;
 	case HDMI_1920x1080i60_16x9:
 	case HDMI_1920x1080i50_16x9:
@@ -2011,7 +2109,6 @@ static void hdmi_tvenc_set_def(enum hdmi_vic vic)
 			(0 << 8) |
 			(0 << 12)
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 		break;
 	case HDMI_3840x2160p30_16x9:
 	case HDMI_3840x2160p25_16x9:
@@ -2032,7 +2129,6 @@ static void hdmi_tvenc_set_def(enum hdmi_vic vic)
 			(0 << 8) |
 			(0 << 12)
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 		break;
 	case HDMI_720x480p60_16x9:
 	case HDMI_720x576p50_16x9:
@@ -2049,7 +2145,6 @@ static void hdmi_tvenc_set_def(enum hdmi_vic vic)
 			(0 << 8) |
 			(0 << 12)
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 		break;
 	case HDMI_1280x720p60_16x9:
 	case HDMI_1280x720p50_16x9:
@@ -2064,7 +2159,6 @@ static void hdmi_tvenc_set_def(enum hdmi_vic vic)
 			(0 << 8) |
 			(0 << 12)
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 		break;
 	default:
 		hd_write_reg(P_VPU_HDMI_SETTING, (0 << 0) |
@@ -2076,9 +2170,7 @@ static void hdmi_tvenc_set_def(enum hdmi_vic vic)
 			(0 << 8) |
 			(0 << 12)
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 	}
-	hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 }
 
 static void hdmi_tvenc_vesa_set(enum hdmi_vic vic)
@@ -2187,7 +2279,6 @@ static void hdmi_tvenc_vesa_set(enum hdmi_vic vic)
 				(0 << 8) |
 				(0 << 12)
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 		break;
 	default:
 		hd_write_reg(P_VPU_HDMI_SETTING, (0 << 0) |
@@ -2199,9 +2290,7 @@ static void hdmi_tvenc_vesa_set(enum hdmi_vic vic)
 				(0 << 8) |
 				(0 << 12)
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 	}
-	hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);
 }
 
 static void hdmi_tvenc_set(enum hdmi_vic vic)
@@ -2268,7 +2357,6 @@ static void hdmi_tvenc_set(enum hdmi_vic vic)
 			(1 << 8) | /* [11: 8] wr_rate. 0=A write every clk1; 1=A write every 2 clk1; ...; 15=A write every 16 clk1.*/
 			(1 <<12)   /* [15:12] rd_rate. 0=A read every clk2; 1=A read every 2 clk2; ...; 15=A read every 16 clk2.*/
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 0, 1);  // [    0] src_sel_enci: Enable ENCI output to HDMI*/
 		break;
 	case HDMI_1920x1080i60_16x9:
 	case HDMI_1920x1080i50_16x9:
@@ -2291,7 +2379,6 @@ static void hdmi_tvenc_set(enum hdmi_vic vic)
 			(0 << 8) | /*[11: 8] wr_rate. 0=A write every clk1; 1=A write every 2 clk1; ...; 15=A write every 16 clk1.*/
 			(0 <<12)   /*[15:12] rd_rate. 0=A read every clk2; 1=A read every 2 clk2; ...; 15=A read every 16 clk2.*/
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1); /*[    1] src_sel_encp: Enable ENCP output to HDMI*/
 		break;
 	case HDMI_3840x2160p30_16x9:
 	case HDMI_3840x2160p25_16x9:
@@ -2319,7 +2406,6 @@ static void hdmi_tvenc_set(enum hdmi_vic vic)
 			(0 << 8) | /*[11: 8] wr_rate. 0=A write every clk1; 1=A write every 2 clk1; ...; 15=A write every 16 clk1.*/
 			(0 <<12)   /*[15:12] rd_rate. 0=A read every clk2; 1=A read every 2 clk2; ...; 15=A read every 16 clk2.*/
 		);
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);  /*[    1] src_sel_encp: Enable ENCP output to HDMI*/
 		break;
 	case HDMI_720x480p60_16x9:
 	case HDMI_720x576p50_16x9:
@@ -2345,7 +2431,6 @@ static void hdmi_tvenc_set(enum hdmi_vic vic)
 			(0 <<12)   /*[15:12] rd_rate. 0=A read every clk2; 1=A read every 2 clk2; ...; 15=A read every 16 clk2.*/
 		);
 		/*Annie 01Sep2011: Register VENC_DVI_SETTING and VENC_DVI_SETTING_MORE are no long valid, use VPU_HDMI_SETTING instead.*/
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);  /*[    1] src_sel_encp: Enable ENCP output to HDMI*/
 		break;
 	case HDMI_1280x720p60_16x9:
 	case HDMI_1280x720p50_16x9:
@@ -2369,7 +2454,6 @@ static void hdmi_tvenc_set(enum hdmi_vic vic)
 			(0 <<12)   /*[15:12] rd_rate. 0=A read every clk2; 1=A read every 2 clk2; ...; 15=A read every 16 clk2.*/
 		);
 		/*Annie 01Sep2011: Register VENC_DVI_SETTING and VENC_DVI_SETTING_MORE are no long valid, use VPU_HDMI_SETTING instead.*/
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);  /*[    1] src_sel_encp: Enable ENCP output to HDMI*/
 		break;
 	default:
 		/*Annie 01Sep2011: Register VENC_DVI_SETTING and VENC_DVI_SETTING_MORE are no long valid, use VPU_HDMI_SETTING instead.*/
@@ -2394,7 +2478,6 @@ static void hdmi_tvenc_set(enum hdmi_vic vic)
 			hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 20, 1);
 		}
 		/*Annie 01Sep2011: Register VENC_DVI_SETTING and VENC_DVI_SETTING_MORE are no long valid, use VPU_HDMI_SETTING instead.*/
-		hd_set_reg_bits(P_VPU_HDMI_SETTING, 1, 1, 1);  /*[    1] src_sel_encp: Enable ENCP output to HDMI*/
 	}
 }
 
@@ -2432,6 +2515,8 @@ static void hdmitx_set_dith(struct hdmitx_dev* hdev)
 
 static void set_tmds_clk_div40(unsigned int div40)
 {
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
 	if (div40 == 1) {
 		hdmitx_wr_reg(HDMITX_TOP_TMDS_CLK_PTTN_01, 0);		/*[25:16] tmds_clk_pttn[19:10]  [ 9: 0] tmds_clk_pttn[ 9: 0]*/
 		hdmitx_wr_reg(HDMITX_TOP_TMDS_CLK_PTTN_23, 0x03ff03ff); /*[25:16] tmds_clk_pttn[39:30]  [ 9: 0] tmds_clk_pttn[29:20]*/
@@ -2444,7 +2529,8 @@ static void set_tmds_clk_div40(unsigned int div40)
 	hdmitx_wr_reg(HDMITX_TOP_TMDS_CLK_PTTN_CNTL, 0x1);		/*0xc*/
 	msleep(2);
 	hdmitx_wr_reg(HDMITX_TOP_TMDS_CLK_PTTN_CNTL, 0x2);		/*0xc*/
-	scdc_prepare((div40 == 1) ? 1:0);
+	if (hdev->RXCap.scdc_present)
+		scdc_prepare((div40 == 1) ? 1:0);
 }
 
 static void hdmitx_set_vsi_pkt(enum hdmi_vic vic)
@@ -2576,6 +2662,7 @@ void hdmitx_set_drm_pkt(struct master_display_info_s *data)
 	unsigned int hdr_transfer_feature = 0;
 	unsigned int hdr_color_feature = 0;
 	unsigned int hdr_mode = 0;
+	char *hdr_status;
 	/*
 	 *hdr_color_feature: bit 23-16: color_primaries
 	 *	1:bt709  0x9:bt2020
@@ -2634,26 +2721,32 @@ void hdmitx_set_drm_pkt(struct master_display_info_s *data)
 		DRM_DB[0] = 0x02; /* SMPTE ST 2084 */
 		hdmitx_set_packet(HDMI_PACKET_DRM, DRM_DB, DRM_HB);
 		hdmitx_cntl_config(hdev, CONF_AVI_BT2020, SET_AVI_BT2020);
+		hdr_status = "HDR10-GAMMA_ST2084";
 		break;
 	case 2:
 		/*non standard*/
 		DRM_DB[0] = 0x02; /* no standard SMPTE ST 2084 */
 		hdmitx_set_packet(HDMI_PACKET_DRM, DRM_DB, DRM_HB);
 		hdmitx_cntl_config(hdev, CONF_AVI_BT2020, CLR_AVI_BT2020);
+		hdr_status = "HDR10-others";
 		break;
 	case 3:
 		/*HLG*/
 		DRM_DB[0] = 0x03;/* HLG is 0x03 */
 		hdmitx_set_packet(HDMI_PACKET_DRM, DRM_DB, DRM_HB);
 		hdmitx_cntl_config(hdev, CONF_AVI_BT2020, SET_AVI_BT2020);
+		hdr_status = "HDR10-GAMMA_HLG";
 		break;
 	case 0:
 	default:
 		/*other case*/
 		hdmitx_set_packet(HDMI_PACKET_DRM, NULL, NULL);
 		hdmitx_cntl_config(hdev, CONF_AVI_BT2020, CLR_AVI_BT2020);
+		hdr_status = "SDR";
 		break;
 	}
+	printf("%s, tf=%d, cf=%d, hdmi_hdr_status: %s\n",
+		__func__, hdr_transfer_feature, hdr_color_feature, hdr_status);
 }
 
 void hdmitx_set_vsif_pkt(enum eotf_type type,
@@ -2667,6 +2760,7 @@ void hdmitx_set_vsif_pkt(enum eotf_type type,
 	unsigned char len = 0;
 	unsigned int vic = hdev->vic;
 	unsigned int hdmi_vic_4k_flag = 0;
+	char *hdr_status = NULL;
 
 	if ((hdev->RXCap.dv_info.ieeeoui != DV_IEEE_OUI))
 		return;
@@ -2716,8 +2810,11 @@ void hdmitx_set_vsif_pkt(enum eotf_type type,
 		}
 		if (type == EOTF_T_DOLBYVISION) {
 			hdmitx_set_packet(HDMI_PACKET_VEND, VEN_DB1, VEN_HB);
+			/* Dolby Vision Source System-on-Chip Platform Kit Version 2.6:
+			 * 4.4.1 Expected AVI-IF for Dolby Vision output, need BT2020 for DV
+			 */
 			hdmitx_cntl_config(hdev, CONF_AVI_BT2020,
-				CLR_AVI_BT2020);/*BT709*/
+				SET_AVI_BT2020);/*BT2020*/
 			if (tunnel_mode == RGB_8BIT) {
 				hdmitx_cntl_config(hdev,CONF_AVI_RGBYCC_INDIC,
 					HDMI_COLOR_FORMAT_RGB);
@@ -2729,6 +2826,7 @@ void hdmitx_set_vsif_pkt(enum eotf_type type,
 				hdmitx_cntl_config(hdev, CONF_AVI_YQ01,
 					YCC_RANGE_FUL);
 			}
+			hdr_status = "DolbyVision-Std";
 		} else {
 			if (hdmi_vic_4k_flag)
 				hdmitx_set_packet(HDMI_PACKET_VEND, VEN_DB1, VEN_HB);
@@ -2741,8 +2839,8 @@ void hdmitx_set_vsif_pkt(enum eotf_type type,
 				YCC_RANGE_LIM);
 			hdmitx_cntl_config(hdev, CONF_AVI_BT2020,
 				CLR_AVI_BT2020);/*BT709*/
+			hdr_status = "SDR";
 		}
-
 	}
 	/*ver1_12  with low_latency = 1 and ver2 use Dolby VSIF*/
 	if ((hdev->RXCap.dv_info.ver == 2) || ((hdev->RXCap.dv_info.ver == 1)
@@ -2788,8 +2886,11 @@ void hdmitx_set_vsif_pkt(enum eotf_type type,
 		/*Dolby Vision standard case*/
 		if (type == EOTF_T_DOLBYVISION) {
 			hdmitx_set_packet(HDMI_PACKET_VEND, VEN_DB2, VEN_HB);
+			/* Dolby Vision Source System-on-Chip Platform Kit Version 2.6:
+			 * 4.4.1 Expected AVI-IF for Dolby Vision output, need BT2020 for DV
+			 */
 			hdmitx_cntl_config(hdev, CONF_AVI_BT2020,
-				CLR_AVI_BT2020);/*BT709*/
+				SET_AVI_BT2020);/*BT2020*/
 			if (tunnel_mode == RGB_8BIT) {/*RGB444*/
 				hdmitx_cntl_config(hdev, CONF_AVI_RGBYCC_INDIC,
 					HDMI_COLOR_FORMAT_RGB);
@@ -2801,17 +2902,17 @@ void hdmitx_set_vsif_pkt(enum eotf_type type,
 				hdmitx_cntl_config(hdev, CONF_AVI_YQ01,
 					YCC_RANGE_FUL);
 			}
+			hdr_status = "DolbyVision-Std";
 		}
 		/*Dolby Vision low-latency case*/
 		else if  (type == EOTF_T_LL_MODE) {
 			hdmitx_set_packet(HDMI_PACKET_VEND, VEN_DB2, VEN_HB);
-			if (hdev->RXCap.colorimetry_data & 0xe0)
-				/*if RX support BT2020, then output BT2020*/
-				hdmitx_cntl_config(hdev, CONF_AVI_BT2020,
-					SET_AVI_BT2020);/*BT2020*/
-			else
-				hdmitx_cntl_config(hdev, CONF_AVI_BT2020,
-					CLR_AVI_BT2020);/*BT709*/
+			/* Dolby vision HDMI Signaling Case25,
+			 * UCD323 not declare bt2020 colorimetry,
+			 * need to forcely send BT.2020
+			 */
+			hdmitx_cntl_config(hdev, CONF_AVI_BT2020,
+				SET_AVI_BT2020);/*BT2020*/
 			if (tunnel_mode == RGB_10_12BIT) {/*10/12bit RGB444*/
 				hdmitx_cntl_config(hdev, CONF_AVI_RGBYCC_INDIC,
 					HDMI_COLOR_FORMAT_RGB);
@@ -2831,6 +2932,7 @@ void hdmitx_set_vsif_pkt(enum eotf_type type,
 				hdmitx_cntl_config(hdev, CONF_AVI_YQ01,
 					YCC_RANGE_LIM);
 			}
+			hdr_status = "DolbyVision-Lowlatency";
 		}
 		/*SDR case*/
 		else {
@@ -2851,8 +2953,11 @@ void hdmitx_set_vsif_pkt(enum eotf_type type,
 				CONF_AVI_YQ01, YCC_RANGE_LIM);
 			hdmitx_cntl_config(hdev, CONF_AVI_BT2020,
 				CLR_AVI_BT2020);/*BT709*/
+			hdr_status = "SDR";
 		}
 	}
+	printf("%s, eotf=%d, tunel_mode=%d, hdmi_hdr_status: %s\n",
+		__func__, type, tunnel_mode, hdr_status ? hdr_status : "SDR");
 }
 
 void hdmitx_set_hdr10plus_pkt(unsigned int flag,
@@ -2868,7 +2973,7 @@ void hdmitx_set_hdr10plus_pkt(unsigned int flag,
 			CLR_AVI_BT2020);
 		return;
 	}
-
+	printf("%s, flag=%d\n", __func__, flag);
 	VEN_DB[0] = 0x8b;
 	VEN_DB[1] = 0x84;
 	VEN_DB[2] = 0x90;
@@ -2918,8 +3023,6 @@ static void save_hdmitx_format(enum hdmi_vic vic, int y420)
 	unsigned int data32;
 
 	data32 = vic & 0xff;
-	data32 |= (hdmitx_rd_reg(HDMITX_DWC_FC_VSDPAYLOAD1) & 0x7) << 8;
-	data32 |= (!!y420) << 11;
 	hd_write_reg(P_SYSCTRL_DEBUG_REG0, data32);
 }
 
@@ -2978,24 +3081,79 @@ static void hdmitx_set_phy(struct hdmitx_dev *hdev)
 	debug("hdmitx phy setting done\n");
 }
 
-static void hdmitx_set_hw(struct hdmitx_dev* hdev)
+static void hdmitx_set_scdc(struct hdmitx_dev *hdev)
+{
+	switch (hdev->vic) {
+	case HDMI_3840x2160p50_16x9:
+	case HDMI_3840x2160p60_16x9:
+	case HDMI_4096x2160p50_256x135:
+	case HDMI_4096x2160p60_256x135:
+		if ((hdev->para->cs == HDMI_COLOR_FORMAT_420)
+		   && (hdev->para->cd == HDMI_COLOR_DEPTH_24B))
+			set_tmds_clk_div40(0);
+		else
+			set_tmds_clk_div40(1);
+		break;
+	case HDMI_3840x2160p50_16x9_Y420:
+	case HDMI_3840x2160p60_16x9_Y420:
+	case HDMI_4096x2160p50_256x135_Y420:
+	case HDMI_4096x2160p60_256x135_Y420:
+		if ((hdev->para->cs == HDMI_COLOR_FORMAT_420)
+		   && (hdev->para->cd == HDMI_COLOR_DEPTH_24B))
+			set_tmds_clk_div40(0);
+		else
+			set_tmds_clk_div40(1);
+		break;
+	case HDMI_3840x2160p24_16x9:
+	case HDMI_3840x2160p24_64x27:
+	case HDMI_4096x2160p24_256x135:
+	case HDMI_3840x2160p25_16x9:
+	case HDMI_3840x2160p25_64x27:
+	case HDMI_4096x2160p25_256x135:
+	case HDMI_3840x2160p30_16x9:
+	case HDMI_3840x2160p30_64x27:
+	case HDMI_4096x2160p30_256x135:
+	case HDMI_1920x1080p100_16x9:
+	case HDMI_1920x1080p120_16x9:
+		if ((hdev->para->cs == HDMI_COLOR_FORMAT_422)
+			|| (hdev->para->cd == HDMI_COLOR_DEPTH_24B))
+			set_tmds_clk_div40(0);
+		else
+			set_tmds_clk_div40(1);
+		break;
+	default:
+		set_tmds_clk_div40(0);
+		break;
+	}
+}
+
+static void hdmitx_disable_venc(void)
+{
+	hd_write_reg(P_ENCI_VIDEO_EN, 0);
+	hd_write_reg(P_ENCP_VIDEO_EN, 0);
+	mdelay(1);
+	hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 0, 2);
+}
+
+static int hdmitx_set_hw(struct hdmitx_dev *hdev)
 {
 	struct hdmi_format_para *para = NULL;
 
 	para = hdmi_get_fmt_paras(hdev->vic);
 	if (para == NULL) {
 		printk("error at %s[%d]\n", __func__, __LINE__);
-		return;
+		return -1;
 	}
+	hdmitx_disable_venc();
+	hdmitx_set_scdc(hdev);
 	hdmitx_set_pll(hdev);
 	hdmitx_enc(hdev->vic);
 	hdmitx_set_dith(hdev);
-	hdmitx_set_phy(hdev);
 
 	/* --------------------------------------------------------*/
 	/* Set up HDMI*/
 	/* --------------------------------------------------------*/
-	config_hdmi20_tx(hdev->vic, para, /*pixel_repeat*/
+	config_hdmi20_tx(hdev, hdev->vic, para, /*pixel_repeat*/
 		hdev->para->cd,           /*Pixel bit width: 4=24-bit; 5=30-bit; 6=36-bit; 7=48-bit.*/
 		TX_INPUT_COLOR_FORMAT,    /*input_color_format: 0=RGB444; 1=YCbCr422; 2=YCbCr444; 3=YCbCr420.*/
 		TX_INPUT_COLOR_RANGE,     /*input_color_range: 0=limited; 1=full.*/
@@ -3041,50 +3199,8 @@ static void hdmitx_set_hw(struct hdmitx_dev* hdev)
 		enc_vpu_bridge_reset(1);
 		break;
 	}
-
-	switch (hdev->vic) {
-	case HDMI_3840x2160p50_16x9:
-	case HDMI_3840x2160p60_16x9:
-	case HDMI_4096x2160p50_256x135:
-	case HDMI_4096x2160p60_256x135:
-		if ((hdev->para->cs == HDMI_COLOR_FORMAT_420)
-		   && (hdev->para->cd == HDMI_COLOR_DEPTH_24B))
-			set_tmds_clk_div40(0);
-		else
-			set_tmds_clk_div40(1);
-		break;
-	case HDMI_3840x2160p50_16x9_Y420:
-	case HDMI_3840x2160p60_16x9_Y420:
-	case HDMI_4096x2160p50_256x135_Y420:
-	case HDMI_4096x2160p60_256x135_Y420:
-		if ((hdev->para->cs == HDMI_COLOR_FORMAT_420)
-		   && (hdev->para->cd == HDMI_COLOR_DEPTH_24B))
-			set_tmds_clk_div40(0);
-		else
-			set_tmds_clk_div40(1);
-		break;
-	case HDMI_3840x2160p24_16x9:
-	case HDMI_3840x2160p24_64x27:
-	case HDMI_4096x2160p24_256x135:
-	case HDMI_3840x2160p25_16x9:
-	case HDMI_3840x2160p25_64x27:
-	case HDMI_4096x2160p25_256x135:
-	case HDMI_3840x2160p30_16x9:
-	case HDMI_3840x2160p30_64x27:
-	case HDMI_4096x2160p30_256x135:
-	case HDMI_1920x1080p100_16x9:
-	case HDMI_1920x1080p120_16x9:
-		if ((hdev->para->cs == HDMI_COLOR_FORMAT_422)
-			|| (hdev->para->cd == HDMI_COLOR_DEPTH_24B))
-			set_tmds_clk_div40(0);
-		else
-			set_tmds_clk_div40(1);
-		break;
-	default:
-		set_tmds_clk_div40(0);
-		break;
-	}
-	hd_write_reg(P_ENCP_VIDEO_EN, 1); /* enable it finially */
+	hdmitx_set_phy(hdev);
+	return 0;
 }
 
 /*Use this self-made function rather than %,
@@ -3214,4 +3330,14 @@ static void hdmitx_csc_config (unsigned char input_color_format,
 	data32 |= (color_depth  << 4);      /*  [7:4] csc_color_depth*/
 	data32 |= (csc_scale	<< 0);      /* [1:0] cscscale*/
 	hdmitx_wr_reg(HDMITX_DWC_CSC_SCALE, data32);
+
+	/* set csc in video path */
+	hdmitx_wr_reg(HDMITX_DWC_MC_FLOWCTRL, (conv_en == 1) ? 0x1 : 0x0);
 }   /* hdmitx_csc_config */
+
+bool hdmitx_get_hpd_state_ext(void)
+{
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
+	return hdev->hpd_state;
+}

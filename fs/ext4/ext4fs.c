@@ -155,7 +155,7 @@ int ext4fs_read_file(struct ext2fs_node *node, loff_t pos,
 			}
 			/* Zero no more than `len' bytes. */
 			n = blocksize - skipfirst;
-			n_left = len - ( buf - start_buf );
+			n_left = len - (buf - start_buf);
 			if (n > n_left)
 				n = n_left;
 			memset(buf, 0, n);

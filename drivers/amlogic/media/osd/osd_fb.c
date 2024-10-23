@@ -292,12 +292,12 @@ unsigned long get_fb_addr(void)
 	} else
 #endif
 	{
-		dt_addr = env_get_ulong("dtb_mem_addr",  16, 0x1000000);
+		dt_addr = (char *) env_get_ulong("dtb_mem_addr",  16, 0x1000000);
 		if (dt_addr == NULL) {
 			osd_logi("dt_addr is null, load default parameters\n");
 		}
 		if (fdt_check_header(dt_addr) < 0) {
-			dt_addr = dt_addr = gd->fdt_blob;
+			dt_addr = (char *)gd->fdt_blob;
 			if (fdt_check_header(dt_addr) < 0) {
 				dt_loaded = -1;
 				osd_logi("check dts: %s, load default fb_addr parameters\n",
@@ -352,6 +352,7 @@ unsigned long get_fb_addr(void)
 		}
 	}
 #endif
+
 	if ((!initrd_set) && (osd_get_chip_type() >= MESON_CPU_MAJOR_ID_AXG)) {
 		sprintf(str_fb_addr,"%lx",fb_addr);
 		env_set("initrd_high", str_fb_addr);

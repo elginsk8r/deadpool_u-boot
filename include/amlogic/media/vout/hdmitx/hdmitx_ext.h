@@ -7,5 +7,6 @@
 #define __HDMITX_EXT_H__
 
 void hdmitx_init(void);
-
+//hpd state used by external module
+bool hdmitx_get_hpd_state_ext(void);
 #endif

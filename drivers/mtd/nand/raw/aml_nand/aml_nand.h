@@ -122,6 +122,7 @@ typedef struct _nand_page0_sc2 {
 		nand_cmd_t retry_usr[32];
 		ext_info_t ext_info;
 		fip_info_t fip_info;
+		uint32_t ddrp_start_page;
  }nand_page0_t;
 
 typedef union nand_core_clk {
@@ -559,6 +560,7 @@ int m3_nand_boot_write_page(struct mtd_info *mtd, struct nand_chip *chip,
 	uint32_t offset, int data_len, const uint8_t *buf,
 	int oob_required, int page, int raw);
 
+int aml_get_samsung_fbbt_flag(void);
 int aml_nand_get_fbb_issue(void);
 
 void aml_nand_check_fbb_issue(u8 *dev_id);
