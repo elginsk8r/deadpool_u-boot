@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_common/optimus_download.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __OPTIMUS_DOWNLOAD_H__
@@ -30,12 +33,12 @@ int optimus_media_download_verify(const int argc, char * const argv[], char *inf
 u32 optimus_dump_storage_data(u8* pBuf, const u32 wantSz, char* errInfo);
 
 
-//for key opearations
+//for key operations
 //
 int v2_key_command(const int argc, char * const argv[], char *info);
 
 /*
- *This fucntion called by mread command, mread= bulkcmd "upload key .." + n * upload transfer, for key n==1
+ *called by mread command, mread= bulkcmd "upload key .." + n * upload transfer, for key n==1
  *Attentions: return 0 if success, else failed
  *@keyName: key name in null-terminated c style string
  *@keyVal: the buffer to read back the key value
@@ -45,16 +48,16 @@ int v2_key_command(const int argc, char * const argv[], char *info);
 int v2_key_read(const char* keyName, u8* keyVal, const unsigned keyValLen, char* errInfo, unsigned* fmtLen);
 
 /*
- *This fucntion called by mwrite command, mread= bulkcmd "download key .." + n * download transfer, for key n==1
- *Attentions: return value is the key length if burn sucess
+ *called by mwrite command, mread= bulkcmd "download key .." + n * download transfer, for key n==1
+ *Attentions: return value is the key length if burn success
  *@keyName: key name in null-terminated c style string
- *@keyVal: key value download from USB, "the value for sepecial keyName" may need de-encrypt by user code
+ *@keyVal: key value download from USB, "the value for special keyName" may need de-encrypt by user code
  *@keyValLen: the key value downloaded from usb transfer!
  *@errInfo: start it with success if burned ok, or format error info into it tell pc burned failed
  */
 unsigned v2_key_burn(const char* keyName, const u8* keyVal, const unsigned keyValLen, char* errInfo);
 
-#if 1//defined(CONFIG_AML_MTD)   //Assume MTD <==> small memory size
+#ifdef CONFIG_AML_MTD   //Assume MTD <==> small memory size
 #define DDR_MEM_ADDR_START  ( 0x010<<20 )
 #define OPTIMUS_DOWNLOAD_TRANSFER_BUF_TOTALSZ   (0X20<<20)//32M
 #else
@@ -70,6 +73,9 @@ unsigned v2_key_burn(const char* keyName, const u8* keyVal, const unsigned keyVa
 //[Buffer 1] Buffer to Back up partition image data that not write back to flash,
 #define OPTIMUS_SPARSE_IMG_LEFT_DATA_ADDR_LOW   (DDR_MEM_ADDR_START + (2U<<20))//Don't access First 1M address
 #define OPTIMUS_SPARSE_IMG_LEFT_DATA_MAX_SZ    (0X2<<20) //back up address for sparse image, 2M
+
+#define OPTIMUS_GETENV_BUF                      (char*)(OPTIMUS_SPARSE_IMG_LEFT_DATA_ADDR_LOW - CONFIG_ENV_SIZE)
+#define OPTIMUS_ENV_MAXLEN                      (CONFIG_ENV_SIZE / 2)
 
 //[Buffer 2] This 64M buffer is used to cache image data received from USB download,
 //            This Buffer size  should be 64M, other size has pending bugs when sparse image is very large.
@@ -97,7 +103,7 @@ unsigned v2_key_burn(const char* keyName, const u8* keyVal, const unsigned keyVa
 #define OPTIMUS_DOWNLOAD_DISPLAY_BUF            (OPTIMUS_BURN_PKG_HEAD_BUF_ADDR + OPTIMUS_BURN_PKG_HEAD_BUF_SZ)
 #define OPTIMUS_DOWNLOAD_BUF_FREE_USE           (OPTIMUS_DOWNLOAD_DISPLAY_BUF + (10U<<20))//free buffer not used by downloading, 2 + 64 + 2 + 10
 
-#define OPTIMUS_VFAT_IMG_WRITE_BACK_SZ          (OPTIMUS_DOWNLOAD_SLOT_SZ*1)//update complete alogrithm if change it
+#define OPTIMUS_VFAT_IMG_WRITE_BACK_SZ          (OPTIMUS_DOWNLOAD_SLOT_SZ * 1)
 #define OPTIMUS_SIMG_WRITE_BACK_SZ              OPTIMUS_DOWNLOAD_TRANSFER_BUF_TOTALSZ
 #define OPTIMUS_MEMORY_WRITE_BACK_SZ            (0X2U<<30)//2GBytes
 #define OPTIMUS_BOOTLOADER_MAX_SZ               (2U<<20)//max size is 2M ??
@@ -126,7 +132,7 @@ unsigned v2_key_burn(const char* keyName, const u8* keyVal, const unsigned keyVa
 #define OPTIMUS_MEDIA_TYPE_NAND         0   //nand is default
 #define OPTIMUS_MEDIA_TYPE_SDMMC        1
 #define OPTIMUS_MEDIA_TYPE_SPIFLASH     2
-#define OPTIMUS_MEDIA_TYPE_STORE        3   //store stands for one of nand/emmc/spi, which smart identified by stoarge driver
+#define OPTIMUS_MEDIA_TYPE_STORE        3   //store stands for one of nand/emmc/spi, which smart identified by storage driver
 #define OPTIMUS_MEDIA_TYPE_MEM          4   //memory, dram and sram
 #define OPTIMUS_MEDIA_TYPE_KEY_UNIFY    5
 
@@ -140,7 +146,7 @@ int optimus_sparse_back_info_probe(void);
 
 unsigned add_sum(const void* pBuf, const unsigned size);//Add-sum used for 64K transfer
 
-//outStr will be null-terminater after format
+//outStr will be null-terminated after format
 int optimus_hex_data_2_ascii_str(const unsigned char* hexData, const unsigned nBytes, char* outStr, const unsigned strSz);
 
 //for prompting step info
@@ -156,10 +162,8 @@ int optimus_update_progress(const unsigned thisBurnSz);
 
 //common internal function
 int optimus_erase_bootloader(const char* extBootDev);
-void optimus_clear_ovd_register(void);
-
 void optimus_reset(const int cfgFlag);
-int optimus_storage_init(int toErase);//init dest burning staorge
+int optimus_storage_init(int toErase);//init dest burning storage
 int optimus_storage_exit(void);
 int is_optimus_storage_inited(void);
 void optimus_poweroff(void);
@@ -199,10 +203,32 @@ int optimus_work_mode_set(int workmode);
 #define OPTIMUS_BURN_TARGET_SUPPORT_UBIFS       0
 #endif// #if defined(CONFIG_AML_MTD) && (defined(UBIFS_IMG) || defined(CONFIG_CMD_UBIFS))
 
-#ifndef P_AO_SEC_SD_CFG0
-#define P_AO_SEC_GP_CFG0 	SYSCTRL_SEC_STATUS_REG4
-#define P_PREG_STICKY_REG2	SYSCTRL_SEC_STICKY_REG2
-#endif// #ifndef P_AO_SEC_SD_CFG0
+//getenv wrapper to avoid coverity stained string error
+//cannot called nested as it shares the same buffer
+const char* getenv_optimus(const char* name);
+
+#ifdef CONFIG_AML_FACTORY_BURN_LOCAL_UPGRADE
+#define SUM_FUNC_TIME_COST 0
+#if SUM_FUNC_TIME_COST
+#define _func_cost_utime_yret(sum, ret, func, ...) do {\
+    unsigned long uTime = timer_get_us(); \
+    ret = func(__VA_ARGS__); \
+    sum += timer_get_us() - uTime; \
+} while(0)
+
+#define _func_cost_utime_nret(sum, func, ...) do {\
+    unsigned long uTime = timer_get_us(); \
+    func(__VA_ARGS__); \
+    sum += timer_get_us() - uTime; \
+} while(0)
+
+extern unsigned long ImageRdTime;
+extern unsigned long FlashRdTime;
+extern unsigned long FlashWrTime;
+
+#else
+#endif//#if SUM_FUNC_TIME_COST
+#endif//#ifdef CONFIG_AML_FACTORY_BURN_LOCAL_UPGRADE
 
 #endif//ifndef __OPTIMUS_DOWNLOAD_H__
 

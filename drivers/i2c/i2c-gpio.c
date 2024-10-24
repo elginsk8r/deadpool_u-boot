@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <dm.h>
 #include <i2c.h>
+#include <amlogic/gpio_i2c.h>
 #include <asm/gpio.h>
 
 #define DEFAULT_UDELAY	5
@@ -18,14 +19,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-enum {
-	PIN_SDA = 0,
-	PIN_SCL,
-	PIN_COUNT,
-};
-
-static unsigned int is_odpin;
-
 struct i2c_gpio_bus {
 	/**
 	  * udelay - delay [us] between GPIO toggle operations,
@@ -33,41 +26,39 @@ struct i2c_gpio_bus {
 	 */
 	int udelay;
 	 /* sda, scl */
-	struct gpio_desc gpios[PIN_COUNT];
+	unsigned int sda;
+	unsigned int scl;
 };
 
-static int i2c_gpio_sda_get(struct gpio_desc *sda)
+static char is_odpin;
+
+static int i2c_gpio_sda_get(unsigned sda)
 {
-	return dm_gpio_get_value(sda);
+	return gpio_get_value(sda);
 }
 
-static void i2c_gpio_sda_set(struct gpio_desc *sda, int bit)
+static void i2c_gpio_sda_set(unsigned sda, int bit)
 {
 	if (bit)
-		dm_gpio_set_dir_flags(sda, GPIOD_IS_IN);
+		gpio_direction_input(sda);
 	else
-		dm_gpio_set_dir_flags(sda, GPIOD_IS_OUT);
+		gpio_direction_output(sda, bit);
 }
 
-static void i2c_gpio_scl_set(struct gpio_desc *scl, int bit)
+static void i2c_gpio_scl_set(unsigned scl, int bit)
 {
-	ulong flags = GPIOD_IS_OUT;
-
 	if (is_odpin) {
 		if (bit)
-			dm_gpio_set_dir_flags(scl, GPIOD_IS_IN);
+			gpio_direction_input(scl);/* set scl high */
 		else
-			dm_gpio_set_dir_flags(scl, flags | GPIOD_IS_OUT_ACTIVE);
+			gpio_direction_output(scl, bit);
 
-		return;
+	} else {
+		gpio_direction_output(scl, bit);
 	}
-
-	if (bit)
-		flags |= GPIOD_IS_OUT_ACTIVE;
-	dm_gpio_set_dir_flags(scl, flags);
 }
 
-static void i2c_gpio_write_bit(struct gpio_desc *scl, struct gpio_desc *sda,
+static void i2c_gpio_write_bit(unsigned scl, unsigned sda,
 			       int delay, uchar bit)
 {
 	i2c_gpio_scl_set(scl, 0);
@@ -78,7 +69,7 @@ static void i2c_gpio_write_bit(struct gpio_desc *scl, struct gpio_desc *sda,
 	udelay(2 * delay);
 }
 
-static int i2c_gpio_read_bit(struct gpio_desc *scl, struct gpio_desc *sda,
+static int i2c_gpio_read_bit(unsigned scl, unsigned sda,
 			     int delay)
 {
 	int value;
@@ -94,7 +85,7 @@ static int i2c_gpio_read_bit(struct gpio_desc *scl, struct gpio_desc *sda,
 }
 
 /* START: High -> Low on SDA while SCL is High */
-static void i2c_gpio_send_start(struct gpio_desc *scl, struct gpio_desc *sda,
+static void i2c_gpio_send_start(unsigned scl, unsigned sda,
 				int delay)
 {
 	udelay(delay);
@@ -107,7 +98,7 @@ static void i2c_gpio_send_start(struct gpio_desc *scl, struct gpio_desc *sda,
 }
 
 /* STOP: Low -> High on SDA while SCL is High */
-static void i2c_gpio_send_stop(struct gpio_desc *scl, struct gpio_desc *sda,
+static void i2c_gpio_send_stop(unsigned scl, unsigned sda,
 			       int delay)
 {
 	i2c_gpio_scl_set(scl, 0);
@@ -121,7 +112,7 @@ static void i2c_gpio_send_stop(struct gpio_desc *scl, struct gpio_desc *sda,
 }
 
 /* ack should be I2C_ACK or I2C_NOACK */
-static void i2c_gpio_send_ack(struct gpio_desc *scl, struct gpio_desc *sda,
+static void i2c_gpio_send_ack(unsigned scl, unsigned sda,
 			      int delay, int ack)
 {
 	i2c_gpio_write_bit(scl, sda, delay, ack);
@@ -134,7 +125,7 @@ static void i2c_gpio_send_ack(struct gpio_desc *scl, struct gpio_desc *sda,
  * to clock any confused device back into an idle state.  Also send a
  * <stop> at the end of the sequence for belts & suspenders.
  */
-static void i2c_gpio_send_reset(struct gpio_desc *scl, struct gpio_desc *sda,
+static void i2c_gpio_send_reset(unsigned scl, unsigned sda,
 				int delay)
 {
 	int j;
@@ -146,7 +137,7 @@ static void i2c_gpio_send_reset(struct gpio_desc *scl, struct gpio_desc *sda,
 }
 
 /* Set sda high with low clock, before reading slave data */
-static void i2c_gpio_sda_high(struct gpio_desc *scl, struct gpio_desc *sda,
+static void i2c_gpio_sda_high(unsigned scl, unsigned sda,
 			      int delay)
 {
 	i2c_gpio_scl_set(scl, 0);
@@ -156,7 +147,7 @@ static void i2c_gpio_sda_high(struct gpio_desc *scl, struct gpio_desc *sda,
 }
 
 /* Send 8 bits and look for an acknowledgement */
-static int i2c_gpio_write_byte(struct gpio_desc *scl, struct gpio_desc *sda,
+static int i2c_gpio_write_byte(unsigned scl, unsigned sda,
 			       int delay, uchar data)
 {
 	int j;
@@ -180,7 +171,7 @@ static int i2c_gpio_write_byte(struct gpio_desc *scl, struct gpio_desc *sda,
  * if ack == I2C_ACK, ACK the byte so can continue reading, else
  * send I2C_NOACK to end the read.
  */
-static uchar i2c_gpio_read_byte(struct gpio_desc *scl, struct gpio_desc *sda,
+static uchar i2c_gpio_read_byte(unsigned scl, unsigned sda,
 				int delay, int ack)
 {
 	int  data;
@@ -198,7 +189,7 @@ static uchar i2c_gpio_read_byte(struct gpio_desc *scl, struct gpio_desc *sda,
 }
 
 /* send start and the slave chip address */
-int i2c_send_slave_addr(struct gpio_desc *scl, struct gpio_desc *sda, int delay,
+int i2c_send_slave_addr(unsigned scl, unsigned sda, int delay,
 			uchar chip)
 {
 	i2c_gpio_send_start(scl, sda, delay);
@@ -215,29 +206,28 @@ static int i2c_gpio_write_data(struct i2c_gpio_bus *bus, uchar chip,
 			       uchar *buffer, int len,
 			       bool end_with_repeated_start)
 {
-	struct gpio_desc *scl = &bus->gpios[PIN_SCL];
-	struct gpio_desc *sda = &bus->gpios[PIN_SDA];
 	unsigned int delay = bus->udelay;
 	int failures = 0;
 
 	debug("%s: chip %x buffer %p len %d\n", __func__, chip, buffer, len);
 
-	if (i2c_send_slave_addr(scl, sda, delay, chip << 1)) {
+	if (i2c_send_slave_addr(bus->scl, bus->sda, delay, chip << 1)) {
 		debug("i2c_write, no chip responded %02X\n", chip);
+		printf("i2c_write, no chip responded %02X\n", chip);
 		return -EIO;
 	}
 
 	while (len-- > 0) {
-		if (i2c_gpio_write_byte(scl, sda, delay, *buffer++))
+		if (i2c_gpio_write_byte(bus->scl, bus->sda, delay, *buffer++))
 			failures++;
 	}
 
 	if (!end_with_repeated_start) {
-		i2c_gpio_send_stop(scl, sda, delay);
+		i2c_gpio_send_stop(bus->scl, bus->sda, delay);
 		return failures;
 	}
 
-	if (i2c_send_slave_addr(scl, sda, delay, (chip << 1) | 0x1)) {
+	if (i2c_send_slave_addr(bus->scl, bus->sda, delay, (chip << 1) | 0x1)) {
 		debug("i2c_write, no chip responded %02X\n", chip);
 		return -EIO;
 	}
@@ -248,16 +238,14 @@ static int i2c_gpio_write_data(struct i2c_gpio_bus *bus, uchar chip,
 static int i2c_gpio_read_data(struct i2c_gpio_bus *bus, uchar chip,
 			      uchar *buffer, int len)
 {
-	struct gpio_desc *scl = &bus->gpios[PIN_SCL];
-	struct gpio_desc *sda = &bus->gpios[PIN_SDA];
 	unsigned int delay = bus->udelay;
 
 	debug("%s: chip %x buffer: %p len %d\n", __func__, chip, buffer, len);
 
 	while (len-- > 0)
-		*buffer++ = i2c_gpio_read_byte(scl, sda, delay, len == 0);
+		*buffer++ = i2c_gpio_read_byte(bus->scl, bus->sda, delay, len == 0);
 
-	i2c_gpio_send_stop(scl, sda, delay);
+	i2c_gpio_send_stop(bus->scl, bus->sda, delay);
 
 	return 0;
 }
@@ -288,8 +276,8 @@ static int i2c_gpio_xfer(struct udevice *dev, struct i2c_msg *msg, int nmsgs)
 static int i2c_gpio_probe(struct udevice *dev, uint chip, uint chip_flags)
 {
 	struct i2c_gpio_bus *bus = dev_get_priv(dev);
-	struct gpio_desc *scl = &bus->gpios[PIN_SCL];
-	struct gpio_desc *sda = &bus->gpios[PIN_SDA];
+	unsigned scl = bus->scl;
+	unsigned sda = bus->sda;
 	unsigned int delay = bus->udelay;
 	int ret;
 
@@ -306,8 +294,8 @@ static int i2c_gpio_probe(struct udevice *dev, uint chip, uint chip_flags)
 static int i2c_gpio_set_bus_speed(struct udevice *dev, unsigned int speed_hz)
 {
 	struct i2c_gpio_bus *bus = dev_get_priv(dev);
-	struct gpio_desc *scl = &bus->gpios[PIN_SCL];
-	struct gpio_desc *sda = &bus->gpios[PIN_SDA];
+	unsigned scl = bus->scl;
+	unsigned sda = bus->sda;
 
 	bus->udelay = 1000000 / (speed_hz << 2);
 
@@ -316,27 +304,32 @@ static int i2c_gpio_set_bus_speed(struct udevice *dev, unsigned int speed_hz)
 	return 0;
 }
 
-static int i2c_gpio_ofdata_to_platdata(struct udevice *dev)
+static int meson_gpio_i2c_probe(struct udevice *bus)
 {
-	struct i2c_gpio_bus *bus = dev_get_priv(dev);
-	const void *blob = gd->fdt_blob;
-	int node = dev_of_offset(dev);
-	int ret;
+	unsigned int ret;
 
-	ret = gpio_request_list_by_name(dev, "gpios", bus->gpios,
-					ARRAY_SIZE(bus->gpios), 0);
-	if (ret < 0)
-		goto error;
+	struct i2c_gpio_bus *i2c = dev_get_priv(bus);
+	struct meson_gpio_i2c_platdata *plat = dev_get_platdata(bus);
 
-	bus->udelay = fdtdec_get_int(blob, node, "i2c-gpio,delay-us",
-				     DEFAULT_UDELAY);
+	debug("%s as sda, %s as scl, rate = %d\n", plat->sda, plat->scl, plat->clock_rate);
 
-	is_odpin = fdtdec_get_int(blob, node, "is_odpin", 0);
+	ret = gpio_lookup_name(plat->sda, NULL, NULL, &i2c->sda);
+	if (ret)
+		printf("look up sda gpio failed\n");
+
+	ret = gpio_lookup_name(plat->scl, NULL, NULL, &i2c->scl);
+	if (ret)
+		printf("look up scl gpio failed\n");
+
+	if (gpio_request(i2c->sda, plat->sda))
+		printf("failed to request sda pin\n");
+	if (gpio_request(i2c->scl, plat->scl))
+		printf("failed to request scl pin\n");
+
+	i2c->udelay = 1000000 / (plat->clock_rate << 2);
+	is_odpin = plat->is_odpin;
 
 	return 0;
-error:
-	pr_err("Can't get %s gpios! Error: %d", dev->name, ret);
-	return ret;
 }
 
 static const struct dm_i2c_ops i2c_gpio_ops = {
@@ -354,7 +347,8 @@ U_BOOT_DRIVER(i2c_gpio) = {
 	.name	= "i2c-gpio",
 	.id	= UCLASS_I2C,
 	.of_match = i2c_gpio_ids,
-	.ofdata_to_platdata = i2c_gpio_ofdata_to_platdata,
+	.probe = meson_gpio_i2c_probe,
 	.priv_auto_alloc_size = sizeof(struct i2c_gpio_bus),
 	.ops	= &i2c_gpio_ops,
+	.per_child_auto_alloc_size = sizeof(struct dm_i2c_chip),
 };

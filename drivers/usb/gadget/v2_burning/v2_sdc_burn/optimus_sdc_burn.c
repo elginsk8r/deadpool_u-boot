@@ -1,25 +1,27 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_sdc_burn.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "optimus_sdc_burn_i.h"
 #include "optimus_led.h"
 #include <asm/arch/secure_apb.h>
 #include <asm/io.h>
-
+#include <emmc_partitions.h>
 #include <amlogic/aml_efuse.h>
 
 static int is_bootloader_old(void)
 {
-    const int sdc_boot = is_tpl_loaded_from_ext_sdmmc();
-    const int usbDiskNewBoot = env_get_hex("usbDiskNewBoot", 0);//default old
+    if (is_tpl_loaded_from_ext_sdmmc()) return 0;
 
-    switch (optimus_work_mode_get()) {
-        case OPTIMUS_WORK_MODE_SDC_PRODUCE: return !sdc_boot;
-        case OPTIMUS_WORK_MODE_UDISK_PRODUCE: return !usbDiskNewBoot;
-        default: return 1;//default old
+    if (OPTIMUS_WORK_MODE_UDISK_PRODUCE == optimus_work_mode_get()) {
+        return !getenv_hex("usbDiskNewBoot", 0);//default old
     }
+
+    return 0;
 }
 
 int get_burn_parts_from_img(HIMAGE hImg, ConfigPara_t* pcfgPara)
@@ -179,7 +181,7 @@ static int optimus_burn_one_partition(const char* partName, HIMAGE hImg, __hdle 
             goto _finish;
         }
 
-        //If the item head is not alinged to FAT cluster, Read it firstly to speed up mmc read
+		//If the item head is not alinged to FAT cluster, Read it firstly to speed up mmc read
         if (itemSizeNotAligned && !sequenceNo)
         {
             if ( itemSizeNotAligned >= imgItemSz ) {
@@ -234,11 +236,11 @@ _finish:
     rcode = optimus_verify_partition(partName, hImg, _errInfo);
     if (ITEM_NOT_EXIST == rcode)
     {
-        DWN_WRN("WRN:part(%s) NOT verified\n", partName);
+        printf("WRN:part(%s) NOT verified\n", partName);
         return 0;
     }
     if (rcode) {
-        DWN_ERR("Fail in verify part(%s)\n", partName);
+        printf("Fail in verify part(%s)\n", partName);
         optimus_progress_ui_printf("Failed at VERIFY part[%s]\n", partName);
         return __LINE__;
     }
@@ -291,7 +293,7 @@ int optimus_sdc_burn_media_partition(const char* mediaImgPath, const char* verif
     return optimus_burn_partition_image("media", mediaImgPath, "normal", verifyFile, 0);
 }
 
-int optimus_burn_bootlader(HIMAGE hImg)
+int optimus_burn_bootloader(HIMAGE hImg)
 {
     int rcode = 0;
     int NeedVerify = 1;
@@ -336,14 +338,11 @@ int optimus_sdc_burn_dtb_load(HIMAGE hImg)
     unsigned char* dtbTransferBuf     = (unsigned char*)partBaseOffset;
 
     //meson1.dtb but not meson.dtb for m8 compatible
-#ifdef CONFIG_CMD_EFUSE
     if (IS_FEAT_BOOT_VERIFY()) {
         DWN_MSG("SecureEnabled, use meson1_ENC\n");
         hImgItem = image_item_open(hImg, partName, "meson1_ENC");
     }
-#endif//#ifdef CONFIG_CMD_EFUSE
-    if (!hImgItem)
-    {
+    else {
         hImgItem = image_item_open(hImg, partName, "meson1");
     }
     if (!hImgItem) {
@@ -386,6 +385,7 @@ int optimus_sdc_burn_dtb_load(HIMAGE hImg)
         rc = (wrLen == itemSz) ? 0 : __LINE__;
     }
 
+	//will decrypt dt image after store init okay,so CANNOT decrypt here
     return rc;
 }
 
@@ -622,6 +622,12 @@ int sdc_burn_aml_keys(HIMAGE hImg, const int keyOverWrite, int licenseKey, int i
 #define sdc_burn_aml_keys(fmt...)     0
 #endif// #if CONFIG_SUPPORT_SDC_KEYBURN
 
+#if SUM_FUNC_TIME_COST
+unsigned long ImageRdTime = 0;
+unsigned long FlashRdTime = 0;
+unsigned long FlashWrTime = 0;
+#endif//#if SUM_FUNC_TIME_COST
+
 int optimus_burn_with_cfg_file(const char* cfgFile)
 {
     extern ConfigPara_t g_sdcBurnPara ;
@@ -634,6 +640,8 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
     int hasBootloader = 0;
     u64 datapartsSz = 0;
     int eraseFlag = pSdcCfgPara->custom.eraseFlash;
+	int eraseBootloader = pSdcCfgPara->custom.eraseBootloader;
+    const int usbDiskUpgrade = (OPTIMUS_WORK_MODE_UDISK_PRODUCE == optimus_work_mode_get());
 
     optimus_buf_manager_init(16*1024);
     hImg = image_open("mmc", "0", "1", cfgFile);
@@ -665,15 +673,17 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
         DWN_ERR("Fail to open image %s\n", pkgPath);
         ret = __LINE__; goto _finish;
     }
-    const int eraseBootloader = pSdcCfgPara->custom.eraseBootloader;
-    const int usbDiskUpgrade = (OPTIMUS_WORK_MODE_UDISK_PRODUCE == optimus_work_mode_get());
+	eraseBootloader = pSdcCfgPara->custom.eraseBootloader;
+	eraseFlag = pSdcCfgPara->custom.eraseFlash;
+	DWN_MSG("eraseBootloader %d, is old %d, %d\n",
+		eraseBootloader, is_bootloader_old(), eraseFlag);
     if (eraseBootloader && is_bootloader_old())
     {
         if (usbDiskUpgrade) {//upgrade new bootloader
-            if (optimus_burn_bootlader(hImg)) {
-                DWN_ERR("Fail in burn new bootloader from usb disk\n");
-                goto _finish;
-            }
+		if (optimus_burn_bootloader(hImg)) {
+			DWN_ERR("Fail in burn new bootloader from usb disk\n");
+			goto _finish;
+		}
             setenv("usbDiskNewBoot", "1");
             setenv("sdcburncfg", cfgFile);
             setenv("usbDiskUpgrade", "run init_display; usb_burn $sdcburncfg");
@@ -690,18 +700,18 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
         }
 
 #if defined(CONFIG_VIDEO_AMLLCD)
-            //axp to low power off LCD, no-charging
-            DWN_MSG("To close LCD\n");
-            ret = run_command("video dev disable", 0);
-            if (ret) {
-                printf("Fail to close back light\n");
-                /*return __LINE__;*/
-            }
+        //axp to low power off LCD, no-charging
+        DWN_MSG("To close LCD\n");
+        ret = run_command("video dev disable", 0);
+        if (ret) {
+            printf("Fail to close back light\n");
+            /*return __LINE__;*/
+        }
 #endif// #if defined(CONFIG_VIDEO_AMLLCD)
 
-            DWN_MSG("Reset to load NEW uboot from ext-mmc!\n");
-            optimus_reset(OPTIMUS_BURN_COMPLETE__REBOOT_SDC_BURN);
-            return __LINE__;//should never reach here!!
+        DWN_MSG("Reset to load NEW uboot from ext-mmc!\n");
+        optimus_reset(OPTIMUS_BURN_COMPLETE__REBOOT_SDC_BURN);
+        return __LINE__;//should never reach here!!
     }
 
     if (OPTIMUS_WORK_MODE_SDC_PRODUCE == optimus_work_mode_get()) //led not depend on image res, can init early
@@ -740,33 +750,29 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
             DWN_MSG("Disable erase as data parts size is 0\n");
     }
     if (eraseFlag && !strcmp("1", getenv("usb_update"))) {
+	char *protect_parts[] = {"env"};
         ret = optimus_storage_init(0);
         if (ret) {
             DWN_ERR("FAil in init flash for usb upgrade\n");
-            return __LINE__;
+            ret = __LINE__; goto _finish;
         }
-
-        DWN_MSG("store_get_type %d\n", store_get_type());
-        //erase after bootloader for usb disk
-        if (BOOT_EMMC == store_get_type()) ret = run_command("echo amlmmc erase non_loader;amlmmc erase non_loader", 0);
-        else ret = run_command("echo store erase.chip; store erase.chip", 0);
+	/*ret = run_command("store erase data", 0);//erase after bootloader for usb disk*/
+	ret = _usb_burn_erase_mmc(ARRAY_SIZE(protect_parts), protect_parts);
     }
     else
         ret = optimus_storage_init(eraseFlag);
     if (ret) {
-        DWN_ERR("Fail to init stoarge for sdc burn\n");
+        DWN_ERR("Fail to init storage for sdc burn\n");
         ret = __LINE__; goto _finish;
     }
-#if 0
     if (pSdcCfgPara->custom.eraseDdrPara) {
         extern int store_ddr_parameter_erase(void);
         DWN_MSG("to erase ddr parameters\n");
         if (store_ddr_parameter_erase()) {
             DWN_ERR("Fail in erase ddr parameters\n");
-            return -__LINE__;
+            ret = __LINE__; goto _finish;
         }
     }
-#endif
 
     optimus_progress_ui_direct_update_progress(hUiProgress, UPGRADE_STEPS_AFTER_DISK_INIT_OK);
 
@@ -793,7 +799,7 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
         ret = optimus_sdc_burn_media_partition(mediaPath, NULL);//no progress bar info if have partition image not in package
         if (ret) {
             DWN_ERR("Fail to burn media partition with image %s\n", mediaPath);
-            /*optimus_storage_exit();*/
+            optimus_storage_exit();
             ret = __LINE__;goto _finish;
         }
     }
@@ -808,10 +814,10 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
 
     if (hasBootloader)
     {//burn bootloader
-        if (usbDiskUpgrade && env_get_hex("usbDiskNewBoot", 0)) {//already upgrade bootloader from pkg
+        if (usbDiskUpgrade && getenv_hex("usbDiskNewBoot", 0)) {//already upgrade bootloader from pkg
             ;
         } else {
-            ret = optimus_burn_bootlader(hImg);
+		ret = optimus_burn_bootloader(hImg);
             if (ret) {
                 DWN_ERR("Fail in burn bootloader\n");
                 goto _finish;
@@ -828,6 +834,9 @@ int optimus_burn_with_cfg_file(const char* cfgFile)
 
 _finish:
     image_close(hImg);
+#if SUM_FUNC_TIME_COST
+    DWN_MSG("[ms]ImageRdTime %ld, FlashRdTime %ld, FlashWrTime %ld\n", ImageRdTime/1000, FlashRdTime/1000, FlashWrTime/1000);
+#endif//#if SUM_FUNC_TIME_COST
     if (hUiProgress) optimus_progress_ui_report_upgrade_stat(hUiProgress, !ret);
     optimus_report_burn_complete_sta(ret, pSdcCfgPara->custom.rebootAfterBurn);
     if (hUiProgress) optimus_progress_ui_release(hUiProgress);
@@ -869,7 +878,7 @@ int do_sdc_burn(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
     }
 
     if ( !aml_check_is_ready_for_sdc_produce() ) {
-        DWN_DBG("sdcard Not ready for sdc_burn\n");
+        DWN_DBG("Not ready\n");
         return __LINE__;
     }
 
@@ -896,3 +905,4 @@ U_BOOT_CMD(
    "argv: [sdc_burn_cfg_file]\n"//usage
    "    -aml_sdc_burn.ini is usually used configure file\n"
 );
+

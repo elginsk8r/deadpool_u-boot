@@ -1,24 +1,27 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * common/ramdump.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <common.h>
 #include <asm/arch/bl31_apis.h>
+#include <asm/reboot.h>
 #include <asm/arch/secure_apb.h>
 #include <ramdump.h>
 #include <emmc_partitions.h>
+#include <asm/cpu_id.h>
 
 #define DEBUG_RAMDUMP	0
-#define AMLOGIC_KERNEL_PANIC		0x0c
-#define AMLOGIC_WATCHDOG_REBOOT		0x0d
-
 
 unsigned long ramdump_base = 0;
 unsigned long ramdump_size = 0;
 unsigned int get_reboot_mode(void)
 {
 	uint32_t reboot_mode_val = ((readl(AO_SEC_SD_CFG15) >> 12) & 0xf);
+
 	return reboot_mode_val;
 }
 
@@ -34,11 +37,32 @@ void ramdump_init(void)
 	printf("%s, add:%lx, size:%lx\n", __func__, ramdump_base, ramdump_size);
 }
 
+static void wait_usb_dev(void)
+{
+	block_dev_desc_t *usb_dev;
+	int print_cnt = 0;
+
+	while (1) {
+		run_command("usb start", 1);
+		usb_dev = usb_stor_get_dev(0);
+		if (!usb_dev) {
+			if (!(print_cnt & 0x3f)) {
+				print_cnt++;
+				printf("ramdump: can't find usb device, please insert a usb disk to save ramdump data\n");
+			}
+			mdelay(10000);
+			continue;
+		} else {
+			break;
+		}
+	}
+}
+
 /*
- * NOTE: this is a default impemention for writing compressed ramdump data
+ * NOTE: this is a default implementation for writing compressed ramdump data
  * to /data/ partition for Android platform. You can read out dumpfile in
  * path /data/crashdump-1.bin when enter Android for crash analyze.
- * by default, /data/ partion for android is EXT4 fs.
+ * by default, /data/ partition for android is EXT4 fs.
  *
  * TODO:
  *    If you are using different fs or OS on your platform, implement compress
@@ -47,18 +71,27 @@ void ramdump_init(void)
  */
 __weak int ramdump_save_compress_data(void)
 {
-	int data_pid;
 	char cmd[128] = {0};
+	char *env;
 
-	data_pid = get_partition_num_by_name("data");
-	if (data_pid < 0) {
-		printf("can't find data partition\n");
-		return -1;
+	env = getenv("ramdump_location");
+	if (!env)
+		return 0;
+
+	printf("ramdump_location:%s\n", env);
+	/* currently we only support write to usb disk */
+	if (strncmp(env, "usb", 3)) {
+		printf("not supported location\n");
+		return 0;
 	}
-	sprintf(cmd, "ext4write mmc 1:%x %lx /crashdump-1.bin %lx\n",
-		data_pid, ramdump_base, ramdump_size);
+
+	wait_usb_dev();
+
+	sprintf(cmd, "fatwrite usb 0 %lx crashdump-1.bin %lx\n",
+		ramdump_base, ramdump_size);
 	printf("CMD:%s\n", cmd);
 	run_command(cmd, 1);
+	run_command("reset", 1);
 	return 0;
 }
 
@@ -89,9 +122,9 @@ static void ramdump_env_setup(unsigned long addr, unsigned long size)
 	 * (initrd_high - 0x010800000)
 	 * dts file size < (fdt_high - initrd_high)
 	 */
-	env_set("initrd_high", "0x04400000");
-	env_set("fdt_high",    "0x04E00000");
-	line = env_get("bootargs");
+	setenv("initrd_high", "0x04400000");
+	setenv("fdt_high",    "0x04E00000");
+	line = getenv("bootargs");
 	if (!line)
 		return;
 
@@ -115,7 +148,7 @@ static void ramdump_env_setup(unsigned long addr, unsigned long size)
 	p1[0] = ' ';
 	sprintf(p1 + 1, "%s=%s ramdump=%lx,%lx",
 		(char *)data, (char *)(data + 6), addr, size);
-	env_set("bootargs", o);
+	setenv("bootargs", o);
 
 #if DEBUG_RAMDUMP
 	run_command("printenv bootargs", 1);
@@ -130,7 +163,7 @@ void check_ramdump(void)
 	char *env;
 	int reboot_mode;
 
-	env = env_get("ramdump_enable");
+	env = getenv("ramdump_enable");
 	if (env) {
 		printf("%s,%s\n", __func__, env);
 		if (!strcmp(env, "1")) {
@@ -141,8 +174,10 @@ void check_ramdump(void)
 				size = ramdump_size;
 				printf("%s, addr:%lx, size:%lx\n",
 					__func__, addr, size);
-				if (addr && size)
+				if (addr && size) {
 					ramdump_env_setup(addr, size);
+					ramdump_save_compress_data();
+				}
 			}
 		}
 	}

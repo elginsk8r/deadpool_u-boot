@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_sdc_burn_i.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __OPTIMUS_SDC_BURN_I_H__
@@ -8,7 +11,6 @@
 
 #include "../v2_burning_i.h"
 #include <fat.h>
-#include <blk.h>
 #include <part.h>
 
 #define ITEM_NOT_EXIST   0x55
@@ -69,7 +71,7 @@ typedef struct _ConfigPara{
 
 //ini parser
 int _optimus_parse_buf_2_lines(char* pTextBuf, const unsigned textSz, const char* lines[],
-                unsigned* totalLineNum, const unsigned MaxLines);//parse text context to linces delimitted by (\r)\n
+                unsigned* totalLineNum, const unsigned MaxLines);//parse text context to lines delimitted by (\r)\n
 
 int parse_ini_file_2_valid_lines(const char* filePath, char* iniBuf, const unsigned bufSz, char* lines[]);
 int parse_ini_buf_2_valid_lines(char* iniBuf, const unsigned bufSz, char* lines[]);
@@ -99,7 +101,7 @@ int get_burn_parts_from_img(HIMAGE hImg, ConfigPara_t* pcfg);
 int optimus_sdc_burn_partitions(ConfigPara_t* pCfgPara, HIMAGE hImg, __hdle hUiProgress, int needVerify);
 int optimus_sdc_burn_dtb_load(HIMAGE hImg);
 
-int optimus_burn_bootlader(HIMAGE hImg);
+int optimus_burn_bootloader(HIMAGE hImg);
 
 int optimus_report_burn_complete_sta(int isFailed, int rebootAfterBurn);
 
@@ -123,10 +125,10 @@ long do_fat_fopen(const char *filename);
 long do_fat_fread(int fd, __u8 *buffer, unsigned long maxsize);
 void do_fat_fclose(int fd);
 s64 do_fat_get_fileSz(const char* imgItemPath);
-int do_fat_fseek(int fd, const int64_t offset, int wherehence);
+int do_fat_fseek(int fd, const __u64 offset, int wherehence);
 unsigned do_fat_get_bytesperclust(int fd);
 int optimus_device_probe(const char* interface, const char* inPart);
-int optimus_fat_register_device(const char *ifname, const char *dev_part_str);
+int optimus_fat_register_device(block_dev_desc_t *dev_desc, int part_no);
 
 //<0 if failed, 0 is normal, 1 is sparse, others reserved
 int do_fat_get_file_format(const char* imgFilePath, unsigned char* pbuf, const unsigned bufSz);

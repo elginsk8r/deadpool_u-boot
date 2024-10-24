@@ -1,12 +1,15 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/sdc_burnkeys/optimus_key_burn.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 /*
  *
  * This cmd [aml_key_burn] aim to burn keys like 'update.exe', and mainly used for myself.
- * like update.exe, the key in here is single and not need to sperate
+ * like update.exe, the key in here is single and not need to separate
  * e.g, for comparison, here to burn a hdcp key using aml_key_burn and update.exe
  *     0. update.exe identify .                                 <-----> aml_key_burn probe vfat sdc
  *     1. update.exe mwrite meson.dtb mem dtb normal .          <-----> aml_key_burn meson_dtb meson.dtb

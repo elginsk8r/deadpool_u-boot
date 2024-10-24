@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/dev/cmd_amlnf_test.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../include/phynand.h"
@@ -11,7 +14,7 @@ extern void amldev_dumpinfo(struct amlnand_phydev *phydev);
 //static int plane_mode = 0;
 //struct aml_nftl_dev * nftl_device;
 
-/* just like memset function but the paraments' type is  little different */
+/* just like memset function but the parameters' type is  little different */
 void *memset_nand_test(void *s, u32 c, size_t count)
 {
 	u32 *sl = (u32 *) s;
@@ -74,6 +77,7 @@ static int nand_erase_ops_test(struct amlnand_phydev *phydev, uint64_t off, uint
 		} else if (ret < 0) {
 			aml_nand_msg("nand get bad block failed: ret=%d at addr=%llx",ret, erase_addr);
 			ret =  -NAND_ERASE_FAILED;
+			goto exit_error;
 		}
 		extern int nand_erase(struct amlnand_phydev *phydev);
 		ret = nand_erase(phydev);
@@ -97,6 +101,11 @@ static int nand_read_ops_test(struct amlnand_phydev *phydev,uint64_t off , uint6
 	unsigned char * buffer = NULL;
 	int ret = 0;
 
+	if (!dat_buf) {
+		aml_nand_msg("nand read no buf");
+		return -NAND_READ_FAILED;
+	}
+
 	offset = off;
 	write_len = len;
 	buffer = aml_nand_malloc(2 * phydev->writesize);
@@ -106,19 +115,16 @@ static int nand_read_ops_test(struct amlnand_phydev *phydev,uint64_t off , uint6
 		goto exit_error;
 	}
 
-	if (!dat_buf) {
-		aml_nand_msg("nand read no buf");
-		return -NAND_READ_FAILED;
-	}
-
 	if ((offset & (phydev->writesize - 1)) != 0 ||(write_len & (phydev->writesize - 1)) != 0) {
 		aml_nand_msg ("Attempt to read non page aligned data");
-		return -NAND_READ_FAILED;
+		ret = -NAND_READ_FAILED;
+		goto exit_error;
 	}
 
 	if ((offset + write_len) > phydev->size) {
 		aml_nand_msg("Attemp to read out side the dev area");
-		return -NAND_READ_FAILED;
+		ret = -NAND_READ_FAILED;
+		goto exit_error;
 	}
 	memset(devops, 0x0, sizeof(struct phydev_ops));
 	devops->addr = offset;
@@ -136,7 +142,8 @@ static int nand_read_ops_test(struct amlnand_phydev *phydev,uint64_t off , uint6
 				continue;
 			} else if (ret < 0) {
 				aml_nand_msg("AMLNAND get bad block failed: ret=%d at addr=%llx",ret, devops->addr);
-				return -1;
+				ret = -NAND_READ_FAILED;
+				goto exit_error;
 			}
 		}
 		memset(buffer,0x0,(2 * phydev->writesize));
@@ -288,7 +295,8 @@ static int nand_write_ops_test(struct amlnand_phydev *phydev , uint64_t off, uin
 				continue;
 			} else if (ret < 0) {
 				aml_nand_msg("AMLNAND get bad block failed: ret=%d at addr=%llx",ret, devops->addr);
-				return -1;
+				ret = -1;
+				goto exit_error;
 			}
 		}
 		ret = phydev->write(phydev);

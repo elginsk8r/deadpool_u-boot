@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2010-2013 Freescale Semiconductor, Inc.
  * Copyright (C) 2013, Boundary Devices <info@boundarydevices.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -12,14 +13,14 @@
 #include <asm/arch/sys_proto.h>
 #include <malloc.h>
 #include <asm/arch/mx6-pins.h>
-#include <linux/errno.h>
+#include <asm/errno.h>
 #include <asm/gpio.h>
-#include <asm/mach-imx/iomux-v3.h>
-#include <asm/mach-imx/mxc_i2c.h>
-#include <asm/mach-imx/sata.h>
-#include <asm/mach-imx/spi.h>
-#include <asm/mach-imx/boot_mode.h>
-#include <asm/mach-imx/video.h>
+#include <asm/imx-common/iomux-v3.h>
+#include <asm/imx-common/mxc_i2c.h>
+#include <asm/imx-common/sata.h>
+#include <asm/imx-common/spi.h>
+#include <asm/imx-common/boot_mode.h>
+#include <asm/imx-common/video.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
 #include <micrel.h>
@@ -30,7 +31,7 @@
 #include <i2c.h>
 #include <input.h>
 #include <netdev.h>
-#include <usb/ehci-ci.h>
+#include <usb/ehci-fsl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 #define GP_USB_OTG_PWR	IMX_GPIO_NR(3, 22)
@@ -386,17 +387,20 @@ int board_eth_init(bd_t *bis)
 #ifdef CONFIG_FEC_MXC
 	bus = fec_get_miibus(base, -1);
 	if (!bus)
-		return -EINVAL;
+		return 0;
 	/* scan phy 4,5,6,7 */
 	phydev = phy_find_by_mask(bus, (0xf << 4), PHY_INTERFACE_MODE_RGMII);
 	if (!phydev) {
-		ret = -EINVAL;
-		goto free_bus;
+		free(bus);
+		return 0;
 	}
 	printf("using phy at %d\n", phydev->addr);
 	ret  = fec_probe(bis, -1, base, bus, phydev);
-	if (ret)
-		goto free_phydev;
+	if (ret) {
+		printf("FEC MXC: %s:failed\n", __func__);
+		free(phydev);
+		free(bus);
+	}
 #endif
 
 #ifdef CONFIG_CI_UDC
@@ -404,12 +408,6 @@ int board_eth_init(bd_t *bis)
 	usb_eth_initialize(bis);
 #endif
 	return 0;
-
-free_phydev:
-	free(phydev);
-free_bus:
-	free(bus);
-	return ret;
 }
 
 static void setup_buttons(void)
@@ -748,7 +746,7 @@ size_t display_count = ARRAY_SIZE(displays);
 
 int board_cfb_skip(void)
 {
-	return NULL != env_get("novideo");
+	return NULL != getenv("novideo");
 }
 
 static void setup_display(void)
@@ -902,7 +900,7 @@ int board_init(void)
 	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
 	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
 
-#ifdef CONFIG_SATA
+#ifdef CONFIG_CMD_SATA
 	setup_sata();
 #endif
 
@@ -953,7 +951,7 @@ static int do_kbd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	char envvalue[ARRAY_SIZE(buttons)+1];
 	int numpressed = read_keys(envvalue);
-	env_set("keybd", envvalue);
+	setenv("keybd", envvalue);
 	return numpressed == 0;
 }
 
@@ -973,7 +971,7 @@ static void preboot_keys(void)
 	char keypress[ARRAY_SIZE(buttons)+1];
 	numpressed = read_keys(keypress);
 	if (numpressed) {
-		char *kbd_magic_keys = env_get("magic_keys");
+		char *kbd_magic_keys = getenv("magic_keys");
 		char *suffix;
 		/*
 		 * loop over all magic keys
@@ -982,7 +980,7 @@ static void preboot_keys(void)
 			char *keys;
 			char magic[sizeof(kbd_magic_prefix) + 1];
 			sprintf(magic, "%s%c", kbd_magic_prefix, *suffix);
-			keys = env_get(magic);
+			keys = getenv(magic);
 			if (keys) {
 				if (!strcmp(keys, keypress))
 					break;
@@ -992,9 +990,9 @@ static void preboot_keys(void)
 			char cmd_name[sizeof(kbd_command_prefix) + 1];
 			char *cmd;
 			sprintf(cmd_name, "%s%c", kbd_command_prefix, *suffix);
-			cmd = env_get(cmd_name);
+			cmd = getenv(cmd_name);
 			if (cmd) {
-				env_set("preboot", cmd);
+				setenv("preboot", cmd);
 				return;
 			}
 		}
@@ -1020,6 +1018,5 @@ int misc_init_r(void)
 #ifdef CONFIG_CMD_BMODE
 	add_board_boot_modes(board_boot_modes);
 #endif
-	env_set_hex("reset_cause", get_imx_reset_cause());
 	return 0;
 }

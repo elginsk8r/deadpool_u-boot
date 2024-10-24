@@ -1,12 +1,17 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_usb_tool/dwc_pcd.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
+
+/* dwc controller pcd drivers header */
 
 #ifndef __DWC_PCD_H__
 #define __DWC_PCD_H__
 
-#if defined(CONFIG_AML_USB_BURN_FULL_SPEED)
+#if CONFIG_AML_USB_BURN_FULL_SPPED
 #define USE_FULL_SPEED
 #endif// #if CONFIG_AML_USB_BURN_FULL_SPPED
 
@@ -159,13 +164,12 @@ typedef struct pcd_struct_s{
         uint32_t	d32[2];
     }setup_pkt;
 	 int ep0state;
-	 int ep0last_state;
 
 	 /* for USB_REQ_GET_STATUS */
 	 unsigned status;
 
      struct {
-         u8     type;//1-->setup+out+in, others: reseved
+	u8     type;//1-->setup+out+in, others: reserved
          u8     setup_complete;
          u8     out_complete;
          u8     in_complete;
@@ -573,7 +577,7 @@ typedef union grstctl_data
 		/** Reserved */
 		unsigned reserved11_29 : 19;
 		/** DMA Request Signal.	 Indicated DMA request is in
-		 * probress.  Used for debug purpose. */
+		 * progress.  Used for debug purpose. */
 		unsigned dmareq : 1;
 		/** AHB Master Idle.  Indicates the AHB Master State
 		 * Machine is in IDLE condition. */
@@ -1164,7 +1168,7 @@ typedef union doepint_data
 		unsigned epdisabled : 1;
 		/** AHB Error */
 		unsigned ahberr : 1;
-		/** Setup Phase Done (contorl EPs) */
+		/** Setup Phase Done (control EPs) */
 		unsigned setup : 1;
 		unsigned reserved04_31 : 28;
 	} b;
@@ -1539,8 +1543,8 @@ typedef struct dwc_otg_dev_if
 
 	/* Device configuration information*/
 	uint8_t	 speed;				 /**< Device Speed	0: Unknown, 1: LS, 2:FS, 3: HS */
-	uint8_t	 num_in_eps;		 /**< Number # of Tx EP range: 0-15 exept ep0 */
-	uint8_t	 num_out_eps;		 /**< Number # of Rx EP range: 0-15 exept ep 0*/
+	uint8_t	 num_in_eps;		 /**< Number # of Tx EP range: 0-15 except ep0 */
+	uint8_t	 num_out_eps;		 /**< Number # of Rx EP range: 0-15 except ep 0*/
 
 	/** Size of periodic FIFOs (Bytes) */
 	uint16_t perio_tx_fifo_size[MAX_PERIO_FIFOS];
@@ -1548,7 +1552,7 @@ typedef struct dwc_otg_dev_if
 	/** Size of Tx FIFOs (Bytes) */
 	uint16_t tx_fifo_size[MAX_TX_FIFOS];
 
-	/** Thresholding enable flags and length varaiables **/
+	/** Thresholding enable flags and length variables **/
 	uint16_t rx_thr_en;
 	uint16_t iso_tx_thr_en;
 	uint16_t non_iso_tx_thr_en;

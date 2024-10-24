@@ -1,19 +1,20 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
- * (C) Copyright 2010 Andreas Bießmann <andreas@biessmann.org>
+ * (C) Copyright 2010 Andreas Bießmann <andreas.devel@gmail.com>
  *
  * derived from previous work
  *
  * (C) Copyright 2002
  * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
  * Marius Groeger <mgroeger@sysgo.de>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <netdev.h>
-#include <asm/mach-types.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/at91_pio.h>
+#include <asm/arch/at91_pmc.h>
 #include <asm/arch/at91_common.h>
 #include <asm/io.h>
 
@@ -32,7 +33,7 @@ int board_init(void)
 
 	/* arch number of AT91RM9200EK-Board */
 	gd->bd->bi_arch_number = MACH_TYPE_AT91RM9200EK;
-	/* adress of boot parameters */
+	/* address of boot parameters */
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
 
 	return 0;

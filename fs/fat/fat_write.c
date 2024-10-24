@@ -1,8 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * fat_write.c
  *
  * R/W (V)FAT 12/16/32 filesystem implementation by Donggeun Kim
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -14,6 +15,7 @@
 #include <linux/ctype.h>
 #include <div64.h>
 #include <linux/math64.h>
+static int flush_dirty_fat_buffer(fsdata *mydata);
 #include "fat.c"
 
 static void uppercase(char *str, int len)
@@ -29,9 +31,7 @@ static void uppercase(char *str, int len)
 static int total_sector;
 static int disk_write(__u32 block, __u32 nr_blocks, void *buf)
 {
-	ulong ret;
-
-	if (!cur_dev)
+	if (!cur_dev || !cur_dev->block_write)
 		return -1;
 
 	if (cur_part_info.start + block + nr_blocks >
@@ -40,11 +40,8 @@ static int disk_write(__u32 block, __u32 nr_blocks, void *buf)
 		return -1;
 	}
 
-	ret = blk_dwrite(cur_dev, cur_part_info.start + block, nr_blocks, buf);
-	if (nr_blocks && ret == 0)
-		return -1;
-
-	return ret;
+	return cur_dev->block_write(cur_dev->dev,
+			cur_part_info.start + block, nr_blocks,	buf);
 }
 
 /*
@@ -63,7 +60,8 @@ static void set_name(dir_entry *dirent, const char *filename)
 	if (len == 0)
 		return;
 
-	strcpy(s_name, filename);
+	strncpy(s_name, filename, VFAT_MAXLEN_BYTES - 1);
+	s_name[VFAT_MAXLEN_BYTES - 1] = '\0';
 	uppercase(s_name, len);
 
 	period = strchr(s_name, '.');
@@ -223,6 +221,9 @@ fill_dir_slot(fat_itr *itr, const char *l_name)
 	__u8 counter = 0, checksum;
 	int idx = 0, ret;
 
+	if (!itr->dent)
+		return -1;
+
 	/* Get short file name checksum value */
 	checksum = mkcksum(itr->dent->name, itr->dent->ext);
 
@@ -351,8 +352,6 @@ static int set_fatent_value(fsdata *mydata, __u32 entry, __u32 entry_value)
 			val1 = cpu_to_le16(entry_value) & 0xfff;
 			((__u16 *)mydata->fatbuf)[off16] &= ~0xfff0;
 			((__u16 *)mydata->fatbuf)[off16] |= (val1 << 4);
-			break;
-		default:
 			break;
 		}
 
@@ -512,7 +511,7 @@ get_set_cluster(fsdata *mydata, __u32 clustnum, loff_t pos, __u8 *buffer,
 		clustcount = lldiv(size, bytesperclust);
 
 		if (!((unsigned long)buffer & (ARCH_DMA_MINALIGN - 1))) {
-			wsize = clustcount * bytesperclust;
+			wsize = clustcount * (loff_t)bytesperclust;
 			ret = disk_write(startsect,
 					 clustcount * mydata->clust_size,
 					 buffer);

@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v3_burning/v3_common/v3_tool_media.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../include/v3_tool_def.h"
@@ -45,262 +48,29 @@ static int _assert_logic_partition_cap(const char* thePartName, const uint64_t n
 }
 
 #if 1//storage wrapper
-static int is_bootloader_discrte(bool* discreteMode)
-{
-	struct storage_info_t storeInfo;
-	if (store_get_device_info(&storeInfo)) {
-		FB_ERR("Fail get store dev info\n");
-		return __LINE__;
-	}
-	*discreteMode = (DISCRETE_BOOTLOADER == storeInfo.mode);
-	return 0;
-}
-
 static int bootloader_copy_sz(void)
 {
-	bool discreteMode = false;
-	if (is_bootloader_discrte(&discreteMode)) {
-		return 0;
-	}
-
-	return store_boot_copy_size("bootloader");
-}
-
-static int _bootloader_write(u8* dataBuf, unsigned off, unsigned binSz, const char* bootName)
-{
-	int iCopy = 0;
-	const int bootCpyNum = store_boot_copy_num(bootName);
-	const int bootCpySz  = (int)store_boot_copy_size(bootName);
-	FB_MSG("[%s] CpyNum %d, bootCpySz 0x%x\n", bootName, bootCpyNum, bootCpySz);
-	if (binSz + off > bootCpySz) FBS_EXIT(_ACK, "bootloader sz(0x%x) + off(0x%x) > bootCpySz 0x%x\n", binSz, off, bootCpySz);
-
-	if (off) {
-		FBS_ERR(_ACK, "current only 0 suuported!\n");
-		return -__LINE__;
-	}
-
-	for (; iCopy < bootCpyNum; ++iCopy) {
-		int ret = store_boot_write(bootName, iCopy, binSz, dataBuf);
-		if (ret) FBS_EXIT(_ACK, "FAil in program[%s] at copy[%d]\n", bootName, iCopy);
-	}
-
-	return 0;
-}
-
-static p_payload_info_t _bl2x_mode_detect(u8* dataBuf)
-{
-	p_payload_info_t pInfo      = (p_payload_info_t)(dataBuf + BL2_SIZE);
-
-	if (AML_MAGIC_HDR_L == pInfo->hdr.nMagicL && AML_MAGIC_HDR_R == pInfo->hdr.nMagicR) {
-		FB_MSG("aml log : bootloader blxx mode!\n");
-		return pInfo;
-	}
-	return NULL;
-}
-
-#ifdef CONFIG_SHA256
-static int _bl2x_mode_check_header(p_payload_info_t pInfo)
-{
-	p_payload_info_hdr_t hdr    = &pInfo->hdr;
-	uint8_t gensum[SHA256_SUM_LEN];
-	const int nItemNum = hdr->byItemNum;
-
-	printf("\naml log : info parse...\n");
-	printf("\tsztimes : %s\n",hdr->szTimeStamp);
-	printf("\tversion : %d\n",hdr->byVersion);
-	printf("\tItemNum : %d\n",nItemNum);
-	printf("\tSize    : %d(0x%x)\n",    hdr->nSize, hdr->nSize);
-	if (nItemNum > 8 || nItemNum < 3) { FBS_EXIT(_ACK, "illegal nitem num %d\n", nItemNum); }
-
-	const int nsz = sizeof(payload_info_hdr_t) + nItemNum * sizeof(payload_info_item_t) - SHA256_SUM_LEN;
-	FB_MSG("nsz 0x%x\n", nsz);
-	sha256_context ctx;
-	sha256_starts(&ctx);
-	sha256_update(&ctx, (u8*)&(hdr->nMagicL), nsz);
-	sha256_finish(&ctx, gensum);
-	int ret = memcmp(gensum, hdr->szSHA2, SHA256_SUM_LEN);
-	if (ret) { FBS_EXIT(_ACK, "hdr info sha256sum not matched\n"); }
-	FB_MSG("hdr info sha256sum DO matched\n");
-
-	return 0;
-}
-#else
-#define _bl2x_mode_check_header(...) 0
-#endif// #ifdef CONFIG_SHA256
-
-static const char* _flashPayload[] = {"bl2",  "bl2e", "bl2x", "ddrfip", "devfip"};
-static p_payload_info_t _blxPayloadInf = NULL;
-static int _payloadInfoSz = 0;
-static int _discrete_bootloader_write(u8* dataBuf, unsigned off, unsigned binSz)
-{
-	int bl2CopySz  = BL2_SIZE/*(int)store_boot_copy_size("bl2")*/;
-	FB_MSG("bl2CopySz 0x%x, binSz 0x%x\n", bl2CopySz, binSz);
-	int ret = 0;
-
-	if (binSz > bl2CopySz)
-	{
-		_blxPayloadInf = NULL;
-		p_payload_info_t pInfo = _bl2x_mode_detect(dataBuf);
-		if (!pInfo) {
-			ret = _bootloader_write(dataBuf + bl2CopySz, 0, binSz - bl2CopySz, "tpl");
-			if (ret) FBS_EXIT(_ACK, "Fail in burn tpl\n");
-		} else
-		{
-			if (_bl2x_mode_check_header(pInfo)) {
-				FBS_EXIT(_ACK, "Fail in check bl2x info\n");
-			}
-			char name[8];
-			int nIndex = 0;
-			p_payload_info_hdr_t hdr    = &pInfo->hdr;
-			p_payload_info_item_t pItem = pInfo->arrItems;
-
-			int offPayload = 0, szPayload = 0;
-
-			memset(name, 0, 8);
-			for (nIndex = 1, pItem += 1; nIndex < hdr->byItemNum; ++nIndex, ++pItem)
-			{
-				memcpy(name, &pItem->nMagic, sizeof(unsigned int));
-				offPayload = pItem->nOffset;
-				szPayload  = pItem->nPayLoadSize;
-				FB_MSG("Item[%d]%4s offset 0x%08x sz 0x%x\n", nIndex, name, offPayload, szPayload);
-				if (!szPayload) continue;
-				ret = _bootloader_write(dataBuf + offPayload, 0, szPayload, _flashPayload[nIndex]);
-				if (ret) FBS_EXIT(_ACK, "Fail in flash payload %s\n", name);
-			}
-			_blxPayloadInf = (p_payload_info_t)V3_DOWNLOAD_VERIFY_INFO;
-			_payloadInfoSz = sizeof(payload_info_hdr_t) + pInfo->hdr.byItemNum * sizeof(payload_info_item_t);
-			memcpy(_blxPayloadInf, pInfo, _payloadInfoSz);
-		}
-	}
-
-	ret = _bootloader_write(dataBuf, 0, bl2CopySz, "bl2");
-	if (ret) FBS_EXIT(_ACK, "Fail in program bl2\n");
-
-	return 0;
+    return 0x4<<20;
 }
 
 int bootloader_write(u8* dataBuf, unsigned off, unsigned binSz)
 {
-	bool discreteMode = false;
-	if (is_bootloader_discrte(&discreteMode)) {
-		return -__LINE__;
-	}
-	if (!discreteMode) {
-		return _bootloader_write(dataBuf, off, binSz, "bootloader");
-	} else {
-		return _discrete_bootloader_write(dataBuf, off, binSz);
-	}
-	return -__LINE__;
-}
+    if ((0x2<<20) < binSz)  FB_MSG("bootloader sz 0x%x > 2M\n", binSz);
+    if ((0x4<<20) <= binSz)  FBS_EXIT(_ACK, "bootloader sz 0x%x > 4M\n", binSz);
 
-static int _bootloader_read(u8* pBuf, unsigned off, unsigned binSz, const char* bootName)
-{
-	int iCopy = 0;
-	const int bootCpyNum = store_boot_copy_num(bootName);
-	const int bootCpySz  = (int)store_boot_copy_size(bootName);
-
-	if (binSz + off > bootCpySz) {
-		FBS_ERR(_ACK, "bootloader sz(0x%x) + off(0x%x) > bootCpySz 0x%x\n", binSz, off, bootCpySz);
-		return -__LINE__;
-	}
-	if (off) FBS_EXIT(_ACK, "current only 0 suuported!\n");
-
-	for (iCopy = 0; iCopy < bootCpyNum; ++iCopy) {
-		void* dataBuf = iCopy ? pBuf + binSz : pBuf;
-		int ret = store_boot_read(bootName, iCopy, binSz, dataBuf);
-		if (ret) FBS_EXIT("Fail to read boot[%s] at copy[%d]\n", bootName, iCopy);
-		if (iCopy) {
-			if (memcmp(pBuf, dataBuf, binSz))
-				FBS_EXIT(_ACK, "[%s] copy[%d] content NOT the same as copy[0]\n", bootName, iCopy);
-		}
-	}
-
-	return 0;
-}
-
-static int _discrete_bootloader_read(u8* dataBuf, unsigned off, unsigned binSz)
-{
-	int bl2CopySz  = BL2_SIZE/*(int)store_boot_copy_size("bl2")*/;
-	FB_MSG("bl2CopySz 0x%x, binSz 0x%x\n", bl2CopySz, binSz);
-
-	int ret = _bootloader_read(dataBuf, 0, bl2CopySz, "bl2");
-	if (ret) FBS_EXIT(_ACK, "Fail in read bl2\n");
-	if (binSz <= bl2CopySz) return 0;
-	memset(dataBuf + bl2CopySz, 0, bl2CopySz);//clear 2k after bl2_size
-
-	if (!_blxPayloadInf) {
-		ret = _bootloader_read(dataBuf + bl2CopySz, 0, binSz - bl2CopySz, "tpl");
-		if (ret) FBS_EXIT(_ACK, "Fail in read tpl\n");
-	} else {
-		char name[8];
-		int nIndex = 0;
-		if (!_blxPayloadInf) FBS_EXIT(_ACK, "exception, _blxPayloadInf null\n");
-
-		p_payload_info_t pInfo      = _blxPayloadInf;
-		p_payload_info_hdr_t hdr    = &pInfo->hdr;
-		p_payload_info_item_t pItem = pInfo->arrItems;
-
-		int offPayload = 0, szPayload = 0;
-
-		memset(name, 0, 8);
-		for (nIndex = 1, pItem +=1; nIndex < hdr->byItemNum; ++nIndex, ++pItem)
-		{
-			memcpy(name, &pItem->nMagic, sizeof(unsigned int));
-			offPayload = pItem->nOffset;
-			szPayload  = pItem->nPayLoadSize;
-			FB_MSG("Item[%d]%4s offset 0x%08x sz 0x%x\n", nIndex, name, offPayload, szPayload);
-			if (!szPayload) continue;
-			ret = _bootloader_read(dataBuf + offPayload, 0, szPayload, _flashPayload[nIndex]);
-			if (ret) FBS_EXIT(_ACK, "Fail in read payload %s\n", name);
-		}
-		memcpy(dataBuf + BL2_SIZE, _blxPayloadInf, _payloadInfoSz);
-	}
-
-	return 0;
+    int ret = store_boot_write((unsigned char*)dataBuf, 0, binSz);
+    return ret ? __LINE__ : 0;
 }
 
 int bootloader_read(u8* pBuf, unsigned off, unsigned binSz)
 {
-	bool discreteMode = false;
-	if (is_bootloader_discrte(&discreteMode)) {
-		return -__LINE__;
-	}
+    int ret = store_boot_read(pBuf, off, binSz);
 
-	if (discreteMode)
-		return _discrete_bootloader_read(pBuf, off, binSz);
-
-	return _bootloader_read(pBuf, off, binSz, "bootloader");
+	return ret ? __LINE__ : 0;
 }
 
 //@rwFlag: 0---read, 1---write, 2---iread
-int store_dtb_rw(void* buf, unsigned dtbSz, int rwFlag)
-{
-    int ret = 0;
-    const unsigned dtbCap = store_rsv_size("dtb");
-    if (dtbCap <= dtbSz)
-        FBS_EXIT(_ACK, "dtb sz 0x%x > cap 0x%x\t", dtbSz, dtbCap);
-
-    switch (rwFlag) {
-        case 2: {//iread
-            ret = store_rsv_read("dtb", dtbSz, buf);
-            if (ret) FBS_EXIT(_ACK, "err(%d) in read dtb\t", ret);
-        }
-        case 0: {//read
-            if ( 2 == rwFlag ) return 0;
-            //TODO: add dtb parser
-            FBS_EXIT(_ACK, "dtb parser not implemented yet\t");
-        }break;
-        case 1: {//write
-            ret = store_rsv_erase("dtb");
-            if (ret) FBS_EXIT(_ACK, "Fail erase dtb, ret %d\n", ret);
-            ret = store_rsv_write("dtb", dtbSz, buf);
-            if (ret) FBS_EXIT(_ACK, "Fail in dtb write, ret %d\t", ret);
-        }break;
-        default: FBS_EXIT(_ACK, "err dtb rwFlag %d\n", rwFlag);
-    }
-
-    return 0;
-}
+extern int store_dtb_rw(void* buf, unsigned dtbSz, int rwFlag);
 #endif// #if 1//storage wrapper
 
 
@@ -322,14 +92,8 @@ int v3tool_media_check_image_size(int64_t imgSz, const char* partName)
             FB_EXIT("imgsz 0x%llx >= max sz 0x%x\n", imgSz, dtbCap);
         return 0;
     }
-    if (!strcmp("gpt", partName)) {
-        if (imgSz >= 0x100000) {
-            FB_EXIT("imgsz 0x%llx >= max sz 1M\n", imgSz);
-        }
-        return 0;
-    }
 
-    partCap = store_part_size(partName);
+    partCap = store_logic_cap(partName);
     if (!partCap) {
         DWN_ERR("Fail to get size for part %s\n", partName);
         return __LINE__;
@@ -393,48 +157,37 @@ static int initr_env(void)
 struct mtd_partition* __attribute__((weak)) get_partition_table(int *partitions)
 { FB_WRN("get_partition_table undefined\n"); return NULL;}
 
-int __attribute__((weak)) sheader_need(void) { FB_WRN("sheader_need undefined\n"); return 0;}
-void __attribute__((weak)) sheader_load(void *addr) { FB_WRN("sheader_load undefined\n"); return;}
-
 #ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
 const char* BackupPart = (const char*)(CONFIG_BACKUP_PART_NORMAL_ERASE);
 char* BackupPartAddr = (char*)(V3_DOWNLOAD_MEM_BASE);
 #endif// #ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
 
-int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz, unsigned gptImgSz)
+int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz)
 {
 	int ret = 0;
 	unsigned char* dtbLoadedAddr = (unsigned char*)V3_DTB_LOAD_ADDR;
+	int dtb_valid = 0;
 
 	if (V3TOOL_WORK_MODE_USB_PRODUCE != v3tool_work_mode_get()) {//Already inited in other work mode
 		/*DWN_MSG("Exit before re-init\n");*/
 		/*store_exit();*/
 	}
 
-	if (dtbImgSz && !gptImgSz) {
+	if (dtbImgSz) {
 #if defined(CONFIG_MTD) && defined(CONFIG_AML_MTDPART)
-		extern int get_meson_mtd_partition_table(struct mtd_partition **partitions);
+		extern struct mtd_partition *get_partition_table(int *partitions);
 		int mtdParts = -1;
-		struct mtd_partition *partitions;
-
-		mtdParts = get_meson_mtd_partition_table(&partitions);
-		if (partitions && (mtdParts > 0)) {//
-			extern int check_valid_dts(unsigned char *buffer);
-			ret = check_valid_dts(dtbLoadedAddr);
+		if ( get_partition_table(&mtdParts)) {//
+			ret = check_valid_dts(dtbLoadedAddr, NULL);
 		} else
 #endif // #if defined(CONFIG_MTD) && defined(CONFIG_AML_MTDPART)
 			ret = get_partition_from_dts(dtbLoadedAddr);
 		if (ret) FBS_EXIT(_ACK, "Failed at check dts\n");
-    } else if (gptImgSz) {
-        if (get_partition_from_dts((unsigned char*)V3_GPT_LOAD_ADDR)) {
-            FBS_EXIT(_ACK, "Fail at check gpt\n");
-        } else FB_MSG("Parse partition table from GPT\n");
-    }
-
-    if (sheader_need()) sheader_load((void*)V3_PAYLOAD_LOAD_ADDR);
+		dtb_valid = 1;
+	}
 
 	ret = store_init(1);
-	if (ret <= 0)
+	if (ret)
 		FBS_EXIT(_ACK, "Fail in store init %d, ret %d\n", 1, ret);
 
 #ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
@@ -448,30 +201,22 @@ int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz, unsigned gptImg
 			break;
 
 		case 3://erase all(with key)
+			FB_MSG("disprotect key before store init 3\n");
+			store_rsv_protect("key", false);
+			initFlag = 3;
+			break;
 		case 1://normal erase, store init 3
 			initFlag = 3;
-			if (3 == eraseFlash) {
-				if (store_rsv_protect("key", false))
-					FBS_EXIT(_ACK, "Fail in disprotect key\n");
-			} else {
-#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
-				//backup env to memory
-				backupPartSz = (u32)store_part_size(BackupPart);
-				FB_MSG("BackupPart %s sz 0x%x\n", BackupPart, backupPartSz);
-				if (!backupPartSz) { FBS_EXIT(_ACK, " FAil in find BackupPart %s\n", BackupPart);}
-				ret = store_read(BackupPart, 0, backupPartSz, BackupPartAddr);
-				if (ret) { FBS_EXIT(_ACK, "FAil in backup important part %s to mem\n", BackupPart);}
-#endif//#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
-			}
 			break;
 
 		case 4: {//force erase all
-					if (store_rsv_protect(NULL, false))
-						FBS_EXIT(_ACK, "Fail in disprotect all rsv\n");
-				}
-		case 2:
+				if (store_rsv_protect(NULL, false))
+					FBS_EXIT(_ACK, "Fail in disprotect all rsv\n");
 				initFlag = 4;
-				break;
+			} break;
+		case 2:
+			initFlag = 4;
+			break;
 
 		default:
 				FBS_EXIT(_ACK, "Unsupported erase flag %d\n", eraseFlash);
@@ -479,21 +224,13 @@ int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz, unsigned gptImg
 
 	FB_MSG("eraseFlash %d, initFlag %d\n", eraseFlash, initFlag);
 	if (5 == eraseFlash) {//erase key only
+        ret = store_init(1);
+		if (ret) FBS_EXIT(_ACK, "disk_initial 1 Failed\n");
 		ret = store_rsv_erase("key");
 		if (ret) FBS_EXIT(_ACK, "disk_initial 5, Fail in erase key\n");
-	} else if (initFlag > 1) {
-		if (store_get_type() == BOOT_EMMC) {
-			FB_MSG("to erase gpt for compatible\n");
-			store_gpt_erase();
-		}
-		ret = store_erase(NULL, 0, 0, 0);
+	} else {
+		ret = store_init(initFlag);
 		if (ret) FBS_EXIT(_ACK, "Fail in erase flash, ret[%d]\n", ret);
-#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
-		if (backupPartSz) {
-			FB_MSG("restore BackupPart %s from mem\n", BackupPart);
-			store_write(BackupPart, 0, backupPartSz, BackupPartAddr);
-		}
-#endif//#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
 	}
 
 	if (V3TOOL_WORK_MODE_USB_PRODUCE == v3tool_work_mode_get()) {
@@ -504,7 +241,8 @@ int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz, unsigned gptImg
 	_disk_intialed_ok  = 1;
 	if (eraseFlash && eraseFlash < 5) _disk_intialed_ok += (1 <<16);
 
-	if (dtbImgSz)//for key init, or fail when get /unifykey
+	FB_DBG("dtb_valid %d, dtbImgSz 0x%x\n", dtb_valid, dtbImgSz);
+	if (dtb_valid)//for key init, or fail when get /unifykey
 	{
 		unsigned long fdtAddr = (unsigned long)dtbLoadedAddr;
 #ifdef CONFIG_MULTI_DTB
@@ -516,6 +254,7 @@ int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz, unsigned gptImg
 		unsigned fdtsz    = fdt_totalsize((char*)fdtAddr);
 		if (fdtAddr != (unsigned long)dtbLoadedAddr)
 			memmove((char*)dtbLoadedAddr, (char*)fdtAddr, fdtsz);
+		setenv_hex("dtb_mem_addr", fdtAddr);
 	}
 
 	return 0;

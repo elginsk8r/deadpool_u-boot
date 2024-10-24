@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2009-2011 Freescale Semiconductor, Inc.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -12,7 +13,7 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/fsl_law.h>
-#include <linux/errno.h>
+#include <asm/errno.h>
 #include "fsl_corenet_serdes.h"
 
 /*
@@ -75,7 +76,7 @@ static const struct {
 	{ 17, 163, FSL_SRDS_BANK_2 },
 	{ 18, 164, FSL_SRDS_BANK_2 },
 	{ 19, 165, FSL_SRDS_BANK_2 },
-#ifdef CONFIG_ARCH_P4080
+#ifdef CONFIG_PPC_P4080
 	{ 20, 170, FSL_SRDS_BANK_3 },
 	{ 21, 171, FSL_SRDS_BANK_3 },
 	{ 22, 172, FSL_SRDS_BANK_3 },
@@ -134,9 +135,6 @@ int is_serdes_configured(enum srds_prtcl device)
 	/* Is serdes enabled at all? */
 	if (!(in_be32(&gur->rcwsr[5]) & FSL_CORENET_RCWSR5_SRDS_EN))
 		return 0;
-
-	if (!(serdes_prtcl_map & (1 << NONE)))
-		fsl_serdes_init();
 
 	return (1 << device) & serdes_prtcl_map;
 }
@@ -490,7 +488,7 @@ void fsl_serdes_init(void)
 	ccsr_gur_t *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
 	int cfg;
 	serdes_corenet_t *srds_regs;
-#ifdef CONFIG_ARCH_P5040
+#ifdef CONFIG_PPC_P5040
 	serdes_corenet_t *srds2_regs;
 #endif
 	int lane, bank, idx;
@@ -513,11 +511,9 @@ void fsl_serdes_init(void)
 	 * Extract hwconfig from environment since we have not properly setup
 	 * the environment but need it for ddr config params
 	 */
-	if (env_get_f("hwconfig", buffer, sizeof(buffer)) > 0)
+	if (getenv_f("hwconfig", buffer, sizeof(buffer)) > 0)
 		buf = buffer;
 #endif
-	if (serdes_prtcl_map & (1 << NONE))
-		return;
 
 	/* Is serdes enabled at all? */
 	if (!(in_be32(&gur->rcwsr[5]) & FSL_CORENET_RCWSR5_SRDS_EN))
@@ -576,7 +572,7 @@ void fsl_serdes_init(void)
 		}
 	}
 
-#ifdef CONFIG_ARCH_P5040
+#ifdef CONFIG_PPC_P5040
 	/*
 	 * Lanes on bank 4 on P5040 are commented-out, but for some SERDES
 	 * protocols, these lanes are routed to SATA.  We use serdes_prtcl_map
@@ -606,9 +602,6 @@ void fsl_serdes_init(void)
 
 	soc_serdes_init();
 
-	/* Set the first bit to indicate serdes has been initialized */
-	serdes_prtcl_map |= (1 << NONE);
-
 #ifdef CONFIG_SYS_P4080_ERRATUM_SERDES8
 	/*
 	 * Bank two uses the clock from bank three, so if bank two is enabled,
@@ -620,7 +613,7 @@ void fsl_serdes_init(void)
 
 #ifdef CONFIG_SYS_P4080_ERRATUM_SERDES_A001
 	/*
-	 * The work-aroud for erratum SERDES-A001 is needed only if bank two
+	 * The work-around for erratum SERDES-A001 is needed only if bank two
 	 * is disabled and bank three is enabled.  The converse is also true,
 	 * but SERDES8 ensures that bank 3 is always enabled if bank 2 is
 	 * enabled, so there's no point in complicating the code to handle

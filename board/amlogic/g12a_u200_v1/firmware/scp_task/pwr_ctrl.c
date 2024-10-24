@@ -1,31 +1,64 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * board/amlogic/g12a_u200_v1/firmware/scp_task/pwr_ctrl.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <gpio.h>
 #include "pwm_ctrl.h"
 #ifdef CONFIG_CEC_WAKEUP
-#include <cec_tx_reg.h>
+#include <hdmi_cec_arc.h>
 #endif
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+#define MESON_CPU_MAJOR_ID_G12A		0x28
+
+static int is_cpu_id_g12a(void)
+{
+	unsigned int cpu_id_reg = readl(P_AO_SEC_SD_CFG8);
+	unsigned int family_id = (cpu_id_reg >> 24) & (0XFF);
+
+	if (family_id == MESON_CPU_MAJOR_ID_G12A)
+		return 1;
+	else
+		return 0;
+}
+
 static void set_vddee_voltage(unsigned int target_voltage)
 {
-	unsigned int to;
+	unsigned int to, pwm_size = 0;
+	static int (*pwm_voltage_ee)[2];
 
-	for (to = 0; to < ARRAY_SIZE(pwm_voltage_table_ee); to++) {
-		if (pwm_voltage_table_ee[to][1] >= target_voltage) {
+	/* BOOT_9 = H use PWM_CFG0(0.67v-0.97v), =L use PWM_CFG1(0.69v-0.89v) */
+	/*set BOOT_9 input mode*/
+	writel((readl(PREG_PAD_GPIO0_EN_N) | 0x200), PREG_PAD_GPIO0_EN_N);
+	if (((readl(PREG_PAD_GPIO0_EN_N) & 0x200 ) == 0x200) &&
+			((readl(PREG_PAD_GPIO0_I) & 0x200 ) == 0x0)) {
+		uart_puts("use vddee new table!");
+		uart_puts("\n");
+		pwm_voltage_ee = pwm_voltage_table_ee_new;
+		pwm_size = ARRAY_SIZE(pwm_voltage_table_ee_new);
+	} else {
+		uart_puts("use vddee table!");
+		uart_puts("\n");
+		pwm_voltage_ee = pwm_voltage_table_ee;
+		pwm_size = ARRAY_SIZE(pwm_voltage_table_ee);
+	}
+
+	for (to = 0; to < pwm_size; to++) {
+		if (pwm_voltage_ee[to][1] >= target_voltage) {
 			break;
 		}
 	}
 
-	if (to >= ARRAY_SIZE(pwm_voltage_table_ee)) {
-		to = ARRAY_SIZE(pwm_voltage_table_ee) - 1;
+	if (to >= pwm_size) {
+		to = pwm_size - 1;
 	}
 
-	writel(pwm_voltage_table_ee[to][0],AO_PWM_PWM_B);
+	writel(*(*(pwm_voltage_ee + to)), AO_PWM_PWM_B);
 }
 
 static void power_off_at_24M(unsigned int suspend_from)
@@ -40,13 +73,21 @@ static void power_off_at_24M(unsigned int suspend_from)
 	writel(readl(AO_RTI_PIN_MUX_REG1) & (~(0xf << 28)), AO_RTI_PIN_MUX_REG1);
 
 	/*step down ee voltage*/
-	set_vddee_voltage(AML_VDDEE_SLEEP_VOLTAGE);
+	set_vddee_voltage(CONFIG_VDDEE_SLEEP_VOLTAGE);
 }
 
 static void power_on_at_24M(unsigned int suspend_from)
 {
-	/*step up ee voltage*/
-	set_vddee_voltage(AML_VDDEE_INIT_VOLTAGE);
+	/*
+	 * sm1 ac200 board share BSP code with g12a_u200_v1
+	 */
+	if (is_cpu_id_g12a()) {
+		/*g12a_u200_v1 step up ee voltage*/
+		set_vddee_voltage(CONFIG_VDDEE_INIT_VOLTAGE);
+	} else {
+		/*sm1 ac200 step up ee voltage*/
+		set_vddee_voltage(CONFIG_VDDEE_INIT_VOLTAGE_SM1);
+	}
 
 	/*set test_n low to power on vcck & vcc 3.3v*/
 	writel(readl(AO_GPIO_O) | (1 << 31), AO_GPIO_O);
@@ -69,8 +110,8 @@ void get_wakeup_source(void *response, unsigned int suspend_from)
 
 	p->status = RESPONSE_OK;
 	val = (POWER_KEY_WAKEUP_SRC | AUTO_WAKEUP_SRC | REMOTE_WAKEUP_SRC |
-	       ETH_PHY_WAKEUP_SRC | BT_WAKEUP_SRC | ETH_PHY_GPIO_SRC
-	       | CECB_WAKEUP_SRC);
+	       BT_WAKEUP_SRC | ETH_PHY_GPIO_SRC | CEC_WAKEUP_SRC |
+	       CECB_WAKEUP_SRC);
 
 	p->sources = val;
 
@@ -115,20 +156,22 @@ static unsigned int detect_key(unsigned int suspend_from)
 	unsigned *irq = (unsigned *)WAKEUP_SRC_IRQ_ADDR_BASE;
 	init_remote();
 #ifdef CONFIG_CEC_WAKEUP
-		if (hdmi_cec_func_config & 0x1) {
-			remote_cec_hw_reset();
-			cec_node_init();
-		}
+	cec_start_config();
 #endif
 
 	do {
 		#ifdef CONFIG_CEC_WAKEUP
-		if (irq[IRQ_AO_CECB] == IRQ_AO_CEC2_NUM) {
-			irq[IRQ_AO_CECB] = 0xFFFFFFFF;
-			if (cec_power_on_check())
-				exit_reason = CEC_WAKEUP;
-		}
+		if (cec_suspend_wakeup_chk())
+			exit_reason = CEC_WAKEUP;
+		/*if (irq[IRQ_AO_CEC] == IRQ_AO_CEC1_NUM ||*/
+		 /*   irq[IRQ_AO_CECB] == IRQ_AO_CEC2_NUM) {*/
+		irq[IRQ_AO_CEC] = 0xFFFFFFFF;
+		irq[IRQ_AO_CECB] = 0xFFFFFFFF;
+		if (cec_suspend_handle())
+			exit_reason = CEC_WAKEUP;
+		/*}*/
 		#endif
+
 		if (irq[IRQ_AO_IR_DEC] == IRQ_AO_IR_DEC_NUM) {
 			irq[IRQ_AO_IR_DEC] = 0xFFFFFFFF;
 			if (remote_detect_key())
@@ -159,6 +202,11 @@ static unsigned int detect_key(unsigned int suspend_from)
 					&& (readl(PREG_PAD_GPIO2_O) & (0x01 << 17))
 					&& !(readl(PREG_PAD_GPIO2_EN_N) & (0x01 << 17)))
 				exit_reason = BT_WAKEUP;
+		}
+
+		if (irq[IRQ_ETH_PTM] == IRQ_ETH_PMT_NUM) {
+			irq[IRQ_ETH_PTM]= 0xFFFFFFFF;
+			exit_reason = ETH_PMT_WAKEUP;
 		}
 
 		if (exit_reason)

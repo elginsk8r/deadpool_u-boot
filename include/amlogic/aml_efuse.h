@@ -1,7 +1,11 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/amlogic/aml_efuse.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
+
 
 #ifndef __BL2_EFUSE_H__
 #define __BL2_EFUSE_H__
@@ -65,17 +69,10 @@
 //EFUSE_LICX	--> AO_SEC_SD_CFG10/9 --> EFUSE mirror
 int IS_FEAT_BOOT_VERIFY(void);
 int IS_FEAT_BOOT_ENCRYPT(void);
-int IS_FEAT_DIS_EMMC_USER(void);
-int IS_FEAT_DIS_EMMC_BOOT_0(void);
-int IS_FEAT_DIS_EMMC_BOOT_1(void);
-int IS_FEAT_EN_4BL2_SNOR(void);
-int IS_FEAT_DIS_NBL2_SNOR(void);
-int IS_FEAT_EN_8BL2_SNAND(void);
-int IS_FEAT_DIS_NBL2_SNAND(void);
-int IS_FEAT_DIS_8BL2_NAND(void);
-int IS_FEAT_DIS_NBL2_NAND(void);
-int IS_FEAT_DIS_CHIPSET_ROOTCERT_0(void);
-int IS_FEAT_DIS_NORMAL_DEVICE_ROOTCERT_0(void);
-int IS_FEAT_DIS_DFU_DEVICE_ROOTCERT_0(void);
+
+int efuse_read_cali(char *buf, size_t count, uint32_t offset);
+int efuse_get_cali_cvbs(void);
+int efuse_get_cali_item(char *str);
+int efuse_check_pattern_item(char *str);
 
 #endif /* __BL2_EFUSE_H__ */

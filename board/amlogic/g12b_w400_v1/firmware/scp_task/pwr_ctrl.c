@@ -1,12 +1,15 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * board/amlogic/g12b_w400_v1/firmware/scp_task/pwr_ctrl.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <gpio.h>
 #include "pwm_ctrl.h"
 #ifdef CONFIG_CEC_WAKEUP
-#include <cec_tx_reg.h>
+#include <hdmi_cec_arc.h>
 #endif
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -61,13 +64,13 @@ static void power_off_at_24M(unsigned int suspend_from)
 	writel(readl(AO_RTI_PIN_MUX_REG1) & (~(0xf << 28)), AO_RTI_PIN_MUX_REG1);
 
 	/*step down ee voltage*/
-	set_vddee_voltage(AML_VDDEE_SLEEP_VOLTAGE);
+	set_vddee_voltage(CONFIG_VDDEE_SLEEP_VOLTAGE);
 }
 
 static void power_on_at_24M(unsigned int suspend_from)
 {
 	/*step up ee voltage*/
-	set_vddee_voltage(AML_VDDEE_INIT_VOLTAGE);
+	set_vddee_voltage(CONFIG_VDDEE_INIT_VOLTAGE);
 
 	/*set test_n high to power on vcck_b & vcc 3.3v*/
 	writel(readl(AO_GPIO_O) | (1 << 31), AO_GPIO_O);
@@ -95,7 +98,7 @@ void get_wakeup_source(void *response, unsigned int suspend_from)
 
 	p->status = RESPONSE_OK;
 	val = (POWER_KEY_WAKEUP_SRC | AUTO_WAKEUP_SRC | REMOTE_WAKEUP_SRC |
-	       BT_WAKEUP_SRC);
+	       BT_WAKEUP_SRC | CEC_WAKEUP_SRC | CECB_WAKEUP_SRC);
 
 	p->sources = val;
 
@@ -109,6 +112,17 @@ void get_wakeup_source(void *response, unsigned int suspend_from)
 	gpio->irq = IRQ_AO_GPIO0_NUM;
 	gpio->trig_type = GPIO_IRQ_FALLING_EDGE;
 	p->gpio_info_count = ++i;
+#ifdef CONFIG_BT_WAKEUP
+	gpio = &(p->gpio_info[i]);
+	gpio->wakeup_id = BT_WAKEUP_SRC;
+	gpio->gpio_in_idx = GPIOX_18;
+	gpio->gpio_in_ao = 0;
+	gpio->gpio_out_idx = -1;
+	gpio->gpio_out_ao = -1;
+	gpio->irq = IRQ_GPIO1_NUM;
+	gpio->trig_type	= GPIO_IRQ_FALLING_EDGE;
+	p->gpio_info_count = ++i;
+#endif
 
 }
 extern void __switch_idle_task(void);
@@ -119,17 +133,18 @@ static unsigned int detect_key(unsigned int suspend_from)
 	unsigned *irq = (unsigned *)WAKEUP_SRC_IRQ_ADDR_BASE;
 	init_remote();
 #ifdef CONFIG_CEC_WAKEUP
-		if (hdmi_cec_func_config & 0x1) {
-			remote_cec_hw_reset();
-			cec_node_init();
-		}
+	cec_start_config();
 #endif
 
 	do {
 		#ifdef CONFIG_CEC_WAKEUP
-		if (irq[IRQ_AO_CECB] == IRQ_AO_CEC2_NUM) {
+		if (cec_suspend_wakeup_chk())
+			exit_reason = CEC_WAKEUP;
+		if (irq[IRQ_AO_CEC] == IRQ_AO_CEC1_NUM ||
+		    irq[IRQ_AO_CECB] == IRQ_AO_CEC2_NUM) {
+			irq[IRQ_AO_CEC] = 0xFFFFFFFF;
 			irq[IRQ_AO_CECB] = 0xFFFFFFFF;
-			if (cec_power_on_check())
+			if (cec_suspend_handle())
 				exit_reason = CEC_WAKEUP;
 		}
 		#endif
@@ -149,7 +164,15 @@ static unsigned int detect_key(unsigned int suspend_from)
 			if ((readl(AO_GPIO_I) & (1<<3)) == 0)
 				exit_reason = POWER_KEY_WAKEUP;
 		}
-
+#ifdef CONFIG_BT_WAKEUP
+		if (irq[IRQ_GPIO1] == IRQ_GPIO1_NUM) {
+			irq[IRQ_GPIO1] = 0xFFFFFFFF;
+			if (!(readl(PREG_PAD_GPIO2_I) & (0x01 << 18))
+				&& (readl(PREG_PAD_GPIO2_O) & (0x01 << 17))
+				&& !(readl(PREG_PAD_GPIO2_EN_N) & (0x01 << 17)))
+				exit_reason = BT_WAKEUP;
+		}
+#endif
 		if (irq[IRQ_ETH_PTM] == IRQ_ETH_PMT_NUM) {
 			irq[IRQ_ETH_PTM]= 0xFFFFFFFF;
 			exit_reason = ETH_PMT_WAKEUP;

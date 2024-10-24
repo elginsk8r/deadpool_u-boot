@@ -1,8 +1,9 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2009 Stefan Roese <sr@denx.de>, DENX Software Engineering
  *
  * Copyright (C) 2006 Micronas GmbH
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _REG_SCC_PREMIUM_H_
@@ -50,7 +51,7 @@
 #define SCC39_BASE		0x00111380
 #define SCC40_BASE		0x00111400
 
-/*  Relative offsets of the register adresses */
+/*  Relative offsets of the register addresses */
 
 #define SCC_ENABLE_OFFS		0x00000000
 #define SCC_ENABLE(base)	((base) + SCC_ENABLE_OFFS)

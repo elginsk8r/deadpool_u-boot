@@ -1,37 +1,36 @@
-# SPDX-License-Identifier: GPL-2.0+
 #
 # (C) Copyright 2000-2003
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
+#
+# SPDX-License-Identifier:	GPL-2.0+
+#
 
 extra-y	:= start.o
 
 obj-y	+= cpu.o
-ifndef CONFIG_$(SPL_TPL_)TIMER
-obj-$(CONFIG_SYS_ARCH_TIMER) += generic_timer.o
-endif
+obj-y	+= generic_timer.o
 obj-y	+= cache_v8.o
-ifdef CONFIG_SPL_BUILD
-obj-$(CONFIG_ARMV8_SPL_EXCEPTION_VECTORS) += exceptions.o
-else
 obj-y	+= exceptions.o
-endif
 obj-y	+= cache.o
 obj-y	+= tlb.o
 obj-y	+= transition.o
-obj-y	+= fwcall.o
-obj-y	+= cpu-dt.o
-obj-$(CONFIG_ARM_SMCCC)		+= smccc-call.o
+obj-y	+= cpu_id.o
+obj-y	+= board_id.o
 
 obj-y	+= a32_kernel_pre_entry.o
+obj-$(CONFIG_ARM_SMCCC)	+= smccc-call.o
 
-ifndef CONFIG_SPL_BUILD
-obj-$(CONFIG_ARMV8_SPIN_TABLE) += spin_table.o spin_table_v8.o
+obj-$(CONFIG_FSL_LSCH3) += fsl-lsch3/
+obj-$(CONFIG_AML_MESON) += $(SOC)/
+
+
+obj-$(CONFIG_AML_HW_SHA2) += hard_sha2.o
+
+
+obj-$(CONFIG_AML_HW_AES) += hw_aes.o
+obj-$(CONFIG_ARMV8_CE_SHA1) += sha1_ce_glue.o sha1_ce_core.o
+obj-$(CONFIG_ARMV8_CE_SHA256) += sha256_ce_glue.o sha256_ce_core.o
+obj-$(CONFIG_ARMV8_CE_AES) += aes_ce_glue.o aes_ce_core.o
+ifndef CONFIG_AML_UASAN
+obj-y	+= memcpy.o memmove.o string.o memset.o memcmp.o strcmp.o strncmp.o strlen.o strnlen.o
 endif
-obj-$(CONFIG_$(SPL_)ARMV8_SEC_FIRMWARE_SUPPORT) += sec_firmware.o sec_firmware_asm.o
-
-obj-$(CONFIG_FSL_LAYERSCAPE) += fsl-layerscape/
-obj-$(CONFIG_S32V234) += s32v234/
-obj-$(CONFIG_ARCH_ZYNQMP) += zynqmp/
-obj-$(CONFIG_TARGET_HIKEY) += hisilicon/
-obj-$(CONFIG_ARMV8_PSCI) += psci.o
-obj-$(CONFIG_ARCH_SUNXI) += lowlevel_init.o

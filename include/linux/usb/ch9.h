@@ -39,6 +39,8 @@
 
 /*-------------------------------------------------------------------------*/
 
+#define USB_ENABLE	0xea
+
 /* CONTROL REQUEST SUPPORT */
 
 /*
@@ -49,8 +51,6 @@
  */
 #define USB_DIR_OUT			0		/* to device */
 #define USB_DIR_IN			0x80		/* to host */
-
-#define USB_ENABLE	0xea
 
 /*
  * USB types, the second of three bRequestType fields
@@ -231,8 +231,6 @@ struct usb_ctrlrequest {
 #define USB_DT_PIPE_USAGE		0x24
 /* From the USB 3.0 spec */
 #define	USB_DT_SS_ENDPOINT_COMP		0x30
-/* From HID 1.11 spec */
-#define USB_DT_HID_REPORT		0x22
 
 /* Conventional codes for class-specific descriptors.  The convention is
  * defined in the USB "Common Class" Spec (3.11).  Individual class specs
@@ -338,7 +336,7 @@ struct usb_string_descriptor {
 	__u8  bDescriptorType;
 
 	__le16 wData[1];		/* UTF-16LE encoded */
-} __attribute__ ((packed));
+} __attribute__ ((aligned(16)));
 
 /* note that "string" zero is special, it holds language codes that
  * the device supports, not Unicode characters.
@@ -383,29 +381,6 @@ struct usb_endpoint_descriptor {
 #define USB_DT_ENDPOINT_SIZE		7
 #define USB_DT_ENDPOINT_AUDIO_SIZE	9	/* Audio extension */
 
-/* Used to access common fields */
-struct usb_generic_descriptor {
-	__u8  bLength;
-	__u8  bDescriptorType;
-};
-
-struct __packed usb_class_hid_descriptor {
-	u8 bLength;
-	u8 bDescriptorType;
-	u16 bcdCDC;
-	u8 bCountryCode;
-	u8 bNumDescriptors;	/* 0x01 */
-	u8 bDescriptorType0;
-	u16 wDescriptorLength0;
-	/* optional descriptors are not supported. */
-};
-
-struct __packed usb_class_report_descriptor {
-	u8 bLength;	/* dummy */
-	u8 bDescriptorType;
-	u16 wLength;
-	u8 bData[0];
-};
 
 /*
  * Endpoints
@@ -419,12 +394,6 @@ struct __packed usb_class_report_descriptor {
 #define USB_ENDPOINT_XFER_BULK		2
 #define USB_ENDPOINT_XFER_INT		3
 #define USB_ENDPOINT_MAX_ADJUSTABLE	0x80
-
-#define USB_ENDPOINT_MAXP_MASK		0x07ff
-#define USB_EP_MAXP_MULT_SHIFT		11
-#define USB_EP_MAXP_MULT_MASK		(3 << USB_EP_MAXP_MULT_SHIFT)
-#define USB_EP_MAXP_MULT(m)		\
-	(((m) & USB_EP_MAXP_MULT_MASK) >> USB_EP_MAXP_MULT_SHIFT)
 
 /* The USB 3.0 spec redefines bits 5:4 of bmAttributes as interrupt ep type. */
 #define USB_ENDPOINT_INTRTYPE		0x30
@@ -633,20 +602,6 @@ static inline int usb_endpoint_maxp(const struct usb_endpoint_descriptor *epd)
 	return __le16_to_cpu(get_unaligned(&epd->wMaxPacketSize));
 }
 
-/**
- * usb_endpoint_maxp_mult - get endpoint's transactional opportunities
- * @epd: endpoint to be checked
- *
- * Return @epd's wMaxPacketSize[12:11] + 1
- */
-static inline int
-usb_endpoint_maxp_mult(const struct usb_endpoint_descriptor *epd)
-{
-	int maxp = __le16_to_cpu(epd->wMaxPacketSize);
-
-	return USB_EP_MAXP_MULT(maxp) + 1;
-}
-
 static inline int usb_endpoint_interrupt_type(
 		const struct usb_endpoint_descriptor *epd)
 {
@@ -655,7 +610,6 @@ static inline int usb_endpoint_interrupt_type(
 
 /*-------------------------------------------------------------------------*/
 
-#if 0
 /* USB_DT_SS_ENDPOINT_COMP: SuperSpeed Endpoint Companion descriptor */
 struct usb_ss_ep_comp_descriptor {
 	__u8  bLength;
@@ -686,7 +640,6 @@ usb_ss_max_streams(const struct usb_ss_ep_comp_descriptor *comp)
 
 	return max_streams;
 }
-#endif
 
 /* Bits 1:0 of bmAttributes if this is an isoc endpoint */
 #define USB_SS_MULT(p)			(1 + ((p) & 0x3))
@@ -1050,14 +1003,5 @@ struct usb_set_sel_req {
  * http://compliance.usb.org/index.asp?UpdateFile=Electrical&Format=Standard#34
  */
 #define USB_SELF_POWER_VBUS_MAX_DRAW		100
-
-/**
- * struct usb_string - wraps a C string and its USB id
- * @id:the (nonzero) ID for this string
- * @s:the string, in UTF-8 encoding
- *
- * If you're using usb_gadget_get_string(), use this to wrap a string
- * together with its ID.
- */
 
 #endif /* __LINUX_USB_CH9_H */

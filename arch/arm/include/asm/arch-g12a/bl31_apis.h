@@ -1,21 +1,17 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12a/bl31_apis.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
-/*
- * Trustzone API
- *
- * Copyright (C) 2012 Amlogic, Inc.
- *
- * Author: Platform-SH@amlogic.com
- *
- */
 
 #ifndef __GXBB_BL31_APIS_H
 #define __GXBB_BL31_APIS_H
 
 #include <asm/arch/io.h>
+#include <amlogic/image_check.h>
 
 /*#define SRAM_READ				0x82000010
 #define CORE_RD_REV1			0x82000011
@@ -45,6 +41,9 @@
 #define EFUSE_WRITE				0x82000031
 #define EFUSE_WRITE_PATTERN		0x82000032
 #define EFUSE_USER_MAX    0x82000033
+#define EFUSE_OBJ_READ    0x8200003B
+#define EFUSE_OBJ_WRITE   0x8200003C
+#define EFUSE_READ_CALI         0x8200003D
 
 #define DEBUG_EFUSE_WRITE_PATTERN	0x820000F0
 #define DEBUG_EFUSE_READ_PATTERN	0x820000F1
@@ -81,13 +80,6 @@
 
 /* KEYMASTER */
 #define SET_BOOT_PARAMS		0x82000072
-#define SHA256_DIGEST_SIZE  32
-typedef struct {
-	uint32_t device_locked;
-	uint32_t verified_boot_state;
-	uint8_t verified_boot_key[SHA256_DIGEST_SIZE];
-	uint8_t verified_boot_hash[SHA256_DIGEST_SIZE];
-} keymaster_boot_params;
 
 /* Secure HAL APIs */
 #define TRUSTZONE_HAL_API_SRAM                  0x400
@@ -111,6 +103,8 @@ struct sram_hal_api_arg {
 #define JTAG_A53_EE 3
 #define CLUSTER_BIT 2
 
+
+/* AVB2 */
 #define GET_AVBKEY_FROM_FIP              0x820000b0
 
 /////////////////////////////////////////////////////////////////////////////////

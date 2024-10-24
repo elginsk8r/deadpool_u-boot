@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * board/amlogic/g12b_w400_v1/eth_setup.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <common.h>
@@ -8,7 +11,7 @@
 #include <errno.h>
 #include <environment.h>
 #include <fdt_support.h>
-#include <linux/libfdt.h>
+#include <libfdt.h>
 #include <asm/arch/eth_setup.h>
 /*
  *
@@ -20,8 +23,8 @@ struct eth_board_socket* eth_board_setup(char *name){
 	new_board= (struct eth_board_socket*) malloc(sizeof(struct eth_board_socket));
 	if (NULL == new_board) return NULL;
 	if (name != NULL) {
-		new_board->name=(char*)malloc(strlen(name));
-		strncpy(new_board->name,name,strlen(name));
+		new_board->name = (char*)malloc(strlen(name) + 2);
+		strncpy(new_board->name, name, strlen(name));
 	}else{
 		new_board->name="gxb";
 	}

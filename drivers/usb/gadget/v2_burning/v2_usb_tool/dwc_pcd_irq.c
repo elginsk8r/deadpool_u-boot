@@ -1,9 +1,13 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_usb_tool/dwc_pcd_irq.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
-#include "../../platform.h"
+/* dwc controller pcd interrupt drivers  */
+#include "platform.h"
 #include "usb_ch9.h"
 #include "dwc_pcd.h"
 #include "dwc_pcd_irq.h"
@@ -66,7 +70,6 @@ static void do_setup_out_status_phase( pcd_struct_t *_pcd)
 
 }
 
-#if (defined AML_USB_BURN_TOOL)
 static void pcd_out_completed(pcd_struct_t *_pcd)
 {
     if (_pcd->cmdtype.out_complete && _pcd->cmdtype.in_complete)
@@ -80,7 +83,6 @@ static void pcd_in_completed(pcd_struct_t *_pcd)
 {
 	do_vendor_in_complete(_pcd,(struct usb_ctrlrequest*)&_pcd->setup_pkt);
 }
-#endif//#if (defined AML_USB_BURN_TOOL)
 
 
 static void pcd_setup( pcd_struct_t *_pcd )
@@ -113,11 +115,9 @@ static void pcd_setup( pcd_struct_t *_pcd )
     {
         /* handle non-standard (class/vendor) requests in the gadget driver */
         //do_gadget_setup(_pcd, &ctrl );
-        DBG("Vendor requset\n");
-#if (defined AML_USB_BURN_TOOL)
+	DBG("Vendor request\n");
         do_vendor_request(_pcd, &ctrl );
         dwc_otg_ep_req_start(_pcd,0);
-#endif
         return;
     }
 
@@ -208,7 +208,7 @@ static void pcd_setup( pcd_struct_t *_pcd )
 /**
  * This function handles EP0 Control transfers.
  *
- * The state of the control tranfers are tracked in
+ * The state of the control transfers are tracked in
  * <code>ep0state</code>.
  * is_in : 1 -- IN Trans
  * is_in : 0 -- OUT/SETUP Trans
@@ -238,27 +238,23 @@ static void handle_ep0( int is_in )
             }
             else {
                 ep0_complete_request( _pcd );
-                _pcd->ep0last_state = 1;
+                pcd_in_completed(_pcd);/////////////
             }
             break;
 
         case EP0_OUT_DATA_PHASE:
             ep0_complete_request(_pcd );
             _pcd->cmdtype.in_complete = 1;
-            _pcd->ep0last_state = 2;
+            pcd_out_completed(_pcd);
             break;
 
+
         case EP0_STATUS:
+
             ep0_complete_request( _pcd );
             _pcd->ep0state = EP0_IDLE;
             ep0->stopped = 1;
             ep0->is_in = 0;  /* OUT for next SETUP */
-            if (_pcd->ep0last_state == 1) {
-                pcd_in_completed(_pcd);
-            } else if (_pcd->ep0last_state == 2) {
-                pcd_out_completed(_pcd);
-            }
-            _pcd->ep0last_state = 0;
 
             break;
 
@@ -305,10 +301,8 @@ static void complete_ep( int ep_num,int is_in )
 		ep->xfer_buff = 0;
 		ep->xfer_len = 0;
 	}
-#if (defined AML_USB_BURN_TOOL)
 
 	do_bulk_complete(pcd);
-#endif
 }
 /**
  * This function completes the ep0 control transfer.
@@ -527,7 +521,7 @@ static void handle_in_ep_timeout_intr(uint32_t _epnum)
         gintmsk_data_t intr_mask = {0};
 
 
-        /* Disable the NP Tx Fifo Empty Interrrupt */
+	/* Disable the NP Tx Fifo Empty Interrupt */
 
 	intr_mask.b.nptxfempty = 1;
 	dwc_modify_reg32( DWC_REG_GINTMSK, intr_mask.d32, 0);
@@ -737,7 +731,7 @@ int32_t dwc_otg_pcd_handle_np_tx_fifo_empty_intr(void)
 #if 1
 			   /*
 				  TODO:  Remove these code.
-				  Because, if code break from "while"(Line427), an incomplete-in-trans will occour.
+				  Because, if code break from "while"(Line427), an incomplete-in-trans will occur.
 				  Then the tansfer will break.
 			   */
 			   int retry = 50000;	//retry times
@@ -963,7 +957,7 @@ do { \
                             DBG("EP%d OUT AHB Error\n", epnum);
 				CLEAR_OUT_EP_INTR(epnum,ahberr);
                     }
-                    /* Setup Phase Done (contorl EPs) */
+		/* Setup Phase Done (control EPs) */
                     if ( doepint.b.setup ) {
                             handle_ep0( 0 );
 				CLEAR_OUT_EP_INTR(epnum,setup);
@@ -1036,8 +1030,7 @@ do { \
                         if ( diepint.b.xfercompl ) {
 
 
-                                /* Disable the NP Tx FIFO Empty
-                                 * Interrrupt */
+				/* Disable the NP Tx FIFO Empty Interrupt */
                                 intr_mask.b.nptxfempty = 1;
                                 dwc_modify_reg32( DWC_REG_GINTMSK, intr_mask.d32, 0);
 
@@ -1251,10 +1244,8 @@ int dwc_common_irq(void)
 		ERR("Session Request Success Status Change\n");
 	}
 	if (gotgint.b.sesenddet) {
-		ERR("Session End Detected, Line Disconected\n");
-		#if (defined AML_USB_BURN_TOOL)
+		ERR("Session End Detected, Line Disconnected\n");
                 cb_4_dis_connect_intr();
-        #endif
 	}
 
 	dwc_write_reg32(DWC_REG_GOTGINT,gotgint.d32); // clear intr
@@ -1293,9 +1284,7 @@ int dwc_pcd_irq(void)
 
 	if (gintr_status.b.rxstsqlvl) {
 		dwc_otg_pcd_handle_rx_status_q_level_intr();
-		#if (defined AML_USB_BURN_TOOL)
 		pcd_out_completed(&this_pcd[0]);
-		#endif
 	}
 	if (gintr_status.b.nptxfempty) {
 		dwc_otg_pcd_handle_np_tx_fifo_empty_intr( );

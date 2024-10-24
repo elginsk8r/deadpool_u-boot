@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v3_burning/v3_common/v3_tool_simg2img.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../include/v3_tool_def.h"
@@ -21,7 +24,7 @@ static struct
     int             pktHeadLen;
     char*           chunkDataBuf;//buf for usb download
 
-    //back up infomation for verify
+    //back up information for verify
     chunk_header_t* chunkInfoBackAddr;//file header and chunk info back address
     uint32_t        backChunkNum;      //chunk number backed
     int64_t         leftTransLen;
@@ -179,7 +182,7 @@ static int check_chunk_info(const chunk_header_t* chunk, unsigned* pDataLen, uns
                     return -__LINE__;
                 }
                 const int fillFieldLen = 4;
-                if (fillVal) *fillVal = *(unsigned*)(chunk+1);
+                if (fillVal) *fillVal = *(unsigned*)(chunk+1) ;
                 chunkDataLen = fillFieldLen;
             }break;
         case CHUNK_TYPE_CRC32:
@@ -217,7 +220,7 @@ static int simg2img_fill_chunk_write(const char* partName, int fillLen, const un
             default: FBS_EXIT(_ACK, "unsupported boot dev %d\n", store_get_type());
         }
     } else {/* always need fill when flash NOT erased */}
-   //for, emmc, if fillVal is 0, then needFill = false if "disk_inital > 0"
+   //for, emmc, if fillVal is 0, then needFill = false if "disk_initial > 0"
     if (!needFill) return 0;
 
     int LeftDataLen = fillLen;
@@ -246,7 +249,7 @@ static int simg2img_fill_chunk_write(const char* partName, int fillLen, const un
 
 
 //v3tool_simg2img_write_img called after transfer (and checksum) ok
-//Recevied data format: [file header] + [chunk info] or [chunk body >=0] + [next chunk info]
+//rx data format: [file header] + [chunk info] or [chunk body >=0] + [next chunk info]
 //                  <==> <[file header]> + <[chunkBody]> + <[nextChunkInfo]>
 //                      //has [file header] if first download
 //                      //[chunkBody] size 0 if first download or CHUNK_TYPE_DONT_CARE
@@ -321,7 +324,7 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
     {
         const chunk_header_t* pChunk = _spPacketStates.chunkInfo;//this download info
         const char* part = downPara->commonInf.partName;
-        int64_t flashAddr = _spPacketStates.nextFlashAddr + downPara->commonInf.partStartOff;
+        int64_t flashAddr = _spPacketStates.nextFlashAddr;
         unsigned flashWrLen = dataSize;
         const unsigned chunkFlashSpace = pChunk->chunk_sz * _spPacketStates.sparseBlkSz;;
 
@@ -341,7 +344,7 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
             }
             const unsigned* fillVal = (unsigned*)dataBuf;
             FB_DBG("fill wr: off/sz 0x%08llx flashWrLen %x\n", _spPacketStates.nextFlashAddr, chunkFlashSpace);
-            if (simg2img_fill_chunk_write((char*)part, chunkFlashSpace, fillVal, flashAddr)) {
+            if (simg2img_fill_chunk_write((char*)part, chunkFlashSpace, fillVal, _spPacketStates.nextFlashAddr)) {
                 sperr("Fail in fill fill-chunk\n");
                 return -__LINE__;
             }
@@ -351,7 +354,7 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
                 sperr("DONT_CARE trunk sz %x err, should be 0\n", dataSize);
                 return -__LINE__;
             }
-            FB_DBG("donnot care: off/sz 0x%08llx flashWrLen", _spPacketStates.nextFlashAddr, chunkFlashSpace);
+            FB_DBG("donnot care: off/sz 0x%08llx flashWrLen 0x%x", _spPacketStates.nextFlashAddr, chunkFlashSpace);
             _spPacketStates.nextFlashAddr += chunkFlashSpace;
         } else {
             sperr("chunk(%x) should not be here", chunkType);
@@ -365,7 +368,7 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
         nextDownInf = (chunk_header_t*)(dataBuf + dataSize);
         _spPacketStates.chunkInfo = _spPacketStates.chunkInfoBackAddr;
         memcpy(_spPacketStates.chunkInfoBackAddr++, nextDownInf, CHUNK_HEAD_SIZE);
-        //spmsg("back chunkInfo 0x%p, next %p, %x\n", _spPacketStates.chunkInfo, nextDownInf, _spPacketStates.chunkInfo->chunk_type);
+        FB_DBG("back chunkInfo 0x%p, next %p, %x\n", _spPacketStates.chunkInfo, nextDownInf, _spPacketStates.chunkInfo->chunk_type);
 
         unsigned chunkDataLen = 0;
         if (check_chunk_info(nextDownInf, &chunkDataLen, NULL, NULL)) {
@@ -376,7 +379,7 @@ int v3tool_simg2img_write_img(const UsbDownInf* downInf, const ImgDownloadPara* 
         if (_spPacketStates.fileOffset + chunkDataLen < _spPacketStates.imgTotalLen) {
             _spPacketStates.leftTransLen += CHUNK_HEAD_SIZE;
         }
-        //spmsg("update leftTransLen 0x%llx\n", _spPacketStates.leftTransLen);
+        FB_DBG("update leftTransLen 0x%llx\n", _spPacketStates.leftTransLen);
     }
 
     return 0;
@@ -417,7 +420,7 @@ int v3tool_simg2img_verify_img(sha1_context* ctx, const char* partName, int64_t 
     for ( ; _iChunk < nChunk; ++_iChunk, ++backInf )
     {
         if (!_dataChunkLeft) sha1_update(ctx, (u8*)backInf, CHUNK_HEAD_SIZE);
-        const int64_t flashSpace = backInf->chunk_sz * _spPacketStates.sparseBlkSz;
+        const int64_t flashSpace = backInf->chunk_sz * (int64_t)_spPacketStates.sparseBlkSz;
         switch (backInf->chunk_type)
         {
             case CHUNK_TYPE_RAW:

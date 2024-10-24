@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_ini_parser.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "optimus_sdc_burn_i.h"
@@ -159,7 +162,7 @@ int _optimus_abandon_ini_comment_lines(char* lines[], const unsigned lineNum)
             }
         }
 
-        //if all character is space or tab, also invlalid it
+        //if all character is space or tab, also invalid it
         if (isSpaceLine)
         {
             lines[lineIndex] = NULL;
@@ -390,9 +393,6 @@ int optimus_ini_trans_lines_2_usr_params(const char* const lines[], const unsign
                                                 }
                                         }
                                 }
-                                break;
-
-                        default:
                                 break;
                 }
 

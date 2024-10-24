@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/phy/boot_operation.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../include/phynand.h"
@@ -10,9 +13,8 @@ extern void uboot_set_ran_mode(struct amlnand_phydev *phydev);
 extern void nand_boot_info_prepare(struct amlnand_phydev *phydev, unsigned char * page0_buf);
 extern int mt_L95B_nand_check(struct amlnand_chip *aml_chip);
 extern int mt_L85C_nand_check(struct amlnand_chip *aml_chip);
-extern struct amlnand_phydev *aml_phy_get_dev(const char * name);
 
-extern nand_page0_t *p_page0_buf;
+
 static int read_uboot(struct amlnand_phydev *phydev)
 {
 	struct amlnand_chip *aml_chip = (struct amlnand_chip *)phydev->priv;
@@ -22,7 +24,6 @@ static int read_uboot(struct amlnand_phydev *phydev)
 	struct chip_operation *operation = &(aml_chip->operation);
 	struct chip_ops_para *ops_para = &(aml_chip->ops_para);
 	struct en_slc_info *slc_info = &(controller->slc_info);
-	ext_info_t * p_ext_info = NULL;
 
 	u32 configure_data, pages_per_blk, configure_data_w;
 	u32 pages_per_blk_w, page_size, tmp_size;
@@ -101,9 +102,9 @@ static int read_uboot(struct amlnand_phydev *phydev)
 		en_slc, len, addr );
 	valid_pages = (en_slc)?(valid_pages>>1):valid_pages;
 	for (i = 1;
-		i < ((valid_pages*flash->pagesize)/len + 1); i++) {
-		if (((valid_pages*flash->pagesize)/(2*i) >= len)
-				&& (boot_num < 4))
+		i < (((u64)valid_pages * flash->pagesize) / len + 1); i++) {
+		if ((((u64)valid_pages * flash->pagesize) / (2 * i) >= len) &&
+		    boot_num < 4)
 			boot_num <<= 1;
 		else
 			break;
@@ -120,10 +121,7 @@ static int read_uboot(struct amlnand_phydev *phydev)
 		controller->ecc_steps);
 	while (1) {
 		if ((((u32)addr / flash->pagesize) %
-			(each_boot_pages >> 1)) == 0)
-
-			/* if ((((u32)addr / flash->pagesize) %
-			each_boot_pages) == 0)*/{
+			each_boot_pages) == 0) {
 				uboot_set_ran_mode(phydev);
 				page_size = (flash->pagesize / 512) *
 					NAND_ECC_UNIT_SHORT;
@@ -170,7 +168,7 @@ static int read_uboot(struct amlnand_phydev *phydev)
 				NAND_BOOT_NAME,
 				strlen((const char *)NAND_BOOT_NAME)))
 				&& (((((u32)addr / flash->pagesize))%/*each_boot_pages*/
-			(each_boot_pages >> 1)) == 0)) {
+			each_boot_pages) == 0)) {
 			controller->ran_mode = 1;
 			memcpy((u8 *)(&configure_data_w),
 				ops_para->data_buf,
@@ -178,12 +176,10 @@ static int read_uboot(struct amlnand_phydev *phydev)
 			memcpy((u8 *)(&pages_per_blk_w),
 				ops_para->data_buf+4,
 				sizeof(int));
-			memcpy((u8 *)p_page0_buf, ops_para->data_buf, flash->pagesize);
-			p_ext_info = &(p_page0_buf->ext_info);
+
 			aml_nand_msg("configure_data:%x, pages_per_blk:%x",
 				configure_data,
 				pages_per_blk);
-			aml_nand_msg("boot num11: %d",p_ext_info->boot_num);
 
 			addr += flash->pagesize;
 #if 1
@@ -277,130 +273,6 @@ int roomboot_nand_read(struct amlnand_phydev *phydev)
 	return ret;
 }
 
-
-/**
- * @usage: get the copy number of bootloader
- *
- * @name: only can be "bootloader"
- * @return: the copy number of the "bootloader"
- *   0xff: error;
- *	 >=1, success;
- */
-u8 amlnf_boot_cpys(const char *part_name)
-{
-	struct amlnand_chip *aml_chip = NULL;
-	struct nand_flash *flash = NULL;
-	struct amlnand_phydev *phydev = NULL;
-	struct phydev_ops *devops = NULL;
-	u8 *page0_buf = NULL;
-	ext_info_t *p_ext_info = NULL;
-	u8 ret = 0xff;
-	char *dev_name = NULL;
-
-	if (strcmp(part_name, "bootloader") == 0) {
-		dev_name = NAND_BOOT_NAME;
-	} else {
-		aml_nand_msg("no tpl");
-		return ret;
-	}
-
-	phydev = aml_phy_get_dev(dev_name);
-	if (!phydev) {
-		aml_nand_msg("phydev be NULL");
-		return ret;
-	}
-
-	aml_chip = (struct amlnand_chip *)phydev->priv;
-	flash = &(aml_chip->flash);
-
-	page0_buf = aml_nand_malloc(flash->pagesize);
-	if (page0_buf == NULL) {
-		aml_nand_msg("malloc failed:%d", flash->pagesize);
-		return ret;
-	}
-	memset(p_page0_buf, 0, flash->pagesize);
-	memset(page0_buf, 0, flash->pagesize);
-
-	devops = &(phydev->ops);
-	devops->addr = 0;
-	devops->mode = NAND_HW_ECC;
-	devops->len = flash->pagesize;
-	devops->datbuf = page0_buf;
-
-	ret = roomboot_nand_read(phydev);
-	if (ret < 0) {
-		aml_nand_msg("nand read uboot failed");
-		return 0xff;
-	}
-
-	p_ext_info = &(p_page0_buf->ext_info);
-	aml_nand_msg("boot num1: %d",p_ext_info->boot_num);
-	return p_ext_info->boot_num;
-}
-
-/**
- * @usage: get the copy size of bootloader
- *
- * @name: only can be "bootloader"
- *
- * @return: the size of every copy
- */
- u64 amlnf_boot_copy_size(const char *part_name)
-{
-	struct amlnand_chip *aml_chip = NULL;
-	struct nand_flash *flash = NULL;
-	struct amlnand_phydev *phydev = NULL;
-	struct phydev_ops *devops = NULL;
-	u8 *page0_buf = NULL;
-	ext_info_t *p_ext_info = NULL;
-	u8 ret = 0xff;
-	char *dev_name = NULL;
-	u64 size;
-
-	if (strcmp(part_name, "bootloader") == 0) {
-		dev_name = NAND_BOOT_NAME;
-	} else {
-		aml_nand_msg("no tpl");
-		return ret;
-	}
-
-	phydev = aml_phy_get_dev(dev_name);
-	if (!phydev) {
-		aml_nand_msg("phydev be NULL");
-		return ret;
-	}
-
-	aml_chip = (struct amlnand_chip *)phydev->priv;
-	flash = &(aml_chip->flash);
-
-	page0_buf = aml_nand_malloc(flash->pagesize);
-	if (page0_buf == NULL) {
-		aml_nand_msg("malloc failed:%d", flash->pagesize);
-		return ret;
-	}
-	memset(p_page0_buf, 0, flash->pagesize);
-	memset(page0_buf, 0, flash->pagesize);
-
-	devops = &(phydev->ops);
-	devops->addr = 0;
-	devops->mode = NAND_HW_ECC;
-	devops->len = flash->pagesize;
-	devops->datbuf = page0_buf;
-
-	ret = roomboot_nand_read(phydev);
-	if (ret < 0) {
-		aml_nand_msg("nand read uboot failed");
-		return 0xff;
-	}
-
-	p_ext_info = &(p_page0_buf->ext_info);
-	size = (p_ext_info->each_boot_pages * flash->pagesize);
-	aml_nand_msg("boot size: %lld,occupy pages :%d",size, p_ext_info->each_boot_pages);
-	return size;
-}
-
-
-
 void _dump_mem_u8(uint8_t * buf, uint32_t len)
 {
 	uint32_t i;
@@ -477,7 +349,9 @@ static int write_uboot(struct amlnand_phydev *phydev)
 	if (controller->bch_mode == NAND_ECC_BCH_SHORT)
 		page_size = (flash->pagesize / 512) * NAND_ECC_UNIT_SHORT;
 
-	oobsize = controller->ecc_steps*controller->user_mode;
+	//oobsize = controller->ecc_steps*controller->user_mode;
+	oobsize = ((flash->pagesize+flash->oobsize)/512) *
+		controller->user_mode;/*for infopage0 oobsize >data page oobsize*/
 	BOOT_LINE
 	tmp_size = phydev->writesize;
 	/* phydev->writesize = page_size; */
@@ -553,7 +427,7 @@ static int write_uboot(struct amlnand_phydev *phydev)
 		BOOT_LINE
 		writelen = 0;
 		addr = 0;
-		addr += flash->pagesize * p_ext_info->each_boot_pages *i;
+		addr += (u64)flash->pagesize * p_ext_info->each_boot_pages * i;
 		boot_pages = p_ext_info->each_boot_pages;
 		if (ops_para->option & DEV_SLC_MODE) {
 			addr >>= 1;
@@ -847,7 +721,7 @@ int roomboot_nand_write(struct amlnand_phydev *phydev)
 				ops_para->page_addr);
 			/* break; */
 		addr += phydev->erasesize;
-	} while (addr < (1024 * flash->pagesize));
+	} while (addr < (1024 * (u64)flash->pagesize));
 	BOOT_LINE
 	memset(devops, 0x0, sizeof(struct phydev_ops));
 	devops->addr = offset;
@@ -882,7 +756,7 @@ static int uboot_open(struct inode * inode, struct file * filp)
 	return 0;
 }
 /*
- * This funcion reads the u-boot envionment variables.
+ * This function reads the u-boot environment variables.
  * The f_pos points directly to the env location.
  */
 static ssize_t uboot_read(struct file *file,

@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_ini__aml_sdc_burn.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "optimus_sdc_burn_i.h"
@@ -96,6 +99,7 @@ int print_sdc_burn_para(const ConfigPara_t* pCfgPara)
         printf("erase_flash      = %d\n", pCustom->eraseFlash);
         printf("reboot           = 0x%x\n", pCustom->rebootAfterBurn);
         printf("key_overwrite    = 0x%x\n", pCustom->keyOverwrite);
+        printf("erase_ddr_para    = 0x%x\n", pCustom->eraseDdrPara);
         printf("\n");
     }
 
@@ -498,7 +502,7 @@ U_BOOT_CMD(
    0,               //repeatable
    do_ini_parser,   //command function
    "Burning a partition from sdmmc ",           //description
-   "Usage: sdc_update partiton image_file_path fileFmt(android sparse, other normal) [,verify_file]\n"   //usage
+	"Usage: sdc_update partition file_path fileFmt(android sparse, other normal) [,verify_file]\n"
 );
 #endif//#if MYDBG
 

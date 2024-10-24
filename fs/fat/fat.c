@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * fat.c
  *
@@ -6,25 +5,31 @@
  *
  * 2002-07-28 - rjones@nexus-tech.net - ported to ppcboot v1.1.6
  * 2003-03-10 - kharris@nexus-tech.net - ported to uboot
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <blk.h>
+#include <errno.h>
 #include <config.h>
 #include <exports.h>
 #include <fat.h>
-#include <fs.h>
 #include <asm/byteorder.h>
 #include <part.h>
 #include <malloc.h>
-#include <memalign.h>
 #include <linux/compiler.h>
 #include <linux/ctype.h>
 
+DECLARE_GLOBAL_DATA_PTR;
+
+#ifdef CONFIG_SUPPORT_VFAT
+//static const int vfat_enabled = 1;
+#else
+static const int vfat_enabled = 0;
+#endif
+
 /*
- * Convert a string to lowercase.  Converts at most 'len' characters,
- * 'len' may be larger than the length of 'str' if 'str' is NULL
- * terminated.
+ * Convert a string to lowercase.
  */
 static void downcase(char *str, size_t len)
 {
@@ -34,7 +39,7 @@ static void downcase(char *str, size_t len)
 	}
 }
 
-static struct blk_desc *cur_dev;
+static block_dev_desc_t *cur_dev;
 static disk_partition_t cur_part_info;
 
 #define DOS_BOOT_MAGIC_OFFSET	0x1fe
@@ -44,19 +49,17 @@ static disk_partition_t cur_part_info;
 static int disk_read(__u32 block, __u32 nr_blocks, void *buf)
 {
 	ulong ret;
-
-	if (!cur_dev)
+	if (!cur_dev || !cur_dev->block_read)
 		return -1;
 
-	ret = blk_dread(cur_dev, cur_part_info.start + block, nr_blocks, buf);
-
+	ret = cur_dev->block_read(cur_dev->dev,
+			cur_part_info.start + block, nr_blocks, buf);
 	if (ret != nr_blocks)
 		return -1;
-
 	return ret;
 }
 
-int fat_set_blk_dev(struct blk_desc *dev_desc, disk_partition_t *info)
+int fat_set_blk_dev(block_dev_desc_t *dev_desc, disk_partition_t *info)
 {
 	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, buffer, dev_desc->blksz);
 
@@ -85,7 +88,7 @@ int fat_set_blk_dev(struct blk_desc *dev_desc, disk_partition_t *info)
 	return -1;
 }
 
-int fat_register_device(struct blk_desc *dev_desc, int part_no)
+int fat_register_device(block_dev_desc_t *dev_desc, int part_no)
 {
 	disk_partition_t info;
 
@@ -93,10 +96,10 @@ int fat_register_device(struct blk_desc *dev_desc, int part_no)
 	cur_dev = NULL;
 
 	/* Read the partition table, if present */
-	if (part_get_info(dev_desc, part_no, &info)) {
+	if (get_partition_info(dev_desc, part_no, &info)) {
 		if (part_no != 0) {
 			printf("** Partition %d not valid on device %d **\n",
-					part_no, dev_desc->devnum);
+					part_no, dev_desc->dev);
 			return -1;
 		}
 
@@ -106,7 +109,7 @@ int fat_register_device(struct blk_desc *dev_desc, int part_no)
 		info.name[0] = 0;
 		info.type[0] = 0;
 		info.bootable = 0;
-#if CONFIG_IS_ENABLED(PARTITION_UUIDS)
+#ifdef CONFIG_PARTITION_UUIDS
 		info.uuid[0] = 0;
 #endif
 	}
@@ -144,7 +147,6 @@ static void get_name(dir_entry *dirent, char *s_name)
 		*s_name = DELETED_FLAG;
 }
 
-static int flush_dirty_fat_buffer(fsdata *mydata);
 #if !defined(CONFIG_FAT_WRITE)
 /* Stub for read only operation */
 int flush_dirty_fat_buffer(fsdata *mydata)
@@ -319,6 +321,12 @@ static int get_contents(fsdata *mydata, dir_entry *dentptr, loff_t pos,
 
 	*gotsize = 0;
 	debug("Filesize: %llu bytes\n", filesize);
+
+	if (filesize >= (gd->start_addr_sp - (loff_t)buffer)) {
+		printf("img size %llx exceed maximum available space %llx\n",
+				filesize, gd->start_addr_sp - (loff_t)buffer);
+		return -1;
+	}
 
 	if (pos >= filesize) {
 		debug("Read position past EOF: %llu\n", pos);
@@ -1016,9 +1024,9 @@ int file_fat_detectfs(void)
 		return 1;
 	}
 
-#if defined(CONFIG_IDE) || \
-    defined(CONFIG_SATA) || \
-    defined(CONFIG_SCSI) || \
+#if defined(CONFIG_CMD_IDE) || \
+    defined(CONFIG_CMD_SATA) || \
+    defined(CONFIG_CMD_SCSI) || \
     defined(CONFIG_CMD_USB) || \
     defined(CONFIG_MMC)
 	printf("Interface:  ");
@@ -1048,7 +1056,7 @@ int file_fat_detectfs(void)
 		printf("Unknown");
 	}
 
-	printf("\n  Device %d: ", cur_dev->devnum);
+	printf("\n  Device %d: ", cur_dev->dev);
 	dev_print(cur_dev);
 #endif
 
@@ -1106,7 +1114,9 @@ int fat_size(const char *filename, loff_t *size)
 		 * expected to fail if passed a directory path:
 		 */
 		free(fsdata.fatbuf);
-		fat_itr_root(itr, &fsdata);
+		ret = fat_itr_root(itr, &fsdata);
+		if (ret)
+			goto out_free_itr;
 		if (!fat_itr_resolve(itr, filename, TYPE_DIR)) {
 			*size = 0;
 			ret = 0;
@@ -1218,7 +1228,8 @@ int fat_readdir(struct fs_dir_stream *dirs, struct fs_dirent **dentp)
 		return -ENOENT;
 
 	memset(dent, 0, sizeof(*dent));
-	strcpy(dent->name, dir->itr.name);
+	strncpy(dent->name, dir->itr.name, sizeof(dent->name) - 1);
+	dent->name[sizeof(dent->name) - 1] = '\0';
 
 	if (fat_itr_isdir(&dir->itr)) {
 		dent->type = FS_DT_DIR;

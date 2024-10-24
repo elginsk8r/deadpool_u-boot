@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_common/optimus_buffer_manager.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../v2_burning_i.h"
@@ -22,10 +25,10 @@ typedef struct bufManager{
 
     u64             tplcmdTotalSz;//total size of a file-system packet
 
-    u32             totalSlotNum;//total slot number that already tranfferred
+    u32             totalSlotNum;//total slot number that already transferred
     u32             mediaAlignSz;//nand write align size, 16K/32k
 
-    u32             nextWriteBackSlot;//when reach n* (writeBackUnitSz/transferUnitSz), then write back the recevied data to media
+	u32             nextWriteBackSlot;//write back if n* (writeBackUnitSz/transferUnitSz)
     u32             leftDataSz;//left data size, Assert that 'leftDataInBackBuf + leftDataSz == transferBuf'
 
     s16             isUpload;
@@ -49,7 +52,7 @@ static BufManager _bufManager =
 //must create/destroy for a command
     .writeBackUnitSz    = OPTIMUS_DOWNLOAD_SLOT_SZ,
 
-    .totalSlotNum      = 0,//not slot data recevied yet!
+	.totalSlotNum      = 0,//not slot data rx yet!
 
     .leftDataSz         = 0,
     .tplcmdTotalSz      = 0,
@@ -187,7 +190,7 @@ int optimus_buf_manager_get_buf_for_bulk_transfer(char** pBuf, const unsigned wa
                         (u8*)(u64)_bufManager.partBaseOffset ;
 
     if (wantSz < _bufManager.transferUnitSz && !isLastTransfer) {
-        DWN_ERR("only last transfer can less 64K, this index %d at size 0x%x illegle\n", totalSlotNum + 1, wantSz);
+        DWN_ERR("only last transfer can less 64K, this index %d at size 0x%x illegal\n", totalSlotNum + 1, wantSz);
         return OPT_DOWN_FAIL;
     }
 
@@ -205,12 +208,12 @@ int optimus_buf_manager_get_buf_for_bulk_transfer(char** pBuf, const unsigned wa
     //prepare data for upload
     if (!bufSzNotDisposed && _bufManager.isUpload)
     {
-        u32 wantSz = (leftPktSz > _bufManager.writeBackUnitSz) ? _bufManager.writeBackUnitSz : ((u32)leftPktSz);
+        u32 _wantSz = (leftPktSz > _bufManager.writeBackUnitSz) ? _bufManager.writeBackUnitSz : ((u32)leftPktSz);
         DWN_DBG("want size 0x%x\n", wantSz);
 
-        u32 readSz = optimus_dump_storage_data((u8*)BufBase, wantSz, errInfo);
-        if (readSz != wantSz) {
-            DWN_ERR("Want read %u, but %u\n", wantSz, readSz);
+        u32 readSz = optimus_dump_storage_data((u8*)BufBase, _wantSz, errInfo);
+        if (readSz != _wantSz) {
+            DWN_ERR("Want read %u, but %u\n", _wantSz, readSz);
             return OPT_DOWN_FAIL;
         }
     }
@@ -228,7 +231,7 @@ int optimus_buf_manager_report_transfer_complete(const u32 transferSz, char* err
                         (u8*)(u64)_bufManager.partBaseOffset ;
 
     DWN_DBG("[%d]transferSz=0x%x\n", _bufManager.totalSlotNum, transferSz);
-    //state fileds to update
+    //state fields to update
     _bufManager.totalSlotNum += 1;
     if (_bufManager.totalSlotNum == _bufManager.nextWriteBackSlot)
     {
@@ -238,8 +241,20 @@ int optimus_buf_manager_report_transfer_complete(const u32 transferSz, char* err
         const u8* data = (u8*)BufBase -leftSz;
         const unsigned reserveNotAlignSz = leftPktSz ? _bufManager.itemOffsetNotAlignClusterSz_f : 0;//reserve
 
-        //call cb function to write to media
+        //itemOffsetNotAlignClusterSz_f is from sdcard/usb local package
+        //emmc write need align cluster to make next write offset align clusterm
         DWN_DBG("size 0x%x, reserveNotAlignSz 0x%x\n", size, reserveNotAlignSz);
+#if CONFIG_AML_LOCAL_BURN_BUFF_NOT_ALIGN
+        //As aml_upgrade_package.img is aligned 4,so data from pkg may not align 8 in sdc/usb disk burn case
+        //data not align will invoke emmc write error (may dma issue ?)
+        //Need Macro as newer chip family such as u200 has not this failure
+        if ((uint64_t)data & 0x7) {
+            DWN_MSG("data %p not align 64bit\n", data);
+            u8* alignBuf = (u8*)(((uint64_t)data>>3) << 3);
+            memmove(alignBuf, data, size);
+            data = alignBuf;
+        }
+#endif//#if CONFIG_AML_LOCAL_BURN_BUFF_NOT_ALIGN
         burnSz = optimus_download_img_data(data, size - reserveNotAlignSz, errInfo);
         if (burnSz <= leftSz || !burnSz) {
             DWN_ERR("this burn size %d <= last left size %d, data 0x%p\n", burnSz, leftSz, data);

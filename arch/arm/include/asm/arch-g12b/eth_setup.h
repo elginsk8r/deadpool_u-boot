@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12b/eth_setup.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <asm/arch/io.h>
@@ -92,7 +95,7 @@ typedef union eth_aml_reg0 {
 		} b;
 } eth_aml_reg0_t;
 
-#define ETH_VALIDE_CLKSRC(clk,out_clk) ((clk%out_clk)==0)
+#define ETH_VALID_CLKSRC(clk,out_clk) ((clk%out_clk)==0)
 
 int  eth_clk_set(int selectclk,unsigned long clk_freq,unsigned long out_clk);
 

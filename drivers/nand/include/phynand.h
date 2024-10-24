@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/include/phynand.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef PHYNAND_H_INCLUDED
@@ -15,6 +18,7 @@
 #include <linux/io.h>
 #endif /*AML_NAND_UBOOT*/
 /* #define CONFIG_OF */
+#define BIT(x) (1 << (x))
 
 #define NAND_COMPATIBLE_REGION	1
 #define NAND_RESERVED_REGION	1
@@ -72,11 +76,21 @@ typedef struct _ext_info{
 	/* add new below, */
 } ext_info_t;
 
+typedef struct _fip_info {
+    uint16_t version; //version
+    uint16_t mode;    //compact or discrete
+    uint32_t fip_start; //fip start, pages
+}fip_info_t;
+
 typedef struct _nand_page0 {
 	nand_setup_t nand_setup;		//8
 	unsigned char page_list[NAND_PAGELIST_CNT]; 	//16
 	nand_cmd_t retry_usr[32];		//64 (32 cmd max I/F)
 	ext_info_t ext_info;			//64
+#if (SUPPORT_DDR_PARAMETER)
+	fip_info_t fip_info;
+	uint32 ddrp_start_page;
+#endif
 } nand_page0_t;	//384 bytes max.
 /* --------------------------------------------------- */
 union nand_core_clk_t {
@@ -137,6 +151,7 @@ union nand_core_clk_t {
 #define	ENV_INFO_HEAD_MAGIC		"nenv"
 #define	DTD_INFO_HEAD_MAGIC		"ndtb"
 #define	PHY_PARTITION_HEAD_MAGIC	"phyp"
+#define DDR_PARAMETER_HEAD_MAGIC	"nddr"
 
 #define	FBBT_COPY_NUM	1
 
@@ -157,7 +172,7 @@ union nand_core_clk_t {
 #define	MAX_BLK_NUM			        8192
 #define	RESERVED_BLOCK_CNT		    48
 
-/* nand parameter for read retry, or fulture */
+/* nand parameter for read retry, or future */
 #define	NANS_PARA_BLOCK_CNT		1
 
 /* for shipped bbt block, short mode, full block, never update */
@@ -176,44 +191,44 @@ union nand_core_clk_t {
 #define	MAX_CYCLE_NUM		20
 
 /***nand chip options***/
-#define	NAND_CTRL_FORCE_WP		(1<<0)
+#define	NAND_CTRL_FORCE_WP		BIT(0)
 
 /***nand controller options***/
-#define	NAND_CTRL_NONE_RB		(1<<1)
-#define	NAND_CTRL_INTERLEAVING_MODE	(1<<2)
-#define	NAND_MULTI_PLANE_MODE		(1<<3)
-#define	NAND_USE_SHAREPAGE_MODE		(1<<4)
+#define	NAND_CTRL_NONE_RB		BIT(1)
+#define	NAND_CTRL_INTERLEAVING_MODE	BIT(2)
+#define	NAND_MULTI_PLANE_MODE		BIT(3)
+#define	NAND_USE_SHAREPAGE_MODE		BIT(4)
 
 
 /***nand controller ECC options***/
 #define	MAX_ECC_MODE_NUM		16
-#define	NAND_ECC_TYPE_MASK		(0xf<<4)
+#define	NAND_ECC_TYPE_MASK		(0xf << 4)
 
-#define	NAND_ECC_SOFT_MODE		(0x0<<4)
-#define	NAND_ECC_SHORT_MODE		(0x1<<4)
-#define	NAND_ECC_BCH9_MODE		(0x2<<4)
-#define	NAND_ECC_BCH8_MODE		(0x3<<4)
-#define	NAND_ECC_BCH12_MODE		(0x4<<4)
-#define	NAND_ECC_BCH16_MODE		(0x5<<4)
-#define	NAND_ECC_BCH8_1K_MODE		(0x6<<4)
-#define	NAND_ECC_BCH16_1K_MODE		(0x7<<4)
-#define	NAND_ECC_BCH24_1K_MODE		(0x8<<4)
-#define	NAND_ECC_BCH30_1K_MODE		(0x9<<4)
-#define	NAND_ECC_BCH40_1K_MODE		(0xa<<4)
-#define	NAND_ECC_BCH50_1K_MODE		(0xb<<4)
-#define	NAND_ECC_BCH60_1K_MODE		(0xc<<4)
+#define	NAND_ECC_SOFT_MODE		(0x0 << 4)
+#define	NAND_ECC_SHORT_MODE		(0x1 << 4)
+#define	NAND_ECC_BCH9_MODE		(0x2 << 4)
+#define	NAND_ECC_BCH8_MODE		(0x3 << 4)
+#define	NAND_ECC_BCH12_MODE		(0x4 << 4)
+#define	NAND_ECC_BCH16_MODE		(0x5 << 4)
+#define	NAND_ECC_BCH8_1K_MODE		(0x6 << 4)
+#define	NAND_ECC_BCH16_1K_MODE		(0x7 << 4)
+#define	NAND_ECC_BCH24_1K_MODE		(0x8 << 4)
+#define	NAND_ECC_BCH30_1K_MODE		(0x9 << 4)
+#define	NAND_ECC_BCH40_1K_MODE		(0xa << 4)
+#define	NAND_ECC_BCH50_1K_MODE		(0xb << 4)
+#define	NAND_ECC_BCH60_1K_MODE		(0xc << 4)
 
 
 	/***FOR NAND CHIP TYPES ***/
-#define	NAND_CHIP_TYPE_MASK		(0x3<<9)
+#define	NAND_CHIP_TYPE_MASK		(0x3 << 9)
 
-#define	NAND_CHIP_TYPE_MLC		(0x0<<9)
-#define	NAND_CHIP_TYPE_SLC		(0x1<<9)
-#define	NAND_CHIP_TYPE_TLC		(0x2<<9)
+#define	NAND_CHIP_TYPE_MLC		(0x0 << 9)
+#define	NAND_CHIP_TYPE_SLC		(0x1 << 9)
+#define	NAND_CHIP_TYPE_TLC		(0x2 << 9)
 
-#define	NAND_CHIP_AYSNC_MODE		(0x0<<12)
-#define	NAND_CHIP_TOGGLE_MODE		(0x1<<12)
-#define	NAND_CHIP_SLC_MODE		(0x1<<13)
+#define	NAND_CHIP_ASYNC_MODE		(0x0 << 12)
+#define	NAND_CHIP_TOGGLE_MODE		(0x1 << 12)
+#define	NAND_CHIP_SLC_MODE		(0x1 << 13)
 
 
 	/***FOR TIMMING MODE ***/
@@ -377,7 +392,7 @@ union nand_core_clk_t {
 
 #define	EN_SLC_REG_NUM		8
 
-#define	READ_RETRY_ZERO		((char)-1)
+#define	READ_RETRY_ZERO		(0xff)
 
 #define	NAND_CMD_HYNIX_GET_VALUE		0x37
 #define	NAND_CMD_HYNIX_SET_VALUE_START		0x36
@@ -688,7 +703,7 @@ struct nand_flash {
 *mulit-chip 0
 *serial-chip available
 *multi-plane
-*sigle-plane
+*single-plane
 */
 struct chip_ops_para {
 	u32 page_addr;
@@ -742,8 +757,7 @@ struct phy_partition_info {
 
 #if (AML_CFG_INSIDE_PARTTBL)
 #define MAX_PART_NUM	16
-#define MAX_PART_NAME_LEN 16
-/*#define PART_NAME_LEN 16*/
+#define PART_NAME_LEN 16
 struct partitions {
 	/* identifier string */
 	char name[PART_NAME_LEN];
@@ -849,6 +863,10 @@ struct amlnand_chip {
 	struct nand_arg_info amlnf_dtb;
 	u32 detect_dtb_flag;	/*1:no dtb in flash */
 #endif
+
+#if (SUPPORT_DDR_PARAMETER)
+	struct nand_arg_info nand_ddr_para;
+#endif
 #ifndef AML_NAND_UBOOT
 	struct pinctrl *nand_pinctrl;
 	struct pinctrl_state *nand_pinstate;
@@ -873,6 +891,9 @@ struct amlnand_chip {
 	u32 h_cache_dev;
 	u32 keysize;
 	u32 dtbsize;
+#if (SUPPORT_DDR_PARAMETER)
+	u32 ddrsize;
+#endif
 };
 
 extern struct nand_flash flash_ids_slc[];
@@ -918,8 +939,9 @@ extern int aml_ubootenv_init(struct amlnand_chip *aml_chip);
 extern void nand_get_chip(void *aml_chip);
 extern void nand_release_chip(void *aml_chip);
 extern int aml_key_init(struct amlnand_chip *aml_chip);
+extern int aml_ddr_parameter_init(struct amlnand_chip *aml_chip);
 extern int aml_secure_init(struct amlnand_chip *aml_chip);
-extern unsigned int aml_info_checksum(unsigned char *data, int lenth);
+unsigned int aml_info_checksum(unsigned char *data, int length);
 extern int amlnand_info_init(struct amlnand_chip *aml_chip,
 	u8 *info,
 	u8 *buf,
@@ -943,14 +965,6 @@ extern int amlnand_erase_info_by_name(struct amlnand_chip *aml_chip,
 	u8 *info,
 	u8 *name);
 extern int aml_sys_info_error_handle(struct amlnand_chip *aml_chip);
-extern int aml_nand_update_key(struct amlnand_chip *aml_chip, char *key_ptr);
-extern int aml_nand_update_secure(struct amlnand_chip *aml_chip,
-	char *secure_ptr);
-extern int aml_nand_update_ubootenv(struct amlnand_chip *aml_chip,
-	char *env_ptr);
-
-extern int aml_nand_update_dtb(struct amlnand_chip *aml_chip,
-	char *dtb_ptr);
 
 extern void amlchip_dumpinfo(struct amlnand_chip *aml_chip);
 

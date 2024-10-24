@@ -146,7 +146,7 @@ struct optee_smc_call_get_os_revision_result {
  *					optee_msg_arg.
  * OPTEE_SMC_RETURN_ETHREAD_LIMIT	Number of Trusted OS threads exceeded,
  *					try again later.
- * OPTEE_SMC_RETURN_EBADADDR		Bad physcial pointer to struct
+ * OPTEE_SMC_RETURN_EBADADDR		Bad physical pointer to struct
  *					optee_msg_arg.
  * OPTEE_SMC_RETURN_EBADCMD		Bad/unknown cmd in struct optee_msg_arg
  * OPTEE_SMC_RETURN_IS_RPC()		Call suspended by RPC call to normal
@@ -169,7 +169,7 @@ struct optee_smc_call_get_os_revision_result {
  * Have config return register usage:
  * a0	OPTEE_SMC_RETURN_OK
  * a1	Physical address of start of SHM
- * a2	Size of of SHM
+ * a2	Size of SHM
  * a3	Cache settings of memory, as defined by the
  *	OPTEE_SMC_SHM_* values above
  * a4-7	Preserved

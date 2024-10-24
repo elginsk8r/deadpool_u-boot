@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_common/amlImage_if.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __AMLIMAGE_IF_H__
@@ -106,7 +109,7 @@ int image_item_read(HIMAGE hImg, HIMAGEITEM hItem, void* pBuf, const __u32 wantS
 int image_item_seek(HIMAGE , HIMAGEITEM , __s64 , __u32 );
 
 unsigned image_item_get_first_cluster_size(HIMAGE hImg, HIMAGEITEM hItem);
-unsigned image_get_cluster_size(HIMAGEITEM hImg);//Assert read offset and read size is multiple size of thsi unit
+unsigned int image_get_cluster_size(HIMAGEITEM himg);
 
 int get_item_name(HIMAGE hImg, int itemId, const char** main_type, const char** sub_type);
 

@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v3_burning/v3_usb_tool/aml_dnl.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include <common.h>
@@ -27,9 +30,9 @@
  * CONFIG_USB_GADGET_MANUFACTURER
  * at e.g. ./configs/<board>_defconfig
  */
-//#define CONFIG_USB_GADGET_VENDOR_NUM 0x1b8e
-//#define CONFIG_USB_GADGET_PRODUCT_NUM 0xc004
-//#define CONFIG_USB_GADGET_MANUFACTURER  "Amlogic Inc"
+#define CONFIG_USB_GADGET_VENDOR_NUM 0x1b8e
+#define CONFIG_USB_GADGET_PRODUCT_NUM 0xc004
+#define CONFIG_USB_GADGET_MANUFACTURER  "Amlogic Inc"
 
 #define STRING_MANUFACTURER 25
 #define STRING_PRODUCT 2
@@ -83,8 +86,8 @@ static struct usb_gadget_strings *g_dnl_composite_strings[] = {
 	NULL,
 };
 
-#include <amlogic/cpu_id.h>
-const char * get_usid_string(void)
+#include <asm/cpu_id.h>
+const char * adnl_get_usid_string(void)
 {
     static char chipid_str[32];
 	unsigned char chipid[16];
@@ -97,7 +100,7 @@ const char * get_usid_string(void)
 	buff[0] = buff[24] = '\0';
 	int i = 0;
 	for (; i < 12; ++i) {
-		sprintf(buff, "%s%02x", buff, chipid[15-i]);
+		sprintf(buff + i * 2, "%02x", chipid[15 - i]);
 	}
 	return buff;
 }
@@ -202,9 +205,11 @@ static int g_dnl_bind(struct usb_composite_dev *cdev)
     g_dnl_string_defs[2].id = id;
     device_desc.iSerialNumber = id;
 
-    const char* s = get_usid_string();
-    if (s) strncpy(g_dnl_serial, s, strlen(s));
-    else printf("Fail in get chipid\n");
+    const char* s = adnl_get_usid_string();
+	if (s)
+		strncpy(g_dnl_serial, s, strnlen(s, 32));
+	else
+		printf("Fail in get chipid\n");
 
 	ret = g_dnl_config_register(cdev);
 	if (ret)

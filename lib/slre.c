@@ -441,7 +441,7 @@ loop_greedy(const struct slre *r, int pc, const char *s, int len, int *ofs)
 {
 	int	saved_offset, matched_offset;
 
-	matched_offset = *ofs;
+	saved_offset = matched_offset = *ofs;
 
 	while (match(r, pc + 2, s, len, ofs, NULL)) {
 		saved_offset = *ofs;
@@ -702,6 +702,8 @@ int main(int argc, char *argv[])
 		printf("Data = \"%s\"\n", data);
 
 		(void) memset(caps, 0, sizeof(caps));
+
+		res = 0;
 
 		res = slre_match(&slre, data, len, caps);
 		printf("Result [%d]: %d\n", i, res);

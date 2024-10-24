@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/include/amlnf_ctrl.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef AMLNAND_PHYDEV_H_INCLUDED
 #define AMLNAND_PHYDEV_H_INCLUDED
-
-#include "amlnf_dev.h"
 
 /***nand CE/RB pinmux setting***/
 #define	AML_NAND_CE0	0xe
@@ -73,6 +74,8 @@ enum chip_state_t {
 	CHIP_UNKNOWN
 };
 
+
+extern int nandphy_init(u32 flag);
 extern int amlphy_prepare(u32 flag);
 
 #endif

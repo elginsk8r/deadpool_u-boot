@@ -8,6 +8,8 @@
 
 #define TEE_UUID_LEN		16
 
+#define BIT(nr)         (1UL << (nr))
+
 #define TEE_GEN_CAP_GP          BIT(0)	/* GlobalPlatform compliant TEE */
 #define TEE_GEN_CAP_REG_MEM     BIT(1)	/* Supports registering shared memory */
 
@@ -34,7 +36,6 @@
  * struct tee_version_data::gen_caps
  */
 #define TEE_SUCCESS			0x00000000
-#define TEE_ERROR_STORAGE_NOT_AVAILABLE	0xf0100003
 #define TEE_ERROR_GENERIC		0xffff0000
 #define TEE_ERROR_BAD_PARAMETERS	0xffff0006
 #define TEE_ERROR_ITEM_NOT_FOUND	0xffff0008
@@ -71,7 +72,7 @@ struct tee_optee_ta_uuid {
  * @dev:	The TEE device
  * @link:	List node in the list in struct struct tee_uclass_priv
  * @addr:	Pointer to the shared memory
- * @size:	Size of the the shared memory
+ * @size:	Size of the shared memory
  * @flags:	TEE_SHM_* above
  */
 struct tee_shm {
@@ -117,7 +118,7 @@ struct tee_param_value {
  *		TEE_PARAM_ATTR_TYPE_VALUE_* above
  *
  * Parameters to TA are passed using an array of this struct, for
- * flexibility both value parameters and memory refereces can be used.
+ * flexibility both value parameters and memory references can be used.
  */
 struct tee_param {
 	u64 attr;

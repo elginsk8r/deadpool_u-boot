@@ -1,6 +1,17 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #ifndef _FS_H
 #define _FS_H
@@ -26,16 +37,11 @@
  */
 int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype);
 
-/*
- * fs_set_blk_dev_with_part - Set current block device + partition
- *
- * Similar to fs_set_blk_dev(), but useful for cases where you already
- * know the blk_desc and part number.
- *
- * Returns 0 on success.
- * Returns non-zero if invalid partition or error accessing the disk.
- */
-int fs_set_blk_dev_with_part(struct blk_desc *desc, int part);
+int fs_set_blk_dev_by_off(const char *ifname,
+			  const char *dev_part_str,
+			  int fstype,
+			  unsigned long offset,
+			  unsigned long size);
 
 /**
  * fs_get_type_name() - Get type of current filesystem
@@ -120,7 +126,8 @@ struct fs_dirent {
 /* Note: fs_dir_stream should be treated as opaque to the user of fs layer */
 struct fs_dir_stream {
 	/* private to fs. layer: */
-	struct blk_desc *desc;
+	//struct blk_desc *desc;
+	block_dev_desc_t *desc;
 	int part;
 };
 
@@ -164,15 +171,6 @@ void fs_closedir(struct fs_dir_stream *dirs);
  * @return 0 on success, -1 on error conditions
  */
 int fs_unlink(const char *filename);
-
-/*
- * fs_mkdir - Create a directory
- *
- * @filename: Name of directory to create
- * @return 0 on success, -1 on error conditions
- */
-int fs_mkdir(const char *filename);
-
 /*
  * Common implementation for various filesystem commands, optionally limited
  * to a specific filesystem type via the fstype parameter.
@@ -188,8 +186,6 @@ int file_exists(const char *dev_type, const char *dev_part, const char *file,
 int do_save(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		int fstype);
 int do_rm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-		int fstype);
-int do_mkdir(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		int fstype);
 
 /*

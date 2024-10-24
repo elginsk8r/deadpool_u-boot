@@ -29,8 +29,8 @@
  *
  *      The table can be generated at runtime if desired; code to do so
  *      is shown later.  It might not be obvious, but the feedback
- *      terms simply represent the results of eight shift/xor opera
- *      tions for all combinations of data and CRC register values
+ *      terms simply represent the results of eight shift/xor operations
+ *      for all combinations of data and CRC register values
  *
  *      The values must be right-shifted by eight bits by the "updcrc
  *      logic; the shift must be unsigned (bring in zeroes).  On some
@@ -42,8 +42,8 @@
  * CRC32 code derived from work by Gary S. Brown.
  */
 
-#include "avb_sysdeps.h"
-#include "avb_util.h"
+#include <libavb/avb_sysdeps.h>
+#include <libavb/avb_util.h>
 
 /* Code taken from FreeBSD 8 */
 

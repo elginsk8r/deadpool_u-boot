@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/include/amlnf_dev.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __AML_NFTL_BLOCK_H
@@ -10,7 +13,6 @@
 #include "hw_ctrl.h"
 #include "amlnf_ctrl.h"
 #include "amlnf_cfg.h"
-
 #include "partition_table.h"
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/cpu_sdio.h>
@@ -184,7 +186,7 @@ enum amlnf_error_t {
 	NAND_WRITE_FAILED = 14,
 	NAND_FAILED = 15,
 	NAND_READ_FAILED = 16,
-	NAND_BAD_BLCOK_FAILURE = 17,
+	NAND_BAD_BLOCK_FAILURE = 17,
 	NAND_SHIPPED_BAD_FAILURE = 18,
 	NAND_CONFIGS_FAILED	= 19,
 	NAND_SHIPPED_BADBLOCK_FAILED = 20,
@@ -246,13 +248,13 @@ struct phydev_ops {
  * API for NFTL driver.
  * Provide nand basic information and common operation function.
  * Must meet all the requirement of NFTL driver,
- * and also consider the fulture extensions
+ * and also consider the future extensions
  */
 
 /**
  * struct amlnand_phydev - nand phy device
  * @name:
- * @type: used for fulture, differ from SLC, MLC and TLC
+ * @type: used for future, differ from SLC, MLC and TLC
  * @retlen:	number of data bytes written/read
  * @ooblen:	number of oob bytes to write/read
  * @oobretlen:	number of oob bytes written/read
@@ -296,7 +298,7 @@ struct amlnand_phydev {
 	/*** offset value of the whole nand device***/
 	u64 offset;
 
-	/*** Total size of the cunrrent nand device***/
+	/*** Total size of the current nand device***/
 	u64 size;
 
 	u8 chipnr;
@@ -361,7 +363,7 @@ struct amlnand_phydev {
 	/*
 	 * support read data for sect_uint(512bytes in genreal),
 	 * not just writesize unit, to improve read data speed.
-	 * Not spport yet.
+	 * Not support yet.
 	 */
 	int (*read_sect)(struct amlnand_phydev *phydev);
 
@@ -586,4 +588,6 @@ extern int get_adjust_block_num(void);
 
 extern void amldev_dumpinfo(struct amlnand_phydev *phydev);
 
+int amlnf_key_write(u8 *buf, int len, uint32_t *actual_length);
+int amlnf_key_read(u8 *buf, int len, uint32_t *actual_length);
 #endif

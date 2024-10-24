@@ -1,7 +1,22 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- */
+ * include/amlogic/leds_state.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 
  /*
   *
@@ -57,12 +72,10 @@ uint32_t meson_ledstate_set_brightness(uint32_t led_id, uint32_t brightness);
 uint32_t meson_ledstate_set_breath(uint32_t led_id, uint32_t breath_id);
 
 /*to do:Parameters five and six are reserved parameters*/
-uint32_t meson_ledstate_set_blink_times_on(uint32_t led_id, uint32_t
-		blink_times, uint32_t blink_high, uint32_t blink_low,
-		uint32_t brightness_high, uint32_t brightness_low);
-uint32_t meson_ledstate_set_blink_times_off(uint32_t led_id,
-		uint32_t blink_times,uint32_t blink_high,uint32_t blink_low,
-		uint32_t brightness_high, uint32_t brightness_low);
+uint32_t meson_ledstate_set_blink_times_on(u32 led_id,
+		u32 blink_times, u32 blink_high, u32 blink_low);
+uint32_t meson_ledstate_set_blink_times_off(u32 led_id,
+		u32 blink_times, u32 blink_high, u32 blink_low);
 
 #endif
 /*to do*/
@@ -70,4 +83,3 @@ uint32_t meson_ledstate_set_blink_times_off(uint32_t led_id,
 uint32_t set_led_blink_times_breath(uint32_t led_id,uint32_t blink_times,
 		uint32_t blink_high,uint32_t blink_low );
 #endif
-

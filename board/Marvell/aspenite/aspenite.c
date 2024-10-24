@@ -1,14 +1,14 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2010
  * Marvell Semiconductor <www.marvell.com>
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
  * Contributor: Mahavir Jain <mjain@marvell.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <mvmfp.h>
-#include <asm/mach-types.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/mfp.h>
 #include <asm/arch/armada100.h>
@@ -37,7 +37,7 @@ int board_init(void)
 {
 	/* arch number of Board */
 	gd->bd->bi_arch_number = MACH_TYPE_ASPENITE;
-	/* adress of boot parameters */
+	/* address of boot parameters */
 	gd->bd->bi_boot_params = armd1_sdram_base(0) + 0x100;
 	return 0;
 }

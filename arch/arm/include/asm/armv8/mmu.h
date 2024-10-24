@@ -7,7 +7,15 @@
 #ifndef _ASM_ARMV8_MMU_H_
 #define _ASM_ARMV8_MMU_H_
 
-#include <linux/const.h>
+#include <asm/arch/cpu.h>
+
+#ifdef __ASSEMBLY__
+#define _AC(X, Y)   X
+#else
+#define _AC(X, Y)   (X##Y)
+#endif
+
+#define UL(x)       _AC(x, UL)
 
 /*
  * block/section address mask and size definitions.
@@ -131,7 +139,32 @@ struct mm_region {
 	u64 attrs;
 };
 
-extern struct mm_region *mem_map;
+#ifdef CONFIG_FULL_RAMDUMP
+void load_bl33z(void);
+#endif
+
+struct mm_region bd_mem_map[] = {
+	{
+		.virt = MMU_MT_NORMAL_BASE,
+		.phys = MMU_MT_NORMAL_BASE,
+		.size = MMU_MT_NORMAL_SIZE,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
+			 PTE_BLOCK_INNER_SHARE
+	}, {
+		.virt = MMU_MT_DEVICE_NGNRNE_BASE,
+		.phys = MMU_MT_DEVICE_NGNRNE_BASE,
+		.size = MMU_MT_DEVICE_NGNRNE_SIZE,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
+			 PTE_BLOCK_NON_SHARE |
+			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
+	}, {
+		/* List terminator */
+		0,
+	}
+};
+
+struct mm_region *mem_map = bd_mem_map;
+
 void setup_pgtables(void);
 u64 get_tcr(int el, u64 *pips, u64 *pva_bits);
 #endif

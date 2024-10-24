@@ -1,12 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
- *  U-Boot - x86 Startup Code
+ *  U-boot - x86 Startup Code
  *
  * (C) Copyright 2008-2011
  * Graeme Russ, <graeme.russ@gmail.com>
  *
  * (C) Copyright 2002,2003
  * Daniel Engström, Omicron Ceti AB, <daniel@omicron.se>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/global_data.h>
@@ -27,7 +28,7 @@ start16:
 	movl	$GD_FLG_COLD_BOOT, %ebx
 
 	xorl	%eax, %eax
-	movl	%eax, %cr3	/* Invalidate TLB */
+	movl	%eax, %cr3    /* Invalidate TLB */
 
 	/* Turn off cache (this might require a 486-class CPU) */
 	movl	%cr0, %eax
@@ -48,7 +49,7 @@ o32 cs	lgdt	gdt_ptr
 	jmp	ff
 ff:
 
-	/* Finally restore BIST and jump to the 32-bit initialization code */
+	/* Finally restore BIST and jump to the 32bit initialization code */
 	movw	$code32start, %ax
 	movw	%ax, %bp
 	movl	%ecx, %eax
@@ -63,19 +64,18 @@ idt_ptr:
 	.word	0		/* limit */
 	.long	0		/* base */
 
-	/*
-	 * The following Global Descriptor Table is just enough to get us into
-	 * 'Flat Protected Mode' - It will be discarded as soon as the final
-	 * GDT is setup in a safe location in RAM
-	 */
+/*
+ * The following Global Descriptor Table is just enough to get us into
+ * 'Flat Protected Mode' - It will be discarded as soon as the final
+ * GDT is setup in a safe location in RAM
+ */
 gdt_ptr:
 	.word	0x1f		/* limit (31 bytes = 4 GDT entries - 1) */
-	.long	BOOT_SEG + gdt_rom	/* base */
+	.long	BOOT_SEG + gdt	/* base */
 
-	/* Some CPUs are picky about GDT alignment... */
-	.align	16
-.globl gdt_rom
-gdt_rom:
+/* Some CPUs are picky about GDT alignment... */
+.align 16
+gdt:
 	/*
 	 * The GDT table ...
 	 *

@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_usb_burn/optimus_usb_burn.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../v2_sdc_burn/optimus_sdc_burn_i.h"
@@ -47,7 +50,7 @@ int do_usb_burn(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
     int rcode = 0;
     const char* sdc_cfg_file = argv[1];
 
-    setenv("usb_update","1");
+	setenv("usb_update","1");
 
     if (argc < 2 ) {
         cmd_usage(cmdtp);

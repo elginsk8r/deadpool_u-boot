@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_sdc_update.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "optimus_sdc_burn_i.h"
@@ -23,10 +26,29 @@ static char _errInfo[512] = "";
 //default is mmc 0:1, i.e, part 1 of first registered mmc device
 int optimus_device_probe(const char* interface, const char* inPart)
 {
-    if (optimus_fat_register_device(interface,inPart) != 0) {
-        printf("\n** Unable to use [%s %s] for device probe **\n", interface, inPart);
-        return 1;
-    }
+	block_dev_desc_t *dev_desc=NULL;
+	int dev=0;
+	int part=-1;//-1 is auto mode
+	char *ep;
+
+	dev = (int)simple_strtoul(inPart, &ep, 16);
+	dev_desc = get_dev((char*)interface,dev);
+	if (dev_desc == NULL) {
+		puts("\n** Invalid boot device **\n");
+		return 1;
+	}
+	if (*ep) {
+		if (*ep != ':') {
+			puts("\n** Invalid boot device, use `dev[:part]' **\n");
+			return 1;
+		}
+		part = (int)simple_strtoul(++ep, NULL, 16);
+	}
+	if (optimus_fat_register_device(dev_desc,part) != 0) {
+		printf("\n** Unable to use %s %d:%d for device probe **\n",
+			interface, dev, part);
+		return 1;
+	}
 
     return 0;
 }
@@ -70,18 +92,20 @@ int opt_file_close(__hFileHdl hFile)
 //part size 0 if failed
 s64 storage_get_partition_size_in_byte(const char* partName)
 {
+    int ret = 0;
     u64 size = 0;
 
     if ( !strcmp("_aml_dtb", partName) )
     {
-        return store_rsv_size("dtb");
+        return AML_DTB_IMG_MAX_SZ;
     }
 
-    size = store_part_size(partName);
-    if (!size) {
+    ret = store_get_partition_size((u8 *)partName, &size);
+    if (ret) {
         SDC_ERR("Fail to get size for part %s\n", partName);
         return 0;
     }
+    size <<= 9;//trans sector to byte
 
     return size;
 }
@@ -236,7 +260,7 @@ _finish:
 
 //step 1: get script file size, and get script file contents
 //step 2: read image file
-//"Usage: sdc_update partiton image_file_path [imgFmt, verifyFile]\n"   //usage
+//"Usage: sdc_update partition image_file_path [imgFmt, verifyFile]\n"   //usage
 int do_sdc_update(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
     int rcode = 0;

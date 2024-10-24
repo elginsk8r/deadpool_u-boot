@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2009
  * Net Insight <www.netinsight.net>
@@ -8,11 +7,12 @@
  * (C) Copyright 2009
  * Marvell Semiconductor <www.marvell.com>
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <miiphy.h>
-#include <asm/mach-types.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/soc.h>
 #include <asm/arch/mpp.h>
@@ -103,7 +103,7 @@ int board_init(void)
 	gd->bd->bi_arch_number = MACH_TYPE_OPENRD_ULTIMATE;
 #endif
 
-	/* adress of boot parameters */
+	/* address of boot parameters */
 	gd->bd->bi_boot_params = mvebu_sdram_bar(0) + 0x100;
 	return 0;
 }
@@ -119,8 +119,9 @@ void mv_phy_init(char *name)
 		return;
 
 	/* command to read PHY dev address */
-	if (miiphy_read(name, 0xEE, 0xEE, (u16 *)&devadr)) {
-		printf("Err..%s could not read PHY dev address\n", __func__);
+	if (miiphy_read(name, 0xEE, 0xEE, (u16 *) &devadr)) {
+		printf("Err..%s could not read PHY dev address\n",
+			__FUNCTION__);
 		return;
 	}
 

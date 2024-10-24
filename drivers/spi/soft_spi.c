@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2014 Google, Inc
  *
@@ -7,6 +6,8 @@
  *
  * Influenced by code from:
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -20,16 +21,12 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 struct soft_spi_platdata {
-	struct gpio_desc cs;
-	struct gpio_desc sclk;
-	struct gpio_desc mosi;
-	struct gpio_desc miso;
+	struct fdt_gpio_state cs;
+	struct fdt_gpio_state sclk;
+	struct fdt_gpio_state mosi;
+	struct fdt_gpio_state miso;
 	int spi_delay_us;
-	int flags;
 };
-
-#define SPI_MASTER_NO_RX        BIT(0)
-#define SPI_MASTER_NO_TX        BIT(1)
 
 struct soft_spi_priv {
 	unsigned int mode;
@@ -37,42 +34,41 @@ struct soft_spi_priv {
 
 static int soft_spi_scl(struct udevice *dev, int bit)
 {
-	struct udevice *bus = dev_get_parent(dev);
-	struct soft_spi_platdata *plat = dev_get_platdata(bus);
+	struct soft_spi_platdata *plat = dev->platdata;
+	struct soft_spi_priv *priv = dev_get_priv(dev);
 
-	dm_gpio_set_value(&plat->sclk, bit);
+	gpio_set_value(plat->sclk.gpio, priv->mode & SPI_CPOL ? bit : !bit);
 
 	return 0;
 }
 
 static int soft_spi_sda(struct udevice *dev, int bit)
 {
-	struct udevice *bus = dev_get_parent(dev);
-	struct soft_spi_platdata *plat = dev_get_platdata(bus);
+	struct soft_spi_platdata *plat = dev->platdata;
 
-	dm_gpio_set_value(&plat->mosi, bit);
+	gpio_set_value(plat->mosi.gpio, bit);
 
 	return 0;
 }
 
 static int soft_spi_cs_activate(struct udevice *dev)
 {
-	struct udevice *bus = dev_get_parent(dev);
-	struct soft_spi_platdata *plat = dev_get_platdata(bus);
+	struct soft_spi_platdata *plat = dev->platdata;
+	struct soft_spi_priv *priv = dev_get_priv(dev);
 
-	dm_gpio_set_value(&plat->cs, 0);
-	dm_gpio_set_value(&plat->sclk, 0);
-	dm_gpio_set_value(&plat->cs, 1);
+	gpio_set_value(plat->cs.gpio, !(priv->mode & SPI_CS_HIGH));
+	gpio_set_value(plat->sclk.gpio, priv->mode & SPI_CPOL);
+	gpio_set_value(plat->cs.gpio, priv->mode & SPI_CS_HIGH);
 
 	return 0;
 }
 
 static int soft_spi_cs_deactivate(struct udevice *dev)
 {
-	struct udevice *bus = dev_get_parent(dev);
-	struct soft_spi_platdata *plat = dev_get_platdata(bus);
+	struct soft_spi_platdata *plat = dev->platdata;
+	struct soft_spi_priv *priv = dev_get_priv(dev);
 
-	dm_gpio_set_value(&plat->cs, 0);
+	gpio_set_value(plat->cs.gpio, !(priv->mode & SPI_CS_HIGH));
 
 	return 0;
 }
@@ -107,13 +103,13 @@ static int soft_spi_release_bus(struct udevice *dev)
 static int soft_spi_xfer(struct udevice *dev, unsigned int bitlen,
 			 const void *dout, void *din, unsigned long flags)
 {
-	struct udevice *bus = dev_get_parent(dev);
-	struct soft_spi_priv *priv = dev_get_priv(bus);
-	struct soft_spi_platdata *plat = dev_get_platdata(bus);
+	struct soft_spi_priv *priv = dev_get_priv(dev);
+	struct soft_spi_platdata *plat = dev->platdata;
 	uchar		tmpdin  = 0;
 	uchar		tmpdout = 0;
 	const u8	*txd = dout;
 	u8		*rxd = din;
+	int		cpol = priv->mode & SPI_CPOL;
 	int		cpha = priv->mode & SPI_CPHA;
 	unsigned int	j;
 
@@ -141,21 +137,19 @@ static int soft_spi_xfer(struct udevice *dev, unsigned int bitlen,
 		}
 
 		if (!cpha)
-			soft_spi_scl(dev, 0);
-		if ((plat->flags & SPI_MASTER_NO_TX) == 0)
-			soft_spi_sda(dev, !!(tmpdout & 0x80));
+			soft_spi_scl(dev, !cpol);
+		soft_spi_sda(dev, tmpdout & 0x80);
 		udelay(plat->spi_delay_us);
 		if (cpha)
-			soft_spi_scl(dev, 0);
+			soft_spi_scl(dev, !cpol);
 		else
-			soft_spi_scl(dev, 1);
+			soft_spi_scl(dev, cpol);
 		tmpdin	<<= 1;
-		if ((plat->flags & SPI_MASTER_NO_RX) == 0)
-			tmpdin	|= dm_gpio_get_value(&plat->miso);
+		tmpdin	|= gpio_get_value(plat->miso.gpio);
 		tmpdout	<<= 1;
 		udelay(plat->spi_delay_us);
 		if (cpha)
-			soft_spi_scl(dev, 1);
+			soft_spi_scl(dev, cpol);
 	}
 	/*
 	 * If the number of bits isn't a multiple of 8, shift the last
@@ -189,6 +183,14 @@ static int soft_spi_set_mode(struct udevice *dev, unsigned int mode)
 	return 0;
 }
 
+static int soft_spi_child_pre_probe(struct udevice *dev)
+{
+	struct spi_slave *slave = dev_get_parentdata(dev);
+
+	slave->dev = dev;
+	return spi_ofdata_to_platdata(gd->fdt_blob, dev->of_offset, slave);
+}
+
 static const struct dm_spi_ops soft_spi_ops = {
 	.claim_bus	= soft_spi_claim_bus,
 	.release_bus	= soft_spi_release_bus,
@@ -201,8 +203,13 @@ static int soft_spi_ofdata_to_platdata(struct udevice *dev)
 {
 	struct soft_spi_platdata *plat = dev->platdata;
 	const void *blob = gd->fdt_blob;
-	int node = dev_of_offset(dev);
+	int node = dev->of_offset;
 
+	if (fdtdec_decode_gpio(blob, node, "cs-gpio", &plat->cs) ||
+	    fdtdec_decode_gpio(blob, node, "sclk-gpio", &plat->sclk) ||
+	    fdtdec_decode_gpio(blob, node, "mosi-gpio", &plat->mosi) ||
+	    fdtdec_decode_gpio(blob, node, "miso-gpio", &plat->miso))
+		return -EINVAL;
 	plat->spi_delay_us = fdtdec_get_int(blob, node, "spi-delay-us", 0);
 
 	return 0;
@@ -210,39 +217,24 @@ static int soft_spi_ofdata_to_platdata(struct udevice *dev)
 
 static int soft_spi_probe(struct udevice *dev)
 {
-	struct spi_slave *slave = dev_get_parent_priv(dev);
+	struct spi_slave *slave = dev_get_parentdata(dev);
 	struct soft_spi_platdata *plat = dev->platdata;
-	int cs_flags, clk_flags;
-	int ret;
 
-	cs_flags = (slave->mode & SPI_CS_HIGH) ? 0 : GPIOD_ACTIVE_LOW;
-	clk_flags = (slave->mode & SPI_CPOL) ? GPIOD_ACTIVE_LOW : 0;
+	gpio_request(plat->cs.gpio, "soft_spi_cs");
+	gpio_request(plat->sclk.gpio, "soft_spi_sclk");
+	gpio_request(plat->mosi.gpio, "soft_spi_mosi");
+	gpio_request(plat->miso.gpio, "soft_spi_miso");
 
-	if (gpio_request_by_name(dev, "cs-gpios", 0, &plat->cs,
-				 GPIOD_IS_OUT | cs_flags) ||
-	    gpio_request_by_name(dev, "gpio-sck", 0, &plat->sclk,
-				 GPIOD_IS_OUT | clk_flags))
-		return -EINVAL;
-
-	ret = gpio_request_by_name(dev, "gpio-mosi", 0, &plat->mosi,
-				   GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
-	if (ret)
-		plat->flags |= SPI_MASTER_NO_TX;
-
-	ret = gpio_request_by_name(dev, "gpio-miso", 0, &plat->miso,
-				   GPIOD_IS_IN);
-	if (ret)
-		plat->flags |= SPI_MASTER_NO_RX;
-
-	if ((plat->flags & (SPI_MASTER_NO_RX | SPI_MASTER_NO_TX)) ==
-	    (SPI_MASTER_NO_RX | SPI_MASTER_NO_TX))
-		return -EINVAL;
+	gpio_direction_output(plat->sclk.gpio, slave->mode & SPI_CPOL);
+	gpio_direction_output(plat->mosi.gpio, 1);
+	gpio_direction_input(plat->miso.gpio);
+	gpio_direction_output(plat->cs.gpio, !(slave->mode & SPI_CS_HIGH));
 
 	return 0;
 }
 
 static const struct udevice_id soft_spi_ids[] = {
-	{ .compatible = "spi-gpio" },
+	{ .compatible = "u-boot,soft-spi" },
 	{ }
 };
 
@@ -254,5 +246,7 @@ U_BOOT_DRIVER(soft_spi) = {
 	.ofdata_to_platdata = soft_spi_ofdata_to_platdata,
 	.platdata_auto_alloc_size = sizeof(struct soft_spi_platdata),
 	.priv_auto_alloc_size = sizeof(struct soft_spi_priv),
+	.per_child_auto_alloc_size	= sizeof(struct spi_slave),
 	.probe	= soft_spi_probe,
+	.child_pre_probe	= soft_spi_child_pre_probe,
 };

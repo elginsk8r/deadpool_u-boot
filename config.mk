@@ -1,7 +1,9 @@
-# SPDX-License-Identifier: GPL-2.0+
 #
 # (C) Copyright 2000-2013
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
+#
+# SPDX-License-Identifier:	GPL-2.0+
+#
 #########################################################################
 
 # This file is included from ./Makefile and spl/Makefile.
@@ -15,7 +17,6 @@ PLATFORM_CPPFLAGS :=
 PLATFORM_LDFLAGS :=
 LDFLAGS :=
 LDFLAGS_FINAL :=
-LDFLAGS_STANDALONE :=
 OBJCOPYFLAGS :=
 # clear VENDOR for tcsh
 VENDOR :=
@@ -23,11 +24,6 @@ VENDOR :=
 
 ARCH := $(CONFIG_SYS_ARCH:"%"=%)
 CPU := $(CONFIG_SYS_CPU:"%"=%)
-ifdef CONFIG_SPL_BUILD
-ifdef CONFIG_TEGRA
-CPU := arm720t
-endif
-endif
 BOARD := $(CONFIG_SYS_BOARD:"%"=%)
 ifneq ($(CONFIG_SYS_VENDOR),)
 VENDOR := $(CONFIG_SYS_VENDOR:"%"=%)
@@ -49,23 +45,34 @@ ifdef	SOC
 sinclude $(srctree)/$(CPUDIR)/$(SOC)/config.mk	# include  SoC	specific rules
 endif
 ifneq ($(BOARD),)
+ifeq ($(CONFIG_SUPPORT_CUSTOMER_BOARD), y) #SUPPORT_CUSTOMER_BOARD
+BOARDDIR = customer/board/$(BOARD)
+else #SUPPORT_CUSTOMER_BOARD
 ifdef	VENDOR
-BOARDDIR = $(VENDOR)/$(BOARD)
+BOARDDIR = board/$(VENDOR)/$(BOARD)
 else
-BOARDDIR = $(BOARD)
+BOARDDIR = board/$(BOARD)
 endif
+endif #SUPPORT_CUSTOMER_BOARD
 endif
 ifdef	BOARD
-sinclude $(srctree)/board/$(BOARDDIR)/config.mk	# include board specific rules
+sinclude $(srctree)/$(BOARDDIR)/config.mk	# include board specific rules
 endif
 
 ifdef FTRACE
 PLATFORM_CPPFLAGS += -finstrument-functions -DFTRACE
 endif
 
+# Allow use of stdint.h if available
+ifneq ($(USE_STDINT),)
+PLATFORM_CPPFLAGS += -DCONFIG_USE_STDINT
+endif
+
 #########################################################################
 
 RELFLAGS := $(PLATFORM_RELFLAGS)
+
+OBJCOPYFLAGS += --gap-fill=0xff
 
 PLATFORM_CPPFLAGS += $(RELFLAGS)
 PLATFORM_CPPFLAGS += -pipe
@@ -87,5 +94,4 @@ export FIRMWARE_CPPFLAGS
 export PLATFORM_CPPFLAGS
 export RELFLAGS
 export LDFLAGS_FINAL
-export LDFLAGS_STANDALONE
 export CONFIG_STANDALONE_LOAD_ADDR

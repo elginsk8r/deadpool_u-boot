@@ -8,10 +8,6 @@
 // 32K - 64K    System space, used for miscellanious AOSP features. See below.
 // Note that these offsets are admitted by bootloader,recovery and uncrypt, so they
 // are not configurable without changing all of them.
-
-#ifndef _ANDROID_VAB_H_
-#define _ANDROID_VAB_H_
-
 #define BOOTLOADER_MESSAGE_OFFSET_IN_MISC 0
 #define VENDOR_SPACE_OFFSET_IN_MISC 2 * 1024
 #define WIPE_PACKAGE_OFFSET_IN_MISC 16 * 1024
@@ -54,5 +50,3 @@ struct misc_virtual_ab_message {
     uint8_t source_slot;   // Slot number when merge_status was written.
     uint8_t reserved[57];
 };
-
-#endif

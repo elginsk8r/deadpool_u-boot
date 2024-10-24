@@ -1,12 +1,23 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2010 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 typedef struct sparse_header {
   __le32	magic;		/* 0xed26ff3a */
   __le16	major_version;	/* (0x1) - reject images with higher major versions */
-  __le16	minor_version;	/* (0x0) - allow images with higer minor versions */
+	__le16	minor_version;	/* (0x0) - allow images with higher minor versions */
   __le16	file_hdr_sz;	/* 28 bytes for first revision of the file format */
   __le16	chunk_hdr_sz;	/* 12 bytes for first revision of the file format */
   __le32	blk_sz;		/* block size in bytes, must be a multiple of 4 (4096) */

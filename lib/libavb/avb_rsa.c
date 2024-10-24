@@ -10,8 +10,8 @@
 
 #include "avb_rsa.h"
 #include "avb_sha.h"
-#include "avb_util.h"
-#include "avb_vbmeta_image.h"
+#include <libavb/avb_util.h>
+#include <libavb/avb_vbmeta_image.h>
 
 typedef struct IAvbKey {
   unsigned int len; /* Length of n[] in number of uint32_t */
@@ -73,9 +73,9 @@ static IAvbKey* iavb_parse_key_data(const uint8_t* data, size_t length) {
   return key;
 
 fail:
-  if (key != NULL) {
-    avb_free(key);
-  }
+	if (key != NULL)
+		avb_free(key);
+
   return NULL;
 }
 
@@ -156,8 +156,8 @@ static void modpowF4(const IAvbKey* key, uint8_t* inout) {
     goto out;
   }
 
-  uint32_t* aaa = aaR; /* Re-use location. */
-  int i;
+	uint32_t *aaa = aaR; /* Re-use location. */
+	int i;
 
   /* Convert from big endian byte array to little endian word array. */
   for (i = 0; i < (int)key->len; ++i) {

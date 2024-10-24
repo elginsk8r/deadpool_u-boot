@@ -1,27 +1,42 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v3_burning/aml_v3_burning.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "include/v3_tool_def.h"
 #include <mmc.h>
-#include <amlogic/cpu_id.h>
+#include <asm/cpu_id.h>
+DECLARE_GLOBAL_DATA_PTR;
+
 #ifndef BOOT_DEVICE_USB
 #define BOOT_DEVICE_SD                  4
 #define BOOT_DEVICE_USB                 5
 #endif// #ifndef BOOT_DEVICE_USB
 extern void serial_initialize(void);
-extern void board_init_mem(void);
-extern int aml_v3_usbburning(unsigned timeout, unsigned pcToolWaitTime);
 
-unsigned _get_romcode_boot_id(void)
+extern void board_init_mem(void);
+
+#ifndef MESON_CPU_MAJOR_ID_C1
+#define MESON_CPU_MAJOR_ID_C1		0x30
+#endif//#ifndef MESON_CPU_MAJOR_ID_C1
+#ifndef MESON_CPU_MAJOR_ID_SC2
+#define MESON_CPU_MAJOR_ID_SC2		0x32
+#endif//#ifndef MESON_CPU_MAJOR_ID_SC2
+#ifndef MESON_CPU_MAJOR_ID_C2
+#define MESON_CPU_MAJOR_ID_C2		0x33
+#endif//#ifndef MESON_CPU_MAJOR_ID_C2
+
+static unsigned _get_romcode_boot_id(void)
 {
 	const cpu_id_t cpuid = get_cpu_id();
 	const int familyId	 = cpuid.family_id;
 
     unsigned boot_id = 0;
 #ifdef SYSCTRL_SEC_STATUS_REG2
-	if (MESON_CPU_MAJOR_ID_SC2 <= familyId && MESON_CPU_MAJOR_ID_C2 != familyId) {
+	if (MESON_CPU_MAJOR_ID_SC2 == familyId) {
 		boot_id = readl(SYSCTRL_SEC_STATUS_REG2);
         FB_DBG("boot_id 0x%x\n", boot_id);
 		boot_id = (boot_id>>4) & 0xf;
@@ -30,8 +45,7 @@ unsigned _get_romcode_boot_id(void)
 #endif// #ifdef SYSCTRL_SEC_STATUS_REG2
 
 #if defined(P_AO_SEC_GP_CFG0)
-    if (MESON_CPU_MAJOR_ID_C2 >= familyId &&
-			MESON_CPU_MAJOR_ID_SC2 != familyId) {
+    if (MESON_CPU_MAJOR_ID_SC2 != familyId) {
 		FB_DBG("cfg0 0x%08x\n", readl(P_AO_SEC_GP_CFG0));
 		boot_id = readl(P_AO_SEC_GP_CFG0) & 0xf;
 	}
@@ -45,6 +59,7 @@ static int is_boot_device_usb(void)
     return BOOT_DEVICE_USB == _get_romcode_boot_id();
 }
 
+#if 0
 static int is_bl1_usb_protocol_DNL(void)
 {
 #ifdef SYSCTRL_SEC_STATUS_REG1
@@ -57,22 +72,19 @@ static int is_bl1_usb_protocol_DNL(void)
     return cfg9 & (1U<<15);
 #endif// #ifdef SYSCTRL_SEC_STATUS_REG1
 }
-
+#endif
 
 int aml_v3_factory_usb_burning(int flag, bd_t* bis)
 {
     if (!is_boot_device_usb()) return 1;
-    if (!is_bl1_usb_protocol_DNL()) return 1;
 
-    bis = bis;//avoid compiling warnning
+    bis = bis;//avoid compiling warning
     if ( !flag ) {
-        serial_initialize();//init for write memory
 #ifdef CONFIG_GENERIC_MMC
-        FB_MSG("MMC init for dnl\n");
+        puts("MMC init for dnl\n");
         mmc_initialize(bis);
 #endif
-        set_default_env(NULL, 0);
-        board_init_mem();
+        set_default_env("usb temp env");
     }
 #ifdef CONFIG_SILENT_CONSOLE
     /* enable console output */
@@ -80,11 +92,11 @@ int aml_v3_factory_usb_burning(int flag, bd_t* bis)
 #endif
     //pull down and sleep in bl2-->tpl,
     //to improve pc compatibility
-    /*f_dwc_otg_pullup(0);*/
+    f_dwc_otg_pullup(0);
     udelay(2*1000*1000);
 
     v3tool_work_mode_set(V3TOOL_WORK_MODE_USB_PRODUCE);
-    optimus_clear_ovd_register();//clear OVD register for normal reboot
-    return aml_v3_usbburning(0, 0);
+    optimus_clear_ovd_register();
+    return run_command("adnl", 0);
 }
 

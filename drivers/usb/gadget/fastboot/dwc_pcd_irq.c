@@ -1,13 +1,16 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/fastboot/dwc_pcd_irq.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "usb_boot.h"
 #include "usb_ch9.h"
 #include "dwc_pcd.h"
 #include "dwc_pcd_irq.h"
-#include "../platform.h"
+#include "platform.h"
 
 static void ep0_out_start(void);
 static int ep0_complete_request( pcd_struct_t * pcd);
@@ -262,6 +265,8 @@ static void pcd_setup(pcd_struct_t *_pcd)
 	case USB_REQ_SET_CONFIGURATION:
 		/* Configuration changed */
 		req_flag->request_config = 1;
+		driver->setup(gadget, &ctrl);
+		break;
 	default:
 		DBG("Call the Gadget Driver's setup functions\n");
 		/* Call the Gadget Driver's setup functions */
@@ -666,7 +671,7 @@ static void dwc_otg_pcd_handle_enum_done_intr(void)
 
 	printf("SPEED ENUM\n");
 #ifdef CONFIG_USB_DEVICE_V2
-	set_usb_phy21_tuning_update();
+	set_usb_phy21_tuning_fb();
 #endif
 
 	gadget_wrapper.pcd.ep0state = EP0_IDLE;
@@ -786,7 +791,7 @@ static void dwc_otg_pcd_handle_out_ep_intr(void)
 			if (doepint.b.ahberr) {
 				CLEAR_OUT_EP_INTR(epnum, ahberr);
 			}
-			/* Setup Phase Done (contorl EPs) */
+			/* Setup Phase Done (control EPs) */
 			if (doepint.b.setup) {
 #if (defined CONFIG_USB_DEVICE_V2)
 				handle_ep0();
@@ -824,8 +829,6 @@ static void dwc_otg_pcd_handle_in_ep_intr(void)
 	u32 epnum = 0;
 
 	/* Read in the device interrupt bits */
-	ep_intr = dwc_read_reg32(DWC_REG_DAINT);
-
 	ep_intr = (dwc_read_reg32(DWC_REG_DAINT) &
 		dwc_read_reg32(DWC_REG_DAINTMSK));
 	ep_intr =(ep_intr & 0xffff);
@@ -1040,8 +1043,8 @@ static void dwc_otg_handle_usb_suspend_intr(void)
 
 unsigned int _sofintr_not_occur;
 #if (defined CONFIG_USB_DEVICE_V2)
-unsigned int _sofintr;
-unsigned curTime_sof;
+unsigned int fb_sofintr;
+unsigned fb_curTime_sof;
 #endif
 
 int f_dwc_pcd_irq(void)
@@ -1062,26 +1065,26 @@ int f_dwc_pcd_irq(void)
 	gotgint.d32 = dwc_read_reg32(DWC_REG_GOTGINT);
 
 	if (gotgint.b.sesreqsucstschng)
-		printf("Session Request Success Status Change\n");
+		ERR("Session Request Success Status Change\n");
 	else if (gotgint.b.sesenddet) {
 		/*break to romboot*/
-		printf("Session End Detected\n");
+		ERR("Session End Detected\n");
 		ret = 11;
 	}
 
 	/* clear intr */
 	dwc_write_reg32(DWC_REG_GOTGINT, gotgint.d32);
 
-    if (gintr_status.b.sofintr) {
 #if (defined CONFIG_USB_DEVICE_V2)
-		curTime_sof = get_timer(0);
-		_sofintr = 1;
-#endif
+	if (gintr_status.b.sofintr) {
+		fb_curTime_sof = get_timer(0);
+		fb_sofintr = 1;
 		if (_sofintr_not_occur) {
 			printf("sof\n");
 			_sofintr_not_occur = 0;
 		}
 	}
+#endif
 
 	if (gintr_status.b.rxstsqlvl) {
 	    dwc_otg_pcd_handle_rx_status_q_level_intr();

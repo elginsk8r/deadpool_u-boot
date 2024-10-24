@@ -1,13 +1,17 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_usb_tool/optimus_transform.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../v2_burning_i.h"
 #include "usb_pcd.h"
-#include "../../platform.h"
-//#include <partition_table.h>
-#include <amlogic/cpu_id.h>
+#include "platform.h"
+#include <partition_table.h>
+#include <asm/cpu_id.h>
+#include <amlogic/aml_efuse.h>
 
 #define MYDBG(fmt ...) printf("OPT]"fmt)
 
@@ -15,55 +19,113 @@
 #define USB_BURN_POWER_CONTROL  1
 #endif// #ifdef CONFIG_CMD_AML
 
-static inline int str2longlong(char *p, unsigned long long *num)
+static inline int str2long(const char *p, unsigned long *num)
 {
-    char *endptr;
+	char *endptr;
+	*num = simple_strtoul(p, &endptr, 0);
+	return (*p != '\0' && *endptr == '\0') ? 1 : 0;
+}
 
-    *num = simple_strtoull(p, &endptr, 16);
-    if (*endptr != '\0')
-    {
-        switch (*endptr)
+static int opimus_func_write_bootloader(unsigned long addr)
+{
+        int ret = 0;
+        loff_t size = 0;
+
+        size = 0x60000;//FIXME: 256K at most ??
+
+        ret = store_boot_write((u8*)addr, (loff_t)0, size);
+
+        return ret;
+}
+
+//[0]write_raw_img [1]part_name [2]address, [3]offset, [4]size
+int opimus_func_write_raw_img(int argc, char *argv[], char *info)
+{
+        int ret = 0;
+        u64 addr;
+        u64 off, size;
+        const char* partName = argv[1];
+
+        if (strcmp(partName, "bootloader") == 0)
         {
-            case 'g':
-            case 'G':
-                *num<<=10;
-            case 'm':
-            case 'M':
-                *num<<=10;
-            case 'k':
-            case 'K':
-                *num<<=10;
-                endptr++;
-                break;
+                addr = simple_strtoul(argv[2], NULL, 0);
+                return opimus_func_write_bootloader(addr);
         }
-    }
 
-    return (*p != '\0' && *endptr == '\0') ? 1 : 0;
+        addr = simple_strtoull(argv[2], NULL, 0);
+        off  = simple_strtoull(argv[3], NULL, 0);
+        size = simple_strtoul(argv[4], NULL, 0);
+
+        printf("write_raw_img part %s offset 0x%x, size 0x%x, addr 0x%llx\n", argv[1], (u32)off, (u32)size, addr);
+        ret = store_write_ops((u8*)partName, (u8*)addr, off, size);
+
+        return ret;
+}
+
+
+int optimus_simg2part (int argc, char * const argv[], char *info)
+{
+        int ret = -1;
+        const char* partition_name = argv[1];
+        u8* simg_addr = (u8*)simple_strtoul(argv[2], NULL, 16);
+        u32 pktSz     = simple_strtoul(argv[3], NULL, 0);
+        const unsigned memAddrTop = OPTIMUS_DOWNLOAD_SPARSE_INFO_FOR_VERIFY;//this address backup the chunk info, don't overwrite it!
+
+        if (argc < 4) {
+                sprintf(info, "failed: used simg2part partName memAddr, pktSz]\n");
+                DWN_ERR(info);
+                return __LINE__;
+        }
+        if (!pktSz || !simg_addr) {
+                sprintf(info, "simg_addr or pktSz error\n");
+                DWN_ERR(info);
+                return __LINE__;
+        }
+
+        if ((unsigned long)simg_addr + pktSz > memAddrTop) {
+                sprintf(info, "failed:simg_addr(0x%p) + pktSz(0x%x) > memAddrTop(0x%x)\n", simg_addr, pktSz, memAddrTop);
+                DWN_ERR(info);
+                return __LINE__;
+        }
+
+        ret = optimus_parse_img_download_info(partition_name, pktSz, "sparse", "store", 0);
+        if (ret) {
+                sprintf(info, "failed:init download info for part(%s)\n", partition_name);
+                DWN_ERR(info);
+                return __LINE__;
+        }
+        unsigned writeLen = optimus_download_img_data(simg_addr, pktSz, info);
+        if (writeLen != pktSz) {
+                DWN_ERR("failed when burn simg!, want(0x%x), write(0x%x)\n", pktSz, writeLen);
+                return __LINE__;
+        }
+
+        return ret;
 }
 
 int optimus_mem_md (int argc, char * const argv[], char *info)
 {
-    ulong	addr, length = 0x100;
-    int	size;
-    int rc = 0;
+	ulong	addr, length = 0x100;
+	int	size;
+	int rc = 0;
 
-    if ((size = cmd_get_data_size(argv[0], 4)) < 0)
-        return 1;
+	if ((size = cmd_get_data_size(argv[0], 4)) < 0)
+		return 1;
 
-    /* Address is specified since argc > 1
-    */
-    addr = simple_strtoul(argv[1], NULL, 16);
+	/* Address is specified since argc > 1
+	*/
+	addr = simple_strtoul(argv[1], NULL, 16);
 
-    /* If another parameter, it is the length to display.
-     * Length is the number of objects, not number of bytes.
-     */
-    if (argc > 2)
-        length = simple_strtoul(argv[2], NULL, 16);
+	/* If another parameter, it is the length to display.
+	 * Length is the number of objects, not number of bytes.
+	 */
+	if (argc > 2)
+		length = simple_strtoul(argv[2], NULL, 16);
 
-    /* Print the lines. */
-    print_buffer(addr, (void*)addr, size, length, 16/size);
-    strcpy(info, "success");
-    return rc;
+	/* Print the lines. */
+	print_buffer(addr, (void*)addr, size, length, 16/size);
+	strcpy(info, "success");
+	return rc;
 }
 
 int set_low_power_for_usb_burn(int arg, char* buff)
@@ -86,7 +148,7 @@ int set_low_power_for_usb_burn(int arg, char* buff)
 
 #if USB_BURN_POWER_CONTROL
     int ret2=0;
-    //limit vbus curretn to 500mA, i.e, if hub is 4A, 8 devices at most, arg3 to not set_env as it's not inited yet!!
+    //limit vbus current to 500mA, i.e, if hub is 4A, 8 devices at most, arg3 to not set_env as it's not inited yet!!
     MYDBG("set_usbcur_limit 500 0\n");
     ret2 = run_command("set_usbcur_limit 500 0", 0);
     if (ret2) {
@@ -113,42 +175,38 @@ int cb_4_dis_connect_intr(void)
 
 static int _cpu_temp_in_valid_range(int argc, char* argv[], char* errInfo)
 {
-    int ret = 0;
-    int minTemp = 0;
-    int maxTemp = 0;
-    int cpu_temp = 0;
-    char* env_cpu_temp = NULL;
+        int ret = 0;
+        int minTemp = 0;
+        int maxTemp = 0;
+        unsigned long env_cpu_temp = 0;
 
-    if (3 > argc) {
-        sprintf(errInfo, "argc %d < 3 is invalid\n", argc);
-        return __LINE__;
-    }
-    minTemp = simple_strtol(argv[1], NULL, 0);
-    maxTemp = simple_strtol(argv[2], NULL, 0);
-    if (minTemp <=0 || maxTemp <= 0 || minTemp >= maxTemp) {
-        sprintf(errInfo, "Invalid:minTemp=%s, maxTemp=%s\n", argv[1], argv[2]);
-        return __LINE__;
-    }
-    ret = run_command("read_temp", 0);
-    if (ret < 0) {
-        sprintf(errInfo, "cmd[cpu_temp] failed\n");
-        return __LINE__;
-    }
-    env_cpu_temp = getenv("tempa");
-    if (!env_cpu_temp) {
-        sprintf(errInfo, "Can't get cpu_temp, cpu is not calibrated.\n");
-        return __LINE__;
-    }
-    cpu_temp = simple_strtol(env_cpu_temp, NULL, 0);
-    ret = (cpu_temp >= minTemp && cpu_temp <= maxTemp) ? 0 : __LINE__;
-    if (!ret) {
-        sprintf(errInfo, "%s", env_cpu_temp);
-    }
-    else{
-        sprintf(errInfo, "%s is out of temp range[%d, %d], errInfo[%s]\n", env_cpu_temp, minTemp, maxTemp, getenv("err_info_tempa"));
-    }
+        if (3 > argc) {
+                sprintf(errInfo, "argc %d < 3 is invalid\n", argc);
+                return __LINE__;
+        }
+        minTemp = simple_strtol(argv[1], NULL, 0);
+        maxTemp = simple_strtol(argv[2], NULL, 0);
+        if (minTemp <=0 || maxTemp <= 0 || minTemp >= maxTemp) {
+                sprintf(errInfo, "Invalid:minTemp=%d, maxTemp=%d\n", minTemp, maxTemp);
+                return __LINE__;
+        }
+        ret = run_command("read_temp", 0);
+        if (ret < 0) {
+                sprintf(errInfo, "cmd[cpu_temp] failed\n");
+                return __LINE__;
+        }
 
-    return ret;
+        env_cpu_temp = getenv_ulong("tempa", 10, 0);
+        ret = (env_cpu_temp >= minTemp && env_cpu_temp <= maxTemp) ? 0 : __LINE__;
+        if (!ret) {
+                sprintf(errInfo, "%lu", env_cpu_temp);
+        }
+        else{
+                sprintf(errInfo, "%lu is out of temp range[%d, %d], errInfo[%s]\n",
+                        env_cpu_temp, minTemp, maxTemp, getenv_optimus("err_info_tempa"));
+        }
+
+        return ret;
 }
 
 static int _get_chipid(char* buff)
@@ -161,125 +219,156 @@ static int _get_chipid(char* buff)
         return ret;
     }
 
-    buff[0] = ':', buff[1]='\0';
+    buff[0] = ':';
     for (; i < 12; ++i) {
-        sprintf(buff, "%s%02x", buff, chipid[15-i]);
+        sprintf(buff + 1 + i*2, "%02x", chipid[15-i]);
     }
+    buff[1 + i*2] = '\0';
     return 0;
 }
 
 int optimus_working (const char *cmd, char* buff)
 {
-    static char cmdBuf[CMD_BUFF_SIZE] = {0};
-    int ret = 0;
-    int argc = 33;
-    char *argv[CONFIG_SYS_MAXARGS + 1];	/* NULL terminated	*/
-    const char* optCmd = NULL;
+        static char cmdBuf[CMD_BUFF_SIZE] = {0};
+        int ret = 0;
+        int argc = 33;
+        char *argv[CONFIG_SYS_MAXARGS + 1];	/* NULL terminated	*/
+        /*printf("reboot_mode [%8x, %8x]\n", P_AO_RTI_STATUS_REG1);*/
+        const char* optCmd = NULL;
 
-    memset(buff, 0, CMD_BUFF_SIZE);
-    memcpy(cmdBuf, cmd, CMD_BUFF_SIZE);
-    if ((argc = cli_simple_parse_line(cmdBuf, argv)) == 0)
-    {
-        strcpy(buff, "failed:no command at all");
-        printf("no command at all\n");
-        return -1;	/* no command at all */
-    }
-    optCmd = argv[0];
-
-    if (!strcmp("low_power", optCmd))
-    {
-        ret = set_low_power_for_usb_burn(1, buff);
-    }
-    else if(strcmp(optCmd, "disk_initial") == 0)
-    {
-        unsigned  erase = argc > 1 ? simple_strtoul(argv[1], NULL, 0) : 0;
-
-        ret = optimus_storage_init(erase);
-    }
-    else if(!strcmp(optCmd, "bootloader_is_old"))
-    {
-        ret = is_tpl_loaded_from_usb();
-        if (ret)sprintf(buff, "Failed, bootloader is new\n") ;
-    }
-    else if(!strcmp(optCmd, "erase_bootloader"))
-    {
-        ret = optimus_erase_bootloader("usb");
-
-        if (ret)sprintf(buff, "Failed to erase bootloader\n") ;
-    }
-    else if(strcmp(optCmd, "reset") == 0)
-    {
-        close_usb_phy_clock(0);
-        optimus_reset(OPTIMUS_BURN_COMPLETE__REBOOT_NORMAL);
-    }
-    else if(strcmp(optCmd, "poweroff") == 0)
-    {
-        optimus_poweroff();
-    }
-    else if(strncmp(optCmd, "md", 2) == 0)
-    {
-        ret = optimus_mem_md(argc, argv, buff);
-    }
-    else if(!strcmp(optCmd, "download") || !strcmp("upload", optCmd))
-    {
-        ret = optimus_parse_download_cmd(argc, argv);
-    }
-    else if(!strcmp("key", optCmd))
-    {
-        ret = v2_key_command(argc, argv, buff);
-    }
-    else if(!strcmp("verify", optCmd))
-    {
-        ret = optimus_media_download_verify(argc, argv, buff);
-    }
-    else if(!strcmp("save_setting", optCmd))
-    {
-        ret = optimus_set_burn_complete_flag();
-    }
-    else if(!strcmp("burn_complete", optCmd))
-    {
-        unsigned choice = simple_strtoul(argv[1], NULL, 0);//0 is poweroff, 1 is reset system
-
-        if (OPTIMUS_BURN_COMPLETE__POWEROFF_AFTER_DISCONNECT != choice) {//disconnect except OPTIMUS_BURN_COMPLETE__POWEROFF_AFTER_DISCONNECT
-            close_usb_phy_clock(0);//some platform can't poweroff but dis-connect needed by pc
+        memset(buff, 0, CMD_BUFF_SIZE);
+        memcpy(cmdBuf, cmd, CMD_BUFF_SIZE);
+        if ((argc = cli_simple_parse_line(cmdBuf, argv)) == 0)
+        {
+                strcpy(buff, "failed:no command at all");
+                printf("no command at all\n");
+                return -1;	/* no command at all */
         }
-        ret = optimus_burn_complete(choice);
-    }
-    else if(!strcmp(optCmd, "support_tempcontrol"))
-    {
+        optCmd = argv[0];
+
+        if (!strcmp("low_power", optCmd))
+        {
+                ret = set_low_power_for_usb_burn(1, buff);
+        }
+        else if(strcmp(optCmd, "disk_initial") == 0)
+        {
+                unsigned  erase = argc > 1 ? simple_strtoul(argv[1], NULL, 0) : 0;
+
+		//not usb boot and normal erase, then protect bootloader
+		if (optimus_work_mode_get() != OPTIMUS_WORK_MODE_USB_PRODUCE && erase == 1) {
+			char * const protect_parts[] = {"env"};
+
+			ret = optimus_storage_init(0);
+			if (ret) {
+				DWN_ERR("FAil in init flash for usb tool\n");
+				ret = __LINE__;
+			} else {
+				DWN_MSG("erase flash except bootloader and env\n");
+				ret = _usb_burn_erase_mmc(ARRAY_SIZE(protect_parts), protect_parts);
+				run_command("setenv upgrade_step 3; saveenv", 0);
+			}
+		} else {
+			ret = optimus_storage_init(erase);
+		}
+        }
+        else if(!strcmp(optCmd, "bootloader_is_old"))
+        {
+                ret = is_tpl_loaded_from_usb();
+                if (ret)sprintf(buff, "Failed, bootloader is new\n") ;
+        }
+        else if(!strcmp(optCmd, "erase_bootloader"))
+        {
+                ret = optimus_erase_bootloader("usb");
+
+                if (ret)sprintf(buff, "Failed to erase bootloader\n") ;
+        }
+        else if(strcmp(optCmd, "write_raw_img") == 0)
+        {
+                ret = opimus_func_write_raw_img(argc, argv, buff);
+        }
+        else if(strcmp(optCmd, "simg2part") == 0)
+        {
+                ret = optimus_simg2part(argc, argv, buff);
+        }
+        else if(strcmp(optCmd, "reset") == 0)
+        {
+                close_usb_phy_clock(0);
+                optimus_reset(OPTIMUS_BURN_COMPLETE__REBOOT_NORMAL);
+        }
+        else if(strcmp(optCmd, "poweroff") == 0)
+        {
+                optimus_poweroff();
+        }
+        else if(strncmp(optCmd, "md", 2) == 0)
+        {
+                ret = optimus_mem_md(argc, argv, buff);
+        }
+        else if(!strcmp(optCmd, "download") || !strcmp("upload", optCmd))
+        {
+                ret = optimus_parse_download_cmd(argc, argv);
+        }
+        else if(!strcmp("key", optCmd))
+        {
+                ret = v2_key_command(argc, argv, buff);
+        }
+        else if(!strcmp("verify", optCmd))
+        {
+                ret = optimus_media_download_verify(argc, argv, buff);
+        }
+        else if(!strcmp("save_setting", optCmd))
+        {
+                ret = optimus_set_burn_complete_flag();
+        }
+        else if(!strcmp("burn_complete", optCmd))
+        {
+                unsigned choice = simple_strtoul(argv[1], NULL, 0);//0 is poweroff, 1 is reset system
+
+                if (OPTIMUS_BURN_COMPLETE__POWEROFF_AFTER_DISCONNECT != choice) {//disconnect except OPTIMUS_BURN_COMPLETE__POWEROFF_AFTER_DISCONNECT
+                        close_usb_phy_clock(0);//some platform can't poweroff but dis-connect needed by pc
+                }
+                ret = optimus_burn_complete(choice);
+        }
+        else if(!strcmp(optCmd, "support_tempcontrol"))
+        {
 #ifndef CONFIG_CMD_CPU_TEMP
-        ret = __LINE__;
+                ret = __LINE__;
+                sprintf(buff + 7, "cpu temp control cmd NOT supported.\n");
 #else
-        ret = 0;
+                ret = 0;
+                sprintf(buff + 7, "cpu temp control cmd DO supported.\n");
 #endif// #ifdef CONFIG_CMD_CPU_TEMP
-        sprintf(buff + 7, "cpu temp control cmd %s supported.\n", ret ? "NOT" : "DO");//7 == strlen("failed")
-    }
-    else if(!strcmp(optCmd, "tempcontrol"))
-    {
-        ret = _cpu_temp_in_valid_range(argc, argv, buff + 7);
-    }
-    else if(!strcmp(optCmd, "get_chipid"))
-    {
-        ret = _get_chipid(buff + 7);
-    }
-    else
-    {
-        int flag = 0;
-        ret = run_command(cmd, flag);
-        DWN_MSG("ret = %d\n", ret);
-        /*ret = ret < 0 ? ret : 0;*/
-    }
+        }
+        else if(!strcmp(optCmd, "tempcontrol"))
+        {
+                ret = _cpu_temp_in_valid_range(argc, argv, buff + 7);
+        }
+        else if(!strcmp(optCmd, "get_chipid"))
+        {
+                ret = _get_chipid(buff + 7);
+        } else if(!strcmp(optCmd, "secureboot_en")) {
+                const bool secureboot = IS_FEAT_BOOT_VERIFY();
+                strncpy(buff + 7, secureboot ? "secure" : "normal", 7);
+                ret = 0;
+        }
+        else
+        {
+                int flag = 0;
+                ret = run_command(cmd, flag);
+                DWN_MSG("ret = %d\n", ret);
+                /*ret = ret < 0 ? ret : 0;*/
+        }
 
-    if (ret)
-    {
-        memcpy(buff, "failed:", strlen("failed:"));//use memcpy but not strcpy to not overwrite storage/key info
-    }
-    else
-    {
-        memcpy(buff, "success", strlen("success"));//use memcpy but not strcpy to not overwrite storage/key info
-    }
+        if (ret)
+        {
+                memcpy(buff, "failed:", strlen("failed:"));//use memcpy but not strcpy to not overwrite storage/key info
+        }
+        else
+        {
+                memcpy(buff, "success", strlen("success"));//use memcpy but not strcpy to not overwrite storage/key info
+        }
 
-    printf("[info]%s\n",buff);
-    return ret;
+        printf("[info]%s\n",buff);
+        mdelay(20);
+        return ret;
 }
 

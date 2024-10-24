@@ -17,6 +17,14 @@
 #define CONFIG_BOOTM_VXWORKS 1
 
 #define CONFIG_GZIP 1
+#define CONFIG_BZIP2 1
 #define CONFIG_ZLIB 1
+#define CONFIG_PARTITIONS 1
+
+#ifndef CONFIG_SPL_BUILD
+#define CONFIG_DM_WARN
+#define CONFIG_DM_DEVICE_REMOVE
+#define CONFIG_DM_STDIO
+#endif
 
 #endif

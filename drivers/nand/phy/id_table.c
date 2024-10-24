@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/phy/id_table.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../include/phynand.h"
@@ -466,7 +469,7 @@ struct nand_flash flash_ids_mlc[] = {
 		25,
 		0,
 		TOSHIBA_2XNM,
-		0},  /* not surrport two plane mode */
+		0},  /* not support two plane mode */
 	{"A serials NAND 4GiB TC58TEG5DCJTA00 ",
 		{NAND_MFR_TOSHIBA, 0xD7, 0x84, 0x93, 0x72, 0x57},
 		16384,

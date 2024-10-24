@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000-2009
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -10,9 +11,12 @@
 
 #include <common.h>
 #include <command.h>
-#include <console.h>
 #include <linux/ctype.h>
+#include <asm/arch/timer.h>
 
+#ifdef CONFIG_AMLOGIC_TIME_PROFILE
+DECLARE_GLOBAL_DATA_PTR;
+#endif
 /*
  * Use puts() instead of printf() to avoid printf buffer overflow
  * for long help messages
@@ -84,7 +88,6 @@ int _do_help(cmd_tbl_t *cmd_start, int cmd_items, cmd_tbl_t *cmdtp, int flag,
 /* find command table entry for a command */
 cmd_tbl_t *find_cmd_tbl(const char *cmd, cmd_tbl_t *table, int table_len)
 {
-#ifdef CONFIG_CMDLINE
 	cmd_tbl_t *cmdtp;
 	cmd_tbl_t *cmdtp_temp = table;	/* Init value */
 	const char *p;
@@ -111,7 +114,6 @@ cmd_tbl_t *find_cmd_tbl(const char *cmd, cmd_tbl_t *table, int table_len)
 	if (n_found == 1) {			/* exactly one match */
 		return cmdtp_temp;
 	}
-#endif /* CONFIG_CMDLINE */
 
 	return NULL;	/* not found or ambiguous command */
 }
@@ -163,7 +165,6 @@ int var_complete(int argc, char * const argv[], char last_char, int maxv, char *
 
 static int complete_cmdv(int argc, char * const argv[], char last_char, int maxv, char *cmdv[])
 {
-#ifdef CONFIG_CMDLINE
 	cmd_tbl_t *cmdtp = ll_entry_start(cmd_tbl_t, cmd);
 	const int count = ll_entry_count(cmd_tbl_t, cmd);
 	const cmd_tbl_t *cmdend = cmdtp + count;
@@ -233,9 +234,6 @@ static int complete_cmdv(int argc, char * const argv[], char last_char, int maxv
 
 	cmdv[n_found] = NULL;
 	return n_found;
-#else
-	return 0;
-#endif
 }
 
 static int make_argv(char *s, int argvsz, char *argv[])
@@ -317,7 +315,7 @@ static int find_common_prefix(char * const argv[])
 	return len;
 }
 
-static char tmp_buf[CONFIG_SYS_CBSIZE + 1];	/* copy of console I/O buffer */
+static char tmp_buf[CONFIG_SYS_CBSIZE];	/* copy of console I/O buffer	*/
 
 int cmd_auto_complete(const char *const prompt, char *buf, int *np, int *colp)
 {
@@ -451,7 +449,7 @@ void fixup_cmdtable(cmd_tbl_t *cmdtp, int size)
 		ulong addr;
 
 		addr = (ulong)(cmdtp->cmd) + gd->reloc_off;
-#ifdef DEBUG_COMMANDS
+#if DEBUG_COMMANDS
 		printf("Command \"%s\": 0x%08lx => 0x%08lx\n",
 		       cmdtp->name, (ulong)(cmdtp->cmd), addr);
 #endif
@@ -496,9 +494,17 @@ static int cmd_call(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	int result;
 
+#ifndef BL33_BOOT_TIME_PROBE
 	result = (cmdtp->cmd)(cmdtp, flag, argc, argv);
+#else
+	int i = get_time();
+	result = (cmdtp->cmd)(cmdtp, flag, argc, argv);
+	int j = get_time();
+    if ((j-i)/1000 >= 50)
+		printf("\nTE begin: %d TE end: %d : %s %s : used %d\n",i,j,argv[0],argv[1],j-i);
+#endif
 	if (result)
-		debug("Command failed, result=%d\n", result);
+		debug("Command failed, result=%d", result);
 	return result;
 }
 
@@ -507,6 +513,9 @@ enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
 {
 	enum command_ret_t rc = CMD_RET_SUCCESS;
 	cmd_tbl_t *cmdtp;
+#ifdef CONFIG_AMLOGIC_TIME_PROFILE
+	unsigned int time;
+#endif
 
 	/* Look up command in command table */
 	cmdtp = find_cmd(argv[0]);
@@ -535,7 +544,25 @@ enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
 	if (!rc) {
 		if (ticks)
 			*ticks = get_timer(0);
+	#ifdef CONFIG_AMLOGIC_TIME_PROFILE
+		time = get_time();
+	#endif
 		rc = cmd_call(cmdtp, flag, argc, argv);
+	#ifdef CONFIG_AMLOGIC_TIME_PROFILE
+		time = get_time() - time;
+		if (time > 1000 && gd->time_print_flag) {
+			const char *sym;
+			unsigned long base;
+			unsigned long size;
+			unsigned long faddr = (unsigned long)cmdtp->cmd - gd->reloc_off;
+
+			sym = symbol_lookup(faddr, &base, &size);
+			if (sym)
+				printf("\n ---long cmd function, t:%5d, fun:%s\n", time, sym);
+			else
+				printf("\n ---long cmd function, t:%5d, fun:%p\n", time, cmdtp->cmd);
+		}
+	#endif
 		if (ticks)
 			*ticks = get_timer(*ticks);
 		*repeatable &= cmdtp->repeatable;
@@ -547,13 +574,10 @@ enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
 
 int cmd_process_error(cmd_tbl_t *cmdtp, int err)
 {
-	if (err == CMD_RET_USAGE)
-		return CMD_RET_USAGE;
-
 	if (err) {
 		printf("Command '%s' failed: Error %d\n", cmdtp->name, err);
-		return CMD_RET_FAILURE;
+		return 1;
 	}
 
-	return CMD_RET_SUCCESS;
+	return 0;
 }

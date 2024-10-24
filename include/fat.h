@@ -1,9 +1,10 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * R/O (V)FAT 12/16/32 filesystem implementation by Marcus Sundberg
  *
  * 2002-07-28 - rjones@nexus-tech.net - ported to ppcboot v1.1.6
  * 2003-03-10 - kharris@nexus-tech.net - ported to u-boot
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _FAT_H_
@@ -11,12 +12,17 @@
 
 #include <asm/byteorder.h>
 #include <fs.h>
-
+#include <malloc.h>
+#include <common.h>
+#define CONFIG_SUPPORT_VFAT
 /* Maximum Long File Name length supported here is 128 UTF-16 code units */
 #define VFAT_MAXLEN_BYTES	256 /* Maximum LFN buffer in bytes */
 #define VFAT_MAXSEQ		9   /* Up to 9 of 13 2-byte UTF-16 entries */
 #define PREFETCH_BLOCKS		2
 
+#ifndef CONFIG_FS_FAT_MAX_CLUSTSIZE
+#define CONFIG_FS_FAT_MAX_CLUSTSIZE 65536
+#endif
 #define MAX_CLUSTSIZE	CONFIG_FS_FAT_MAX_CLUSTSIZE
 
 #define DIRENTSPERBLOCK	(mydata->sect_size / sizeof(dir_entry))
@@ -56,6 +62,12 @@
  * dir entries
  */
 #define LAST_LONG_ENTRY_MASK	0x40
+
+/* Flags telling whether we should read a file or list a directory */
+#define LS_NO		0
+#define LS_YES		1
+#define LS_DIR		1
+#define LS_ROOT		2
 
 #define ISDIRDELIM(c)	((c) == '/' || (c) == '\\')
 
@@ -188,13 +200,14 @@ static inline u32 sect_to_clust(fsdata *fsdata, int sect)
 }
 
 int file_fat_detectfs(void);
+int file_fat_ls(const char *dir);
 int fat_exists(const char *filename);
 int fat_size(const char *filename, loff_t *size);
 int file_fat_read_at(const char *filename, loff_t pos, void *buffer,
 		     loff_t maxsize, loff_t *actread);
 int file_fat_read(const char *filename, void *buffer, int maxsize);
-int fat_set_blk_dev(struct blk_desc *rbdd, disk_partition_t *info);
-int fat_register_device(struct blk_desc *dev_desc, int part_no);
+int fat_set_blk_dev(block_dev_desc_t *rbdd, disk_partition_t *info);
+int fat_register_device(block_dev_desc_t *dev_desc, int part_no);
 
 int file_fat_write(const char *filename, void *buf, loff_t offset, loff_t len,
 		   loff_t *actwrite);
@@ -204,6 +217,24 @@ int fat_opendir(const char *filename, struct fs_dir_stream **dirsp);
 int fat_readdir(struct fs_dir_stream *dirs, struct fs_dirent **dentp);
 void fat_closedir(struct fs_dir_stream *dirs);
 int fat_unlink(const char *filename);
-int fat_mkdir(const char *dirname);
 void fat_close(void);
+/* port from uboot2019/include/memalign.h */
+/* alloc */
+/**
+ * malloc_cache_aligned() - allocate a memory region aligned to cache line size
+ *
+ * This allocates memory at a cache-line boundary. The amount allocated may
+ * be larger than requested as it is rounded up to the nearest multiple of the
+ * cache-line size. This ensured that subsequent cache operations on this
+ * memory (flush, invalidate) will not affect subsequently allocated regions.
+ *
+ * @size:       Minimum number of bytes to allocate
+ *
+ * @return pointer to new memory region, or NULL if there is no more memory
+ * available.
+*/
+static inline void *malloc_cache_aligned(size_t size)
+{
+	return memalign(ARCH_DMA_MINALIGN, ALIGN(size, ARCH_DMA_MINALIGN));
+}
 #endif /* _FAT_H_ */

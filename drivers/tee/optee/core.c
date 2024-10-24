@@ -5,10 +5,12 @@
 
 #include <common.h>
 #include <dm.h>
-#include <log.h>
 #include <tee.h>
 #include <linux/arm-smccc.h>
-#include <linux/io.h>
+#include <malloc.h>
+#include <linux/err.h>
+#include <errno.h>
+#include <asm/io.h>
 
 #include "optee_smc.h"
 #include "optee_msg.h"
@@ -17,6 +19,9 @@
 #define PAGELIST_ENTRIES_PER_PAGE \
 	((OPTEE_MSG_NONCONTIG_PAGE_SIZE / sizeof(u64)) - 1)
 
+#define GENMASK(h, l) \
+	(((~0UL) << (l)) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
+
 typedef void (optee_invoke_fn)(unsigned long, unsigned long, unsigned long,
 			       unsigned long, unsigned long, unsigned long,
 			       unsigned long, unsigned long,
@@ -24,6 +29,11 @@ typedef void (optee_invoke_fn)(unsigned long, unsigned long, unsigned long,
 
 struct optee_pdata {
 	optee_invoke_fn *invoke_fn;
+};
+
+struct meson_optee {
+	char *compatible;
+	char *method;
 };
 
 struct rpc_param {
@@ -157,7 +167,7 @@ static int get_msg_arg(struct udevice *dev, uint num_params,
 	return 0;
 }
 
-static int to_msg_param(struct optee_msg_param *msg_params, uint num_params,
+int to_msg_param(struct optee_msg_param *msg_params, uint num_params,
 			const struct tee_param *params)
 {
 	uint n;
@@ -183,11 +193,11 @@ static int to_msg_param(struct optee_msg_param *msg_params, uint num_params,
 		case TEE_PARAM_ATTR_TYPE_MEMREF_INPUT:
 		case TEE_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
 		case TEE_PARAM_ATTR_TYPE_MEMREF_INOUT:
-			mp->attr = OPTEE_MSG_ATTR_TYPE_RMEM_INPUT + p->attr -
+			mp->attr = OPTEE_MSG_ATTR_TYPE_TMEM_INPUT + p->attr -
 				   TEE_PARAM_ATTR_TYPE_MEMREF_INPUT;
 			mp->u.rmem.shm_ref = (ulong)p->u.memref.shm;
 			mp->u.rmem.size = p->u.memref.size;
-			mp->u.rmem.offs = p->u.memref.shm_offs;
+			mp->u.rmem.offs = (u64)(p->u.memref.shm->addr);
 			break;
 		default:
 			return -EINVAL;
@@ -196,7 +206,7 @@ static int to_msg_param(struct optee_msg_param *msg_params, uint num_params,
 	return 0;
 }
 
-static int from_msg_param(struct tee_param *params, uint num_params,
+int from_msg_param(struct tee_param *params, uint num_params,
 			  const struct optee_msg_param *msg_params)
 {
 	uint n;
@@ -206,6 +216,9 @@ static int from_msg_param(struct tee_param *params, uint num_params,
 		struct tee_param *p = params + n;
 		const struct optee_msg_param *mp = msg_params + n;
 		u32 attr = mp->attr & OPTEE_MSG_ATTR_TYPE_MASK;
+
+		if (attr > 8)
+			attr -= 4;
 
 		switch (attr) {
 		case OPTEE_MSG_ATTR_TYPE_NONE:
@@ -574,33 +587,10 @@ static void optee_smccc_smc(unsigned long a0, unsigned long a1,
 	arm_smccc_smc(a0, a1, a2, a3, a4, a5, a6, a7, res);
 }
 
-static void optee_smccc_hvc(unsigned long a0, unsigned long a1,
-			    unsigned long a2, unsigned long a3,
-			    unsigned long a4, unsigned long a5,
-			    unsigned long a6, unsigned long a7,
-			    struct arm_smccc_res *res)
-{
-	arm_smccc_hvc(a0, a1, a2, a3, a4, a5, a6, a7, res);
-}
-
 static optee_invoke_fn *get_invoke_func(struct udevice *dev)
 {
-	const char *method;
-
 	debug("optee: looking for conduit method in DT.\n");
-	method = ofnode_get_property(dev->node, "method", NULL);
-	if (!method) {
-		debug("optee: missing \"method\" property\n");
-		return ERR_PTR(-ENXIO);
-	}
-
-	if (!strcmp("hvc", method))
-		return optee_smccc_hvc;
-	else if (!strcmp("smc", method))
-		return optee_smccc_smc;
-
-	debug("optee: invalid \"method\" property: %s\n", method);
-	return ERR_PTR(-EINVAL);
+	return optee_smccc_smc;
 }
 
 static int optee_ofdata_to_platdata(struct udevice *dev)
@@ -636,8 +626,8 @@ static int optee_probe(struct udevice *dev)
 	 * dynamic shared memory provided by normal world. To keep things
 	 * simple we're only using dynamic shared memory in this driver.
 	 */
-	if (!exchange_capabilities(pdata->invoke_fn, &sec_caps) ||
-	    !(sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)) {
+	if (!exchange_capabilities(pdata->invoke_fn, &sec_caps)) {
+//	|| !(sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)) {
 		debug("%s: OP-TEE capabilities mismatch\n", __func__);
 		return -ENOENT;
 	}
@@ -645,15 +635,17 @@ static int optee_probe(struct udevice *dev)
 	return 0;
 }
 
-static const struct udevice_id optee_match[] = {
-	{ .compatible = "linaro,optee-tz" },
-	{},
+static struct meson_optee meson_optee_pldata[] = {
+		{ "linaro,optee-tz", "smc" },
+};
+
+U_BOOT_DEVICES(optee) = {
+		{ "optee", &meson_optee_pldata[0] },
 };
 
 U_BOOT_DRIVER(optee) = {
 	.name = "optee",
 	.id = UCLASS_TEE,
-	.of_match = optee_match,
 	.ofdata_to_platdata = optee_ofdata_to_platdata,
 	.probe = optee_probe,
 	.ops = &optee_ops,

@@ -1,19 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000-2009
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <bootm.h>
 #include <fdt_support.h>
-#include <linux/libfdt.h>
+#include <libfdt.h>
 #include <malloc.h>
 #include <vxworks.h>
-#include <tee/optee.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
+/* void jump_to_a32_kernel(unsigned long a, unsigned long b,
+   unsigned long c); */
 static int do_bootm_standalone(int flag, int argc, char * const argv[],
 			       bootm_headers_t *images)
 {
@@ -24,9 +26,9 @@ static int do_bootm_standalone(int flag, int argc, char * const argv[],
 		jump_to_a32_kernel(images->ep, 0, 0);
 	} else {
 		/* Don't start if "autostart" is set to "no" */
-		s = env_get("autostart");
+		s = getenv("autostart");
 		if ((s != NULL) && !strcmp(s, "no")) {
-			env_set_hex("filesize", images->os.image_len);
+			setenv_hex("filesize", images->os.image_len);
 			return 0;
 		}
 		appl = (int (*)(int, char * const []))images->ep;
@@ -60,6 +62,7 @@ static int do_bootm_netbsd(int flag, int argc, char * const argv[],
 	void (*loader)(bd_t *, image_header_t *, char *, char *);
 	image_header_t *os_hdr, *hdr;
 	ulong kernel_data, kernel_len;
+	char *consdev;
 	char *cmdline;
 
 	if (flag != BOOTM_STATE_OS_GO)
@@ -91,6 +94,17 @@ static int do_bootm_netbsd(int flag, int argc, char * const argv[],
 			os_hdr = hdr;
 	}
 
+	consdev = "";
+#if   defined(CONFIG_8xx_CONS_SMC1)
+	consdev = "smc1";
+#elif defined(CONFIG_8xx_CONS_SMC2)
+	consdev = "smc2";
+#elif defined(CONFIG_8xx_CONS_SCC2)
+	consdev = "scc2";
+#elif defined(CONFIG_8xx_CONS_SCC3)
+	consdev = "scc3";
+#endif
+
 	if (argc > 0) {
 		ulong len;
 		int   i;
@@ -100,7 +114,7 @@ static int do_bootm_netbsd(int flag, int argc, char * const argv[],
 		cmdline = malloc(len);
 		copy_args(cmdline, argc, argv, ' ');
 	} else {
-		cmdline = env_get("bootargs");
+		cmdline = getenv("bootargs");
 		if (cmdline == NULL)
 			cmdline = "";
 	}
@@ -119,7 +133,7 @@ static int do_bootm_netbsd(int flag, int argc, char * const argv[],
 	 *   arg[2]: char pointer to the console device to use
 	 *   arg[3]: char pointer to the boot arguments
 	 */
-	(*loader)(gd->bd, os_hdr, "", cmdline);
+	(*loader)(gd->bd, os_hdr, consdev, cmdline);
 
 	return 1;
 }
@@ -231,14 +245,14 @@ static int do_bootm_plan9(int flag, int argc, char * const argv[],
 #endif
 
 	/* See README.plan9 */
-	s = env_get("confaddr");
+	s = getenv("confaddr");
 	if (s != NULL) {
 		char *confaddr = (char *)simple_strtoul(s, NULL, 16);
 
 		if (argc > 0) {
 			copy_args(confaddr, argc, argv, '\n');
 		} else {
-			s = env_get("bootargs");
+			s = getenv("bootargs");
 			if (s != NULL)
 				strcpy(confaddr, s);
 		}
@@ -264,7 +278,7 @@ static int do_bootm_plan9(int flag, int argc, char * const argv[],
 #if defined(CONFIG_BOOTM_VXWORKS) && \
 	(defined(CONFIG_PPC) || defined(CONFIG_ARM))
 
-static void do_bootvx_fdt(bootm_headers_t *images)
+void do_bootvx_fdt(bootm_headers_t *images)
 {
 #if defined(CONFIG_OF_LIBFDT)
 	int ret;
@@ -280,12 +294,9 @@ static void do_bootvx_fdt(bootm_headers_t *images)
 		if (ret)
 			return;
 
-		/* Update ethernet nodes */
-		fdt_fixup_ethernet(*of_flat_tree);
-
 		ret = fdt_add_subnode(*of_flat_tree, 0, "chosen");
 		if ((ret >= 0 || ret == -FDT_ERR_EXISTS)) {
-			bootline = env_get("bootargs");
+			bootline = getenv("bootargs");
 			if (bootline) {
 				ret = fdt_find_and_setprop(*of_flat_tree,
 						"/chosen", "bootargs",
@@ -321,8 +332,8 @@ static void do_bootvx_fdt(bootm_headers_t *images)
 	puts("## vxWorks terminated\n");
 }
 
-int do_bootm_vxworks(int flag, int argc, char * const argv[],
-		     bootm_headers_t *images)
+static int do_bootm_vxworks(int flag, int argc, char * const argv[],
+			     bootm_headers_t *images)
 {
 	if (flag != BOOTM_STATE_OS_GO)
 		return 0;
@@ -346,7 +357,6 @@ static int do_bootm_qnxelf(int flag, int argc, char * const argv[],
 {
 	char *local_args[2];
 	char str[16];
-	int dcache;
 
 	if (flag != BOOTM_STATE_OS_GO)
 		return 0;
@@ -361,18 +371,7 @@ static int do_bootm_qnxelf(int flag, int argc, char * const argv[],
 	sprintf(str, "%lx", images->ep); /* write entry-point into string */
 	local_args[0] = argv[0];
 	local_args[1] = str;	/* and provide it via the arguments */
-
-	/*
-	 * QNX images require the data cache is disabled.
-	 */
-	dcache = dcache_status();
-	if (dcache)
-		dcache_disable();
-
 	do_bootelf(NULL, 0, 2, local_args);
-
-	if (dcache)
-		dcache_enable();
 
 	return 1;
 }
@@ -411,60 +410,6 @@ static int do_bootm_integrity(int flag, int argc, char * const argv[],
 }
 #endif
 
-#ifdef CONFIG_BOOTM_OPENRTOS
-static int do_bootm_openrtos(int flag, int argc, char * const argv[],
-			   bootm_headers_t *images)
-{
-	void (*entry_point)(void);
-
-	if (flag != BOOTM_STATE_OS_GO)
-		return 0;
-
-	entry_point = (void (*)(void))images->ep;
-
-	printf("## Transferring control to OpenRTOS (at address %08lx) ...\n",
-		(ulong)entry_point);
-
-	bootstage_mark(BOOTSTAGE_ID_RUN_OS);
-
-	/*
-	 * OpenRTOS Parameters:
-	 *   None
-	 */
-	(*entry_point)();
-
-	return 1;
-}
-#endif
-
-#ifdef CONFIG_BOOTM_OPTEE
-static int do_bootm_tee(int flag, int argc, char * const argv[],
-			bootm_headers_t *images)
-{
-	int ret;
-
-	/* Verify OS type */
-	if (images->os.os != IH_OS_TEE) {
-		return 1;
-	};
-
-	/* Validate OPTEE header */
-	ret = optee_verify_bootm_image(images->os.image_start,
-				       images->os.load,
-				       images->os.image_len);
-	if (ret)
-		return ret;
-
-	/* Locate FDT etc */
-	ret = bootm_find_images(flag, argc, argv);
-	if (ret)
-		return ret;
-
-	/* From here we can run the regular linux boot path */
-	return do_bootm_linux(flag, argc, argv, images);
-}
-#endif
-
 static boot_os_fn *boot_os[] = {
 	[IH_OS_U_BOOT] = do_bootm_standalone,
 #ifdef CONFIG_BOOTM_LINUX
@@ -486,7 +431,7 @@ static boot_os_fn *boot_os[] = {
 	[IH_OS_PLAN9] = do_bootm_plan9,
 #endif
 #if defined(CONFIG_BOOTM_VXWORKS) && \
-	(defined(CONFIG_PPC) || defined(CONFIG_ARM) || defined(CONFIG_RISCV))
+	(defined(CONFIG_PPC) || defined(CONFIG_ARM))
 	[IH_OS_VXWORKS] = do_bootm_vxworks,
 #endif
 #if defined(CONFIG_CMD_ELF)
@@ -495,11 +440,8 @@ static boot_os_fn *boot_os[] = {
 #ifdef CONFIG_INTEGRITY
 	[IH_OS_INTEGRITY] = do_bootm_integrity,
 #endif
-#ifdef CONFIG_BOOTM_OPENRTOS
-	[IH_OS_OPENRTOS] = do_bootm_openrtos,
-#endif
-#ifdef CONFIG_BOOTM_OPTEE
-	[IH_OS_TEE] = do_bootm_tee,
+#ifdef CONFIG_ZIRCON_BOOT_IMAGE
+	[IH_OS_ZIRCON] = do_bootm_zircon,
 #endif
 };
 
@@ -509,27 +451,22 @@ __weak void arch_preboot_os(void)
 	/* please define platform specific arch_preboot_os() */
 }
 
-/* Allow for board specific config before we boot */
-__weak void board_preboot_os(void)
-{
-	/* please define board specific board_preboot_os() */
-}
-
 int boot_selected_os(int argc, char * const argv[], int state,
 		     bootm_headers_t *images, boot_os_fn *boot_fn)
 {
 	arch_preboot_os();
-	board_preboot_os();
+	if (boot_fn) {
 	boot_fn(state, argc, argv, images);
+	}
 
 	/* Stand-alone may return when 'autostart' is 'no' */
 	if (images->os.type == IH_TYPE_STANDALONE ||
-	    IS_ENABLED(CONFIG_SANDBOX) ||
 	    state == BOOTM_STATE_OS_FAKE_GO) /* We expect to return */
 		return 0;
 	bootstage_error(BOOTSTAGE_ID_BOOT_OS_RETURNED);
-	debug("\n## Control returned to monitor - resetting...\n");
-
+#ifdef DEBUG
+	puts("\n## Control returned to monitor - resetting...\n");
+#endif
 	return BOOTM_ERR_RESET;
 }
 

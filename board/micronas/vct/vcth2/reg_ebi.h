@@ -1,8 +1,9 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2008 Stefan Roese <sr@denx.de>, DENX Software Engineering
  *
  * Copyright (C) 2006 Micronas GmbH
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _REG_EBI_PREMIUM_H_
@@ -10,7 +11,7 @@
 
 #define EBI_BASE			0x00000000
 
-/*  Relative offsets of the register adresses */
+/*  Relative offsets of the register addresses */
 
 #define EBI_CPU_IO_ACCS_OFFS		0x00000000
 #define EBI_CPU_IO_ACCS(base)		((base) + EBI_CPU_IO_ACCS_OFFS)

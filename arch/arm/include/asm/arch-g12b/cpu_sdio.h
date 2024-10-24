@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12b/cpu_sdio.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __CPU_SDIO_H__
@@ -14,15 +17,36 @@
 #define SDIO_PORT_B 1
 #define SDIO_PORT_C 2
 
+#define	Cfg_div 	0
+#define Cfg_src		6
+#define Cfg_co_phase	8
+#define	Cfg_tx_phase	10
+#define	Cfg_rx_phase	12
+#define	Cfg_sram_pd		14
+#define	Cfg_tx_delay	16
+#define	Cfg_rx_delay	22
+#define	Cfg_always_on	28
+#define	Cfg_irq_sdio_sleep   29
+#define Cfg_irq_sdio_sleep_ds		30
 
-#if 0
 #define	SD_EMMC_RXD_ERROR				1
 #define	SD_EMMC_TXD_ERROR				1<<1
 #define	SD_EMMC_DESC_ERROR				1<<2
 #define	SD_EMMC_RESP_CRC_ERROR			1<<3
 #define	SD_EMMC_RESP_TIMEOUT_ERROR		1<<4
 #define	SD_EMMC_DESC_TIMEOUT_ERROR		1<<5
-#endif
+
+#define MMC_HS_COPHASE			3
+#define MMC_DDR_COPHASE			2
+#define MMC_HS2_COPHASE         2
+#define MMC_HS4_COPHASE         0
+#define MMC_HS400_TXDELAY		16
+#define CLKSRC_BASE            0Xff63c000
+
+//#define MMC_CMD23
+//#define MMC_HS400_MODE
+//#define MMC_SET_TUNING_PARA             //set tuning para directly without tuning
+//#define MMC_WRITE_TUNING_PARA           //write tuning para in 0x14400
 
 struct sd_emmc_global_regs {
     volatile uint32_t gclock;     // 0x00
@@ -30,7 +54,14 @@ struct sd_emmc_global_regs {
 	volatile uint32_t gdelay1;    //0x08
     volatile uint32_t gadjust;    // 0x0c
     volatile uint32_t gcalout;    // 0x10
-    volatile uint32_t reserved_14[11];   // 0x14~0x3c
+	volatile uint32_t reserved_14[4];   // 0x14~0x20
+	volatile uint32_t gclktest_log;   // 0x24
+	volatile uint32_t gclktest_out;   // 0x28
+	volatile uint32_t geyetest_log;   // 0x2c
+	volatile uint32_t geyetest_out0;   // 0x30
+	volatile uint32_t geyetest_out1;   // 0x34
+	volatile uint32_t gintf3;   // 0x38
+	volatile uint32_t reserved_3c;   // 0x3c
     volatile uint32_t gstart;     // 0x40
     volatile uint32_t gcfg;       // 0x44
     volatile uint32_t gstatus;    // 0x48
@@ -57,6 +88,51 @@ struct sd_emmc_global_regs {
     volatile uint32_t gdesc[128]; // 0x200
     volatile uint32_t gping[128]; // 0x400
     volatile uint32_t gpong[128]; // 0x800
+};
+
+struct sd_emmc_adjust_v3 {
+	u32 reserved8:8;
+	/*[11:8]	  Select one signal to be tested.*/
+	u32 cali_sel:4;
+	/*[12]		Enable calibration. */
+	u32 cali_enable:1;
+	/*[13]	   Adjust interface timing
+	 *by resampling the input signals.
+	 */
+	u32 adj_enable:1;
+	/*[14]	   1: test the rising edge.
+	 *0: test the falling edge.
+	 */
+	u32 cali_rise:1;
+	/*[15]	   1: Sampling the DAT based on DS in HS400 mode.
+	 *0: Sampling the DAT based on RXCLK.
+	 */
+	u32 ds_enable:1;
+	/*[21:16]	   Resample the input signals
+	 *when clock index==adj_delay.
+	 */
+	u32 adj_delay:6;
+	/*[22]	   1: Use cali_dut first falling edge to adjust
+	 *	the timing, set cali_enable to 1 to use this function.
+	 *0: no use adj auto.
+	 */
+	u32 adj_auto:1;
+	u32 reserved22:9;
+};
+
+struct intf3 {
+	u32 clktest_exp:5;
+	u32 clktest_on_m:1;
+	u32 eyetest_exp:5;
+	u32 eyetest_on:1;
+	u32 ds_sht_m:6;
+	u32 ds_sht_exp:4;
+	u32 sd_intf3:1;
+};
+
+struct eyetest_log {
+	u32 eyetest_times:31;
+	u32 eyetest_done:1;
 };
 
 union sd_emmc_setup {
@@ -102,7 +178,7 @@ struct cmd_cfg{
 struct sd_emmc_status{
 	uint32_t rxd_err:8;      /*[7:0]     RX data CRC error per wire, for multiple block read, the CRC errors are ORed together.*/
 	uint32_t txd_err:1;      /*[8]       TX data CRC error, for multiple block write, any one of blocks CRC error. */
-	uint32_t desc_err:1;     /*[9]       SD/eMMC controller doesn¡¯t own descriptor. The owner bit is ¡°0¡±, set cfg_ignore_owner to ignore this error.*/
+	uint32_t desc_err:1;     /*[9]       SD/eMMC controller doesn't own descriptor. The owner bit is '0', set cfg_ignore_owner to ignore this error.*/
 	uint32_t resp_err:1;     /*[10]      Response CRC error.*/
 	uint32_t resp_timeout:1; /*[11]      No response received before time limit. The timeout limit is set by cfg_resp_timeout.*/
 	uint32_t desc_timeout:1; /*[12]      Descriptor execution time over time limit. The timeout limit is set by descriptor itself.*/
@@ -201,7 +277,7 @@ struct sd_emmc_config{
 	uint32_t out_fall:1;     /*[16]      DDR mode only. The command and TXD start from rising edge. Set 1 to start from falling edge. */
 	uint32_t blk_gap_ip:1;   /*[17]      1: Enable SDIO data block gap interrupt period. 0: Disabled.*/
 	uint32_t spare:1;        /*[18]      Spare,  ??? need check*/
-	uint32_t ignore_owner:1; /*[19]      Use this descriptor even if its owner bit is ¡°0¡±.*/
+	uint32_t ignore_owner:1; /*[19]      Use this descriptor even if its owner bit is '0'.*/
 	uint32_t chk_ds:1;       /*[20]      Check data strobe in HS400.*/
 	uint32_t cmd_low:1;      /*[21]      Hold CMD as output Low, eMMC boot mode.*/
 	uint32_t stop_clk:1;     /*[22]      1: stop clock. 0: normal clock.*/
@@ -212,7 +288,7 @@ struct sd_emmc_config{
     uint32_t txd_add_err:1;	/*[24]   	TXD add error test*/
 							/*Test feature, should not be used in normal condition.*/
 							/*It will inverted the first CRC bits of the 3rd block.*/
-							/*Block index starts from 0, 1, 2, ¡­*/
+							/*Block index starts from 0, 1, 2, */
     uint32_t txd_retry:1;	/*[25]   	When TXD CRC error, host sends the block again.*/
 							/*The total number of retries of one descriptor is limited to 15, */
 							/*after 15 retries, the TXD_err is set to high.*/
@@ -223,7 +299,7 @@ struct sd_emmc_config{
 struct sd_emmc_irq_en{
 	uint32_t rxd_err:8;      /*[7:0]     RX data CRC error per wire.*/
 	uint32_t txd_err:1;      /*[8]       TX data CRC error. */
-	uint32_t desc_err:1;     /*[9]       SD/eMMC controller doesn¡¯t own descriptor. */
+	uint32_t desc_err:1;     /*[9]       SD/eMMC controller doesn't own descriptor. */
 	uint32_t resp_err:1;     /*[10]      Response CRC error.*/
 	uint32_t resp_timeout:1; /*[11]      No response received before time limit. */
 	uint32_t desc_timeout:1; /*[12]      Descriptor execution time over time limit. */

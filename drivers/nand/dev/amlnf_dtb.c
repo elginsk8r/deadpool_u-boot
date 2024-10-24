@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/dev/amlnf_dtb.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../include/phynand.h"
@@ -33,7 +36,7 @@ int amlnf_dtb_save(u8 *buf, int len)
 	}
 
 	if (len > aml_chip_dtb->dtbsize) {
-		aml_nand_msg("warnning!!! %s: length too much", __func__);
+		aml_nand_msg("warning!!! %s: length too much", __func__);
 		len = aml_chip_dtb->dtbsize;
 		/*return -EFAULT;*/
 	}
@@ -59,7 +62,7 @@ int amlnf_dtb_save(u8 *buf, int len)
 exit_err:
 	if (dtb_buf) {
 		/* kfree(dtb_buf); */
-		kfree(dtb_buf);
+		aml_nand_free(dtb_buf);
 		dtb_buf = NULL;
 	}
 	return ret;
@@ -78,8 +81,6 @@ int amlnf_dtb_erase(void)
 	if (ret) {
 		aml_nand_msg("dtb error,%s", __func__);
 		ret = -EFAULT;
-	} else {
-		aml_nand_msg("dtb erase success");
 	}
 	return ret;
 }
@@ -92,7 +93,7 @@ int amlnf_dtb_read(u8 *buf, int len)
 	aml_nand_msg("%s: ####", __func__);
 
 	if (len > aml_chip_dtb->dtbsize) {
-		aml_nand_msg("warnning!!! %s dtd length too much", __func__);
+		aml_nand_msg("warning!!! %s dtd length too much", __func__);
 		len = aml_chip_dtb->dtbsize;
 		/*return -EFAULT;*/
 	}
@@ -131,7 +132,7 @@ int amlnf_dtb_read(u8 *buf, int len)
 exit_err:
 	if (dtb_buf) {
 		/* kfree(dtb_buf); */
-		kfree(dtb_buf);
+		aml_nand_free(dtb_buf);
 		dtb_buf = NULL;
 	}
 	return ret;
@@ -367,7 +368,7 @@ int amlnf_dtb_init(struct amlnand_chip *aml_chip)
 
 	aml_nand_dbg("%s: register dtd cdev OK", __func__);
 
-	kfree(dtb_buf);
+	aml_nand_free(dtb_buf);
 	dtb_buf = NULL;
 
 	return ret;
@@ -383,7 +384,7 @@ exit_err1:
 #endif /* AML_NAND_UBOOT */
 exit_err:
 	if (dtb_buf) {
-		kfree(dtb_buf);
+		aml_nand_free(dtb_buf);
 		dtb_buf = NULL;
 	}
 	return ret;
@@ -421,7 +422,7 @@ int amlnf_dtb_init_partitions(struct amlnand_chip *aml_chip)
 	}
 exit_err:
 	if (dtb_buf) {
-		kfree(dtb_buf);
+		aml_nand_free(dtb_buf);
 		dtb_buf = NULL;
 	}
 	return ret;
@@ -475,47 +476,4 @@ exit_err:
 	}
 	return ret;
 }
-
-/* for blank positions... */
-int aml_nand_update_dtb(struct amlnand_chip *aml_chip, char *dtb_ptr)
-{
-	int ret = 0;
-	char malloc_flag = 0;
-	char *dtb_buf = NULL;
-	struct nand_flash *flash = &aml_chip->flash;
-
-	if (dtb_buf == NULL) {
-		dtb_buf = kzalloc(aml_chip_dtb->dtbsize + flash->pagesize, GFP_KERNEL);
-		malloc_flag = 1;
-		if (dtb_buf == NULL)
-			return -ENOMEM;
-		memset(dtb_buf, 0, aml_chip_dtb->dtbsize);
-		ret = amlnand_read_info_by_name(aml_chip,
-			(u8 *)&(aml_chip->amlnf_dtb),
-			(u8 *)dtb_buf,
-			(u8 *)DTD_INFO_HEAD_MAGIC,
-			aml_chip_dtb->dtbsize);
-		if (ret) {
-			aml_nand_msg("read dtb error,%s\n", __func__);
-			ret = -EFAULT;
-			goto exit;
-		}
-	} else
-		dtb_buf = dtb_ptr;
-
-	ret = amlnand_save_info_by_name(aml_chip,
-		(u8 *)&(aml_chip->amlnf_dtb),
-		(u8 *)dtb_buf,
-		(u8 *)DTD_INFO_HEAD_MAGIC,
-		aml_chip_dtb->dtbsize);
-	if (ret < 0)
-		aml_nand_msg("%s: update failed", __func__);
-exit:
-	if (malloc_flag && (dtb_buf)) {
-		kfree(dtb_buf);
-		dtb_buf = NULL;
-	}
-	return 0;
-}
-
 

@@ -4,9 +4,9 @@
  */
 
 #include <common.h>
-#include <log.h>
 #include <tee.h>
 #include <linux/types.h>
+#include <errno.h>
 
 #include "optee_msg.h"
 #include "optee_msg_supplicant.h"
@@ -82,8 +82,8 @@ void optee_suppl_cmd(struct udevice *dev, struct tee_shm *shm_arg,
 		cmd_shm_free(arg);
 		break;
 	case OPTEE_MSG_RPC_CMD_FS:
-		debug("REE FS storage isn't available\n");
-		arg->ret = TEE_ERROR_STORAGE_NOT_AVAILABLE;
+		debug("OPTEE_MSG_RPC_CMD_FS not implemented\n");
+		arg->ret = TEE_ERROR_NOT_IMPLEMENTED;
 		break;
 	case OPTEE_MSG_RPC_CMD_RPMB:
 		optee_suppl_cmd_rpmb(dev, arg);

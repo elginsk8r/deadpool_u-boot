@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_sdc_burn/optimus_led.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../v2_burning_i.h"
@@ -65,7 +68,7 @@ static int optimus_pwm_led_show_state(OptimusLedStates_e ledState)
             }
             break;
         default:
-            DWN_ERR("invlaid pwm state %d\n", ledState);
+		DWN_ERR("invalid pwm state %d\n", ledState);
             return __LINE__;
     }
 

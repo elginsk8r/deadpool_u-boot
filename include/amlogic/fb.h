@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/amlogic/fb.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef _LINUX_FB_H
@@ -48,7 +51,7 @@
 #define FB_AUX_TEXT_MDA		0	/* Monochrome text */
 #define FB_AUX_TEXT_CGA		1	/* CGA/EGA/VGA Color text */
 #define FB_AUX_TEXT_S3_MMIO	2	/* S3 MMIO fasttext */
-#define FB_AUX_TEXT_MGA_STEP16	3	/* MGA Millenium I: text, attr, 14 reserved bytes */
+#define FB_AUX_TEXT_MGA_STEP16	3	/* MGA Millennium I: text, attr, 14 reserved bytes */
 #define FB_AUX_TEXT_MGA_STEP8	4	/* other MGAs:      text, attr,  6 reserved bytes */
 #define FB_AUX_TEXT_SVGA_GROUP	8	/* 8-15: SVGA tileblit compatible modes */
 #define FB_AUX_TEXT_SVGA_MASK	7	/* lower three bits says step */
@@ -85,11 +88,11 @@
 #define FB_ACCEL_SUN_LEO	13	/* Sun leo/zx			*/
 #define FB_ACCEL_IMS_TWINTURBO	14	/* IMS Twin Turbo		*/
 #define FB_ACCEL_3DLABS_PERMEDIA2 15	/* 3Dlabs Permedia 2		*/
-#define FB_ACCEL_MATROX_MGA2064W 16	/* Matrox MGA2064W (Millenium)	*/
+#define FB_ACCEL_MATROX_MGA2064W 16	/* Matrox MGA2064W (Millennium)	*/
 #define FB_ACCEL_MATROX_MGA1064SG 17	/* Matrox MGA1064SG (Mystique)	*/
-#define FB_ACCEL_MATROX_MGA2164W 18	/* Matrox MGA2164W (Millenium II) */
-#define FB_ACCEL_MATROX_MGA2164W_AGP 19	/* Matrox MGA2164W (Millenium II) */
-#define FB_ACCEL_MATROX_MGAG100	20	/* Matrox G100 (Productiva G100) */
+#define FB_ACCEL_MATROX_MGA2164W 18	/* Matrox MGA2164W (Millennium II) */
+#define FB_ACCEL_MATROX_MGA2164W_AGP 19	/* Matrox MGA2164W (Millennium II) */
+#define FB_ACCEL_MATROX_MGAG100	20	/* Matrox G100 (Productive G100) */
 #define FB_ACCEL_MATROX_MGAG200	21	/* Matrox G200 (Myst, Mill, ...) */
 #define FB_ACCEL_SUN_CG14	22	/* Sun cgfourteen		 */
 #define FB_ACCEL_SUN_BWTWO	23	/* Sun bwtwo			*/
@@ -292,8 +295,6 @@ struct fb_con2fbmap {
 #define VESA_VSYNC_SUSPEND      1
 #define VESA_HSYNC_SUSPEND      2
 #define VESA_POWERDOWN          3
-
-#define CANVAS_ALIGNED(x)  (((x) + 63) & ~63)
 
 enum osd_index_e {
 	OSD1 = 0,

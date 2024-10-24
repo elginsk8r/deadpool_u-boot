@@ -325,7 +325,7 @@ struct optee_msg_arg {
  * struct optee_msg_arg::arg holds values defined by OPTEE_MSG_RPC_CMD_* below
  *
  * RPC communication with tee-supplicant is reversed compared to normal
- * client communication desribed above. The supplicant receives requests
+ * client communication described above. The supplicant receives requests
  * and sends responses.
  */
 

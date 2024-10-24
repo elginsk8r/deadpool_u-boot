@@ -1,31 +1,39 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <config.h>
 #include <errno.h>
 #include <common.h>
-#include <mapmem.h>
 #include <part.h>
 #include <ext4fs.h>
 #include <fat.h>
 #include <fs.h>
 #include <sandboxfs.h>
-#include <ubifs_uboot.h>
-#include <btrfs.h>
 #include <asm/io.h>
 #include <div64.h>
 #include <linux/math64.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
-static struct blk_desc *fs_dev_desc;
+static block_dev_desc_t *fs_dev_desc;
 static int fs_dev_part;
 static disk_partition_t fs_partition;
 static int fs_type = FS_TYPE_ANY;
 
-static inline int fs_probe_unsupported(struct blk_desc *fs_dev_desc,
+static inline int fs_probe_unsupported(block_dev_desc_t *fs_dev_desc,
 				      disk_partition_t *fs_partition)
 {
 	printf("** Unrecognized filesystem type **\n");
@@ -122,12 +130,12 @@ struct fstype_info {
 	 * Is it legal to pass NULL as .probe()'s  fs_dev_desc parameter? This
 	 * should be false in most cases. For "virtual" filesystems which
 	 * aren't based on a U-Boot block device (e.g. sandbox), this can be
-	 * set to true. This should also be true for the dummy entry at the end
+	 * set to true. This should also be true for the dumm entry at the end
 	 * of fstypes[], since that is essentially a "virtual" (non-existent)
 	 * filesystem.
 	 */
 	bool null_dev_desc_ok;
-	int (*probe)(struct blk_desc *fs_dev_desc,
+	int (*probe)(block_dev_desc_t *fs_dev_desc,
 		     disk_partition_t *fs_partition);
 	int (*ls)(const char *dirname);
 	int (*exists)(const char *filename);
@@ -153,7 +161,6 @@ struct fstype_info {
 	/* see fs_closedir() */
 	void (*closedir)(struct fs_dir_stream *dirs);
 	int (*unlink)(const char *filename);
-	int (*mkdir)(const char *dirname);
 };
 
 static struct fstype_info fstypes[] = {
@@ -171,11 +178,9 @@ static struct fstype_info fstypes[] = {
 #ifdef CONFIG_FAT_WRITE
 		.write = file_fat_write,
 		.unlink = fat_unlink,
-		.mkdir = fat_mkdir,
 #else
 		.write = fs_write_unsupported,
 		.unlink = fs_unlink_unsupported,
-		.mkdir = fs_mkdir_unsupported,
 #endif
 		.uuid = fs_uuid_unsupported,
 		.opendir = fat_opendir,
@@ -202,7 +207,7 @@ static struct fstype_info fstypes[] = {
 		.uuid = ext4fs_uuid,
 		.opendir = fs_opendir_unsupported,
 		.unlink = fs_unlink_unsupported,
-		.mkdir = fs_mkdir_unsupported,
+		//.mkdir = fs_mkdir_unsupported,
 	},
 #endif
 #ifdef CONFIG_SANDBOX
@@ -220,43 +225,7 @@ static struct fstype_info fstypes[] = {
 		.uuid = fs_uuid_unsupported,
 		.opendir = fs_opendir_unsupported,
 		.unlink = fs_unlink_unsupported,
-		.mkdir = fs_mkdir_unsupported,
-	},
-#endif
-#ifdef CONFIG_CMD_UBIFS
-	{
-		.fstype = FS_TYPE_UBIFS,
-		.name = "ubifs",
-		.null_dev_desc_ok = true,
-		.probe = ubifs_set_blk_dev,
-		.close = ubifs_close,
-		.ls = ubifs_ls,
-		.exists = ubifs_exists,
-		.size = ubifs_size,
-		.read = ubifs_read,
-		.write = fs_write_unsupported,
-		.uuid = fs_uuid_unsupported,
-		.opendir = fs_opendir_unsupported,
-		.unlink = fs_unlink_unsupported,
-		.mkdir = fs_mkdir_unsupported,
-	},
-#endif
-#ifdef CONFIG_FS_BTRFS
-	{
-		.fstype = FS_TYPE_BTRFS,
-		.name = "btrfs",
-		.null_dev_desc_ok = false,
-		.probe = btrfs_probe,
-		.close = btrfs_close,
-		.ls = btrfs_ls,
-		.exists = btrfs_exists,
-		.size = btrfs_size,
-		.read = btrfs_read,
-		.write = fs_write_unsupported,
-		.uuid = btrfs_uuid,
-		.opendir = fs_opendir_unsupported,
-		.unlink = fs_unlink_unsupported,
-		.mkdir = fs_mkdir_unsupported,
+		//.mkdir = fs_mkdir_unsupported,
 	},
 #endif
 	{
@@ -273,7 +242,7 @@ static struct fstype_info fstypes[] = {
 		.uuid = fs_uuid_unsupported,
 		.opendir = fs_opendir_unsupported,
 		.unlink = fs_unlink_unsupported,
-		.mkdir = fs_mkdir_unsupported,
+		//.mkdir = fs_mkdir_unsupported,
 	},
 };
 
@@ -314,7 +283,6 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype)
 	if (!relocated) {
 		for (i = 0, info = fstypes; i < ARRAY_SIZE(fstypes);
 				i++, info++) {
-			info->name += gd->reloc_off;
 			info->probe += gd->reloc_off;
 			info->close += gd->reloc_off;
 			info->ls += gd->reloc_off;
@@ -325,7 +293,7 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype)
 	}
 #endif
 
-	part = blk_get_device_part_str(ifname, dev_part_str, &fs_dev_desc,
+	part = get_device_and_partition(ifname, dev_part_str, &fs_dev_desc,
 					&fs_partition, 1);
 	if (part < 0)
 		return -1;
@@ -348,16 +316,83 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype)
 	return -1;
 }
 
+/* size and offset should by in bytes, eg:
+ * fs_set_blk_dev_by_off("mmc", "1:2", FS_TYPE_EXT, 0x04000000, 0x20000000);
+ */
+int fs_set_blk_dev_by_off(const char *ifname,
+			  const char *dev_part_str,
+			  int fstype,
+			  unsigned long offset,
+			  unsigned long size)
+{
+	struct fstype_info *info;
+	int part, i;
+#ifdef CONFIG_NEEDS_MANUAL_RELOC
+	static int relocated;
+
+	if (!relocated) {
+		for (i = 0, info = fstypes; i < ARRAY_SIZE(fstypes);
+				i++, info++) {
+			info->probe += gd->reloc_off;
+			info->close += gd->reloc_off;
+			info->ls += gd->reloc_off;
+			info->read += gd->reloc_off;
+			info->write += gd->reloc_off;
+		}
+		relocated = 1;
+	}
+#endif
+
+	part = get_device_and_partition(ifname, dev_part_str, &fs_dev_desc,
+					&fs_partition, 1);
+	if (part < 0) {
+		if (fs_dev_desc) { /* manual initialized */
+			printf("%s, %d\n", __func__, __LINE__);
+			fs_partition.start = offset / fs_dev_desc->blksz;
+			fs_partition.size  = size / fs_dev_desc->blksz;
+			fs_partition.blksz = fs_dev_desc->blksz;
+			/*  strcpy((char *)info->name, get_part_name(part, num)); */
+		} else {
+			printf("%s, %d\n", __func__, __LINE__);
+			return -1;
+		}
+	} else {
+		printf("%s, %d\n", __func__, __LINE__);
+		fs_partition.start = offset / fs_dev_desc->blksz;
+		fs_partition.size  = size / fs_dev_desc->blksz;
+		fs_partition.blksz = fs_dev_desc->blksz;
+	}
+
+	for (i = 0, info = fstypes; i < ARRAY_SIZE(fstypes); i++, info++) {
+		if (fstype != FS_TYPE_ANY && info->fstype != FS_TYPE_ANY &&
+				fstype != info->fstype)
+			continue;
+
+		if (!fs_dev_desc && !info->null_dev_desc_ok)
+			continue;
+
+		if (!info->probe(fs_dev_desc, &fs_partition)) {
+			fs_type = info->fstype;
+			fs_dev_part = part;
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
 /* set current blk device w/ blk_desc + partition # */
-int fs_set_blk_dev_with_part(struct blk_desc *desc, int part)
+int fs_set_blk_dev_with_part(block_dev_desc_t *desc, int part)
 {
 	struct fstype_info *info;
 	int ret, i;
 
 	if (part >= 1)
-		ret = part_get_info(desc, part, &fs_partition);
+		ret = get_partition_info(desc, part, &fs_partition);
+
 	else
-		ret = part_get_info_whole_disk(desc, &fs_partition);
+		ret = get_partition_info_whole_disk(desc, &fs_partition);
+
 	if (ret)
 		return ret;
 	fs_dev_desc = desc;
@@ -372,7 +407,6 @@ int fs_set_blk_dev_with_part(struct blk_desc *desc, int part)
 
 	return -1;
 }
-
 static void fs_close(void)
 {
 	struct fstype_info *info = fs_get_info(fs_type);
@@ -489,8 +523,10 @@ static int _fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
 	unmap_sysmem(buf);
 
 	/* If we requested a specific number of bytes, check we got it */
-	if (ret == 0 && len && *actread != len)
-		debug("** %s shorter than offset + len **\n", filename);
+	if (ret == 0 && len && *actread != len) {
+		printf("** Unable to read file %s **\n", filename);
+		ret = -1;
+	}
 	fs_close();
 
 	return ret;
@@ -588,20 +624,6 @@ int fs_unlink(const char *filename)
 	return ret;
 }
 
-int fs_mkdir(const char *dirname)
-{
-	int ret;
-
-	struct fstype_info *info = fs_get_info(fs_type);
-
-	ret = info->mkdir(dirname);
-
-	fs_type = FS_TYPE_ANY;
-	fs_close();
-
-	return ret;
-}
-
 int do_size(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		int fstype)
 {
@@ -616,7 +638,7 @@ int do_size(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	if (fs_size(argv[3], &size) < 0)
 		return CMD_RET_FAILURE;
 
-	env_set_hex("filesize", size);
+	setenv_hex("filesize", size);
 
 	return 0;
 }
@@ -647,7 +669,7 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		if (ep == argv[3] || *ep != '\0')
 			return CMD_RET_USAGE;
 	} else {
-		addr_str = env_get("loadaddr");
+		addr_str = getenv("loadaddr");
 		if (addr_str != NULL)
 			addr = simple_strtoul(addr_str, NULL, 16);
 		else
@@ -656,7 +678,7 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	if (argc >= 5) {
 		filename = argv[4];
 	} else {
-		filename = env_get("bootfile");
+		filename = getenv("bootfile");
 		if (!filename) {
 			puts("** No boot file defined **\n");
 			return 1;
@@ -677,6 +699,8 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	if (ret < 0)
 		return 1;
 
+	flush_dcache_range((unsigned long )addr, (unsigned long )addr+len_read);
+
 	printf("%llu bytes read in %lu ms", len_read, time);
 	if (time > 0) {
 		puts(" (");
@@ -685,8 +709,7 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	}
 	puts("\n");
 
-	env_set_hex("fileaddr", addr);
-	env_set_hex("filesize", len_read);
+	setenv_hex("filesize", len_read);
 
 	return 0;
 }
@@ -777,7 +800,7 @@ int do_fs_uuid(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		return CMD_RET_FAILURE;
 
 	if (argc == 4)
-		env_set(argv[3], uuid);
+		setenv(argv[3], uuid);
 	else
 		printf("%s\n", uuid);
 
@@ -797,9 +820,9 @@ int do_fs_type(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	info = fs_get_info(fs_type);
 
 	if (argc == 4)
-		env_set(argv[3], info->name);
+		setenv(argv[3], info->name);
 	else
-		printf("%s\n", info->name);
+		setenv("%s\n", info->name);
 
 	return CMD_RET_SUCCESS;
 }
@@ -815,26 +838,6 @@ int do_rm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 
 	if (fs_unlink(argv[3]))
 		return 1;
-
-	return 0;
-}
-
-int do_mkdir(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-	     int fstype)
-{
-	int ret;
-
-	if (argc != 4)
-		return CMD_RET_USAGE;
-
-	if (fs_set_blk_dev(argv[1], argv[2], fstype))
-		return 1;
-
-	ret = fs_mkdir(argv[3]);
-	if (ret) {
-		printf("** Unable to create a directory \"%s\" **\n", argv[3]);
-		return 1;
-	}
 
 	return 0;
 }

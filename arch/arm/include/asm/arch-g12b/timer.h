@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12b/timer.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __TIMER_H
@@ -21,5 +24,13 @@ uint32_t get_time(void);
  * @param us            Number of microseconds to delay.
  */
 void _udelay(unsigned int us);
+
+void TE_time(const char *szInfo);
+
+#if defined(BL33_BOOT_TIME_PROBE)
+	#define TE TE_time
+#else
+	#define TE(...)
+#endif
 
 #endif /* __TIMER_H */

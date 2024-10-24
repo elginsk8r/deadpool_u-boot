@@ -8,6 +8,21 @@
 #include <dm/device-internal.h>
 #include <dm/uclass-internal.h>
 #include <tee.h>
+#include <errno.h>
+#include <malloc.h>
+#include <linux/arm-smccc.h>
+#include "optee/optee_smc.h"
+
+#define SHM_NUM    16
+
+static unsigned long shm_start;
+static unsigned long shm_size;
+static unsigned long shm_buffer;
+
+struct shm_malloc {
+	bool flag; // 1 used
+	u32 addr;
+} shm_malc[SHM_NUM];
 
 /**
  * struct tee_uclass_priv - information of a TEE, stored by the uclass
@@ -46,21 +61,45 @@ int tee_invoke_func(struct udevice *dev, struct tee_invoke_arg *arg,
 	return tee_get_ops(dev)->invoke_func(dev, arg, num_param, param);
 }
 
+static u32 shm_alloc(void)
+{
+	int i = 0;
+
+	for (i = 0; i < SHM_NUM; i++) {
+		if (i == SHM_NUM)
+			return -EFAULT;
+		if (shm_malc[i].flag == 0)
+			break;
+	}
+
+	shm_malc[i].flag = 1;
+
+	return shm_malc[i].addr;
+}
+
+static void shm_free(unsigned long addr)
+{
+	u32 i = 0;
+
+	i = (addr - shm_start) / shm_buffer;
+	shm_malc[i].flag = 0;
+}
+
 int __tee_shm_add(struct udevice *dev, ulong align, void *addr, ulong size,
 		  u32 flags, struct tee_shm **shmp)
 {
 	struct tee_shm *shm;
 	void *p = addr;
 	int rc;
+	u32 shm_addr = shm_alloc();
 
-	if (flags & TEE_SHM_ALLOC) {
-		if (align)
-			p = memalign(align, size);
-		else
-			p = malloc(size);
-	}
-	if (!p)
+	if (flags & TEE_SHM_ALLOC)
+		p = map_sysmem(shm_addr, shm_buffer);
+
+	if (!p) {
+		shm_free(shm_addr);
 		return -ENOMEM;
+	}
 
 	shm = calloc(1, sizeof(*shm));
 	if (!shm) {
@@ -91,7 +130,7 @@ int __tee_shm_add(struct udevice *dev, ulong align, void *addr, ulong size,
 err:
 	free(shm);
 	if (flags & TEE_SHM_ALLOC)
-		free(p);
+		shm_free(shm_addr);
 
 	return rc;
 }
@@ -101,7 +140,7 @@ int tee_shm_alloc(struct udevice *dev, ulong size, u32 flags,
 {
 	u32 f = flags;
 
-	f |= TEE_SHM_SEC_REGISTER | TEE_SHM_REGISTER | TEE_SHM_ALLOC;
+	f |= TEE_SHM_REGISTER | TEE_SHM_ALLOC;
 
 	return __tee_shm_add(dev, 0, NULL, size, f, shmp);
 }
@@ -128,7 +167,7 @@ void tee_shm_free(struct tee_shm *shm)
 		list_del(&shm->link);
 
 	if (shm->flags & TEE_SHM_ALLOC)
-		free(shm->addr);
+		shm_free((unsigned long)shm->addr);
 
 	free(shm);
 }
@@ -156,11 +195,11 @@ struct udevice *tee_find_device(struct udevice *start,
 	struct tee_version_data *v = vers ? vers : &lv;
 
 	if (!dev)
-		uclass_find_first_device(UCLASS_TEE, &dev);
+		uclass_first_device(UCLASS_TEE, &dev);
 	else
-		uclass_find_next_device(&dev);
+		uclass_next_device(&dev);
 
-	for (; dev; uclass_find_next_device(&dev)) {
+	for (; dev; uclass_next_device(&dev)) {
 		if (device_probe(dev))
 			continue;
 		tee_get_ops(dev)->get_version(dev, v);
@@ -173,9 +212,23 @@ struct udevice *tee_find_device(struct udevice *start,
 
 static int tee_pre_probe(struct udevice *dev)
 {
+	int i = 0, j = SHM_NUM;
 	struct tee_uclass_priv *priv = dev_get_uclass_priv(dev);
+	struct arm_smccc_res res;
 
 	INIT_LIST_HEAD(&priv->list_shm);
+
+	arm_smccc_smc(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0,
+		  &res);
+
+	shm_start = res.a1;
+	shm_size = res.a2;
+	shm_buffer = shm_size / j;
+
+	for (i = 0; i < SHM_NUM; i++) {
+		shm_malc[i].flag = 0;
+		shm_malc[i].addr = shm_start + i * shm_buffer;
+	}
 
 	return 0;
 }
@@ -204,7 +257,7 @@ UCLASS_DRIVER(tee) = {
 	.id = UCLASS_TEE,
 	.name = "tee",
 	.per_device_auto_alloc_size = sizeof(struct tee_uclass_priv),
-	.pre_probe = tee_pre_probe,
+	.post_probe = tee_pre_probe,
 	.pre_remove = tee_pre_remove,
 };
 

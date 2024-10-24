@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  *
  * (C) Copyright 2009 Magnus Lilja <lilja.magnus@gmail.com>
  *
  * (c) 2007 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 
@@ -72,7 +73,7 @@ int board_early_init_f(void)
 
 int board_init(void)
 {
-	/* adress of boot parameters */
+	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM_1 + 0x100;
 
 	return 0;

@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/nand/include/hw_ctrl.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __HW_CTRL_H__
 #define __HW_CTRL_H__
-
-#include "amlnf_dev.h"
 
 #ifndef AML_NAND_UBOOT
 #include <linux/types.h>

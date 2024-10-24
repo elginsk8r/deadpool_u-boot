@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/amlogic/aml_tlv.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #ifndef __AMLOGIC_TLV_H_
@@ -19,7 +22,7 @@ typedef struct __s_bl2_to_bl3x_hdr_t{
 	unsigned    int    nMagic;         //magic for identify itself, AML_BL2_TMASTER_MAGIC (@BL2)
 	unsigned    int    nVersion;       //version for control
 	unsigned    int    nHeadSize;      //sizeof(this)
-	unsigned    char   szRserved1[4];  //reserved for furture
+	unsigned    char   szRserved1[4];  //reserved for future
 
 	unsigned    char   szBL2Info[96];  //BL2 build information
 

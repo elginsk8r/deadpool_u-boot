@@ -7,13 +7,12 @@
 #define __OPTEE_PRIVATE_H
 
 #include <tee.h>
-#include <log.h>
 
 /**
  * struct optee_private - OP-TEE driver private data
  * @rpmb_mmc:		mmc device for the RPMB partition
  * @rpmb_dev_id:	mmc device id matching @rpmb_mmc
- * @rpmb_original_part:	the previosly active partition on the mmc device,
+ * @rpmb_original_part:	the previously active partition on the mmc device,
  *			used to restore active the partition when the RPMB
  *			accesses are finished
  */

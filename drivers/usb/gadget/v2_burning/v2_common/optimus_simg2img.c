@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_common/optimus_simg2img.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../v2_burning_i.h"
@@ -30,7 +33,7 @@ static struct
     u32      notWrBackSz4LongChunk;
     u32      nextFlashAddr4LastLongChunk; //flash start Addr not write back chunk data , in sector
 
-    //back up infomation for verify
+    //back up information for verify
     u32      chunkInfoBackAddr;//file header and chunk info back address
     u32      backChunkNum;      //chunk number backed
     u64      chunkOffset;
@@ -211,21 +214,22 @@ int optimus_simg_to_media(char* simgPktHead, const u32 pktLen, u32* unParsedData
                             sperr("error FILL chunk\n");
                             return -__LINE__;
                     }
-                    switch (store_get_type()) {
-                            case BOOT_EMMC:
-                            case BOOT_SD:
+                    switch (device_boot_flag) {
+                            case EMMC_BOOT_FLAG:
+                            case SPI_EMMC_FLAG:
                                     _NeedFillAsNotErasedYet = (fillVal != 0);
                                     break;
 
-                            case BOOT_NAND_NFTL:
+                            case NAND_BOOT_FLAG:
+                            case SPI_NAND_FLAG:
                                     _NeedFillAsNotErasedYet = (fillVal != 0XFFFFFFFFU);
                                     break;
                             default:
                                     _NeedFillAsNotErasedYet = 1;
                                     break;
                     }
-                    //for, emmc, if fillVal is 0, then _NeedFillAsNotErasedYet = false if "disk_inital > 0"
-                    if (!_NeedFillAsNotErasedYet)_NeedFillAsNotErasedYet = (is_optimus_storage_inited()>>16) == 0;// == 0 means 'disk_inital 0'
+                    //for, emmc, if fillVal is 0, then _NeedFillAsNotErasedYet = false if "disk_initial > 0"
+                    if (!_NeedFillAsNotErasedYet)_NeedFillAsNotErasedYet = (is_optimus_storage_inited()>>16) == 0;// == 0 means 'disk_initial 0'
 
                     if (_NeedFillAsNotErasedYet)
                     {
@@ -422,7 +426,7 @@ U_BOOT_CMD(
    1,               //repeatable
    do_timestamp,   //command function
    "Burning a partition from sdmmc ",           //description
-   "Usage: sdc_update partiton image_file_path fileFmt(sparse or normal)\n"   //usage
+	"Usage: sdc_update partition image_file_path fileFmt(sparse or normal)\n"   //usage
 );
 #endif//#if 0
 

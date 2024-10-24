@@ -1,21 +1,17 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/include/asm/arch-g12b/bl31_apis.h
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
-/*
- * Trustzone API
- *
- * Copyright (C) 2012 Amlogic, Inc.
- *
- * Author: Platform-SH@amlogic.com
- *
- */
 
 #ifndef __GXBB_BL31_APIS_H
 #define __GXBB_BL31_APIS_H
 
 #include <asm/arch/io.h>
+#include <amlogic/image_check.h>
 
 /*#define SRAM_READ				0x82000010
 #define CORE_RD_REV1			0x82000011
@@ -31,6 +27,7 @@
 #define GET_SHARE_STORAGE_MESSAGE_BASE	0x82000026
 #define GET_SHARE_STORAGE_BLOCK_SIZE		0x82000027
 #define SET_STORAGE_INFO		0x82000028
+#define SET_REBOOT_REASON		0x82000049
 
 /* Set Reboot Reason then Reboot*/
 #define PSCI_SYS_REBOOT		0x84000009
@@ -44,6 +41,9 @@
 #define EFUSE_WRITE				0x82000031
 #define EFUSE_WRITE_PATTERN		0x82000032
 #define EFUSE_USER_MAX    0x82000033
+#define EFUSE_OBJ_READ    0x8200003B
+#define EFUSE_OBJ_WRITE   0x8200003C
+#define EFUSE_READ_CALI         0x8200003D
 
 #define DEBUG_EFUSE_WRITE_PATTERN	0x820000F0
 #define DEBUG_EFUSE_READ_PATTERN	0x820000F1
@@ -80,13 +80,6 @@
 
 /* KEYMASTER */
 #define SET_BOOT_PARAMS		0x82000072
-#define SHA256_DIGEST_SIZE  32
-typedef struct {
-	uint32_t device_locked;
-	uint32_t verified_boot_state;
-	uint8_t verified_boot_key[SHA256_DIGEST_SIZE];
-	uint8_t verified_boot_hash[SHA256_DIGEST_SIZE];
-} keymaster_boot_params;
 
 /* Secure HAL APIs */
 #define TRUSTZONE_HAL_API_SRAM                  0x400
@@ -136,6 +129,7 @@ struct sram_hal_api_arg {
 void aml_set_jtag_state(unsigned state, unsigned select);
 unsigned aml_get_reboot_reason(void);
 unsigned aml_reboot(uint64_t function_id, uint64_t arg0, uint64_t arg1, uint64_t arg2);
+void aml_set_reboot_reason(uint64_t function_id, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 unsigned long aml_sec_boot_check(unsigned long ,unsigned long ,unsigned long,unsigned long );
 long get_sharemem_info(unsigned long);
 void set_usb_boot_function(unsigned long command);
@@ -145,5 +139,4 @@ void bl31_get_chipid(unsigned int *, unsigned int *,
 	unsigned int *, unsigned int *);
 void set_viu_probe_enable(void);
 int32_t set_boot_params(const keymaster_boot_params*);
-int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen);
 #endif

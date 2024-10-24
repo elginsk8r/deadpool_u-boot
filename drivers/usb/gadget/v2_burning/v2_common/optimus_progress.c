@@ -1,11 +1,15 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/usb/gadget/v2_burning/v2_common/optimus_progress.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
  */
 
 #include "../v2_burning_i.h"
+#include <emmc_partitions.h>
 
-#define OPTIMUS_PROMPT_SIZE_MIN     (4U<<20)//mininal size to prompt burning progress step
+#define OPTIMUS_PROMPT_SIZE_MIN     (4U << 20)//minimal size to prompt burning progress step
 
 struct ProgressInfo{
     u32     itemSzLow;
@@ -77,7 +81,7 @@ int optimus_update_progress(const unsigned thisBurnSz)
     return 0;
 }
 
-//outStr will be null-terminater after format
+//outStr will be null-terminated after format
 int optimus_hex_data_2_ascii_str(const unsigned char* hexData, const unsigned nBytes, char* outStr, const unsigned strSz)
 {
     int i = 1;
@@ -86,11 +90,11 @@ int optimus_hex_data_2_ascii_str(const unsigned char* hexData, const unsigned nB
         return __LINE__;
     }
 
-    sprintf(outStr, "%02x", hexData[0]);
-    for (; i < nBytes; ++i)
+    for (i = 0; i < nBytes; ++i)
     {
-        sprintf(outStr, "%s%02x", outStr, hexData[i]);
+        sprintf(outStr + 2 * i, "%02x", hexData[i]);
     }
+    outStr[2*i] = '\0';
 
     return 0;
 }
@@ -135,6 +139,9 @@ unsigned add_sum(const void* pBuf, const unsigned size)
 }
 
 #ifndef SCPI_CMD_USB_BOOT
+#include <asm/arch/bl31_apis.h>
+#include <asm/cpu_id.h>
+
 #define SCPI_CMD_USB_BOOT 		0xB0	//skip to wait pc with timeout
 #define SCPI_CMD_USB_UNBOOT 	0xB1	//skip to wait pc forever
 #define SCPI_CMD_SDCARD_BOOT 	0xB2
@@ -142,21 +149,14 @@ unsigned add_sum(const void* pBuf, const unsigned size)
 static void _erase_bootloader(uint64_t arg0)
 {
     if (SCPI_CMD_CLEAR_BOOT == arg0) return;//dummy as not supported
-
-    const char* bootName = "bootloader";
-    const int bootCpyNum = store_boot_copy_num(bootName);
-
-    printf("arg0[0x%llx]\n", arg0);
-    printf("set_boot_first_timeout not defined so Really erase\n");
-    int iCopy = 0;
-    for (; iCopy < bootCpyNum; ++iCopy) {
-        store_boot_erase(bootName, iCopy);
-    }
+#ifdef FORCE_USB_BOOT
+	set_usb_boot_function(FORCE_USB_BOOT);
+#else
+    store_erase_ops((u8*)"boot", 0, 0, 0);
+#endif//#ifdef FORCE_USB_BOOT
 }
 extern void set_boot_first_timeout(uint64_t arg0) __attribute__((weak, alias("_erase_bootloader")));
 
-#include <asm/arch/bl31_apis.h>
-#include <amlogic/cpu_id.h>
 #endif//#ifndef SCPI_CMD_USB_BOOT
 //I assume that store_inited yet when "bootloader_is_old"!!!!
 int optimus_erase_bootloader(const char* extBootDev)
@@ -167,18 +167,14 @@ int optimus_erase_bootloader(const char* extBootDev)
         return 0;
     }
 
-    if (!strcmp("usb-timeout", extBootDev))
-    {
-        set_boot_first_timeout(SCPI_CMD_USB_BOOT);
-        return 0;
-    }
-
     if (!strcmp("sdc", extBootDev))
     {
+#ifdef MESON_CPU_MAJOR_ID_C1
         cpu_id_t cpuid = get_cpu_id();
         if (MESON_CPU_MAJOR_ID_C1 == cpuid.family_id && MESON_CPU_CHIP_REVISION_A == cpuid.chip_rev)
             _erase_bootloader(SCPI_CMD_SDCARD_BOOT);
-        else 
+        else
+#endif//#ifdef MESON_CPU_MAJOR_ID_C1
             set_boot_first_timeout(SCPI_CMD_SDCARD_BOOT);
         return 0;
     }
@@ -190,4 +186,64 @@ void optimus_clear_ovd_register(void)
 {
     set_boot_first_timeout(SCPI_CMD_CLEAR_BOOT);
 }
+
+extern unsigned int get_part_tbl_from_ept(int num, char *name);
+#ifdef CONFIG_AML_SD_EMMC
+int _usb_burn_erase_mmc(int argc, char * const protect_parts[])
+{
+	int num = 0;
+	const int protect_key = 1;
+	int ret = 0;
+	unsigned int mask_flags;
+	char name[MAX_PART_NAME_LEN];
+	struct mmc *mmc;
+	const unsigned int protect_mask = MMC_PARTITION_PROTECT_MASK;
+	const int dev = EMMC_DTB_DEV;//CONFIG_SYS_MMC_BOOT_DEV;
+	const int CMD_BUF_SZ = 128;
+	char cmd_buf[CMD_BUF_SZ];
+	/*protect_key = emmckey_is_protected(mmc);*/
+
+	mmc = find_mmc_device(dev);
+	if (!mmc)
+		return 1;
+	mmc_init(mmc);
+
+	while (get_part_tbl_from_ept(num, name) != -1) {
+		mask_flags = get_part_tbl_from_ept(num, name);
+		if ((mask_flags & protect_mask) && protect_key) {
+			printf("%-10s partition is protected\n", name);
+		} else if (protect_key && !strcmp(name, MMC_RESERVED_NAME)) {
+			printf("%-10s partition is protected\n", name);
+		} else if (!strcmp(name, MMC_BOOT_NAME)) {
+			printf("%-10s partition is protected\n", name);
+		} else {
+			int i = 0;
+			int need_protect = 0;
+
+			for (; i < argc && !need_protect; ++i)
+				need_protect = !strcmp(protect_parts[i], name);
+			if (!need_protect) {
+				printf("%-10s partition is erased: ", name);
+				/*ret |= _amlmmc_erase_single_part(dev, mmc, name);*/
+				snprintf(cmd_buf, CMD_BUF_SZ, "store erase partition %s", name);
+				ret = run_command(cmd_buf, 0);
+				if (ret) {
+					DWN_MSG("Fail in %s\n", cmd_buf);
+					break;
+				}
+			} else {
+				printf("%-10s partition is Keeped\n", name);
+			}
+		}
+		num++;
+	}
+
+	return ret;
+}
+#else
+int _usb_burn_erase_mmc(int argc, char * const protect_parts[])
+{
+	return 1;
+}
+#endif//#ifdef CONFIG_AML_SD_EMMC
 
