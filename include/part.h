@@ -69,6 +69,8 @@ typedef struct disk_partition {
 	char	type_guid[UUID_STR_LEN + 1];	/* type GUID as string, if exists	*/
 #endif
 #ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
+	efi_guid_t partition_type_guid;
+	efi_guid_t unique_partition_guid;
 	gpt_entry_attributes attributes;
 #endif
 #ifdef CONFIG_DOS_PARTITION

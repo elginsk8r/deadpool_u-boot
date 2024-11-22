@@ -27,20 +27,39 @@
 
 #ifdef CONFIG_DM_ETH
 #include <asm/arch/pwr_ctrl.h>
+#include <asm/arch/register.h>
+#include <dm/pinctrl.h>
+#ifdef CONFIG_DM_GPIO
+#include <asm/gpio.h>
+#endif
+struct dw_eth_dev *priv_tool = NULL;
+
+#ifndef ANACTRL_PLL_GATE_DIS
+#define ANACTRL_PLL_GATE_DIS 0xffffffff
 #endif
 
-#define ETH_PLL_CTL0 0x44
-#define ETH_PLL_CTL1 0x48
-#define ETH_PLL_CTL2 0x4C
-#define ETH_PLL_CTL3 0x50
-#define ETH_PLL_CTL4 0x54
-#define ETH_PLL_CTL5 0x58
-#define ETH_PLL_CTL6 0x5C
-#define ETH_PLL_CTL7 0x60
+#endif
 
-#define ETH_PHY_CNTL0 0x80
-#define ETH_PHY_CNTL1 0x84
-#define ETH_PHY_CNTL2 0x88
+#define AML_ETH_PLL_CTL0 0x44
+#define AML_ETH_PLL_CTL1 0x48
+#define AML_ETH_PLL_CTL2 0x4C
+#define AML_ETH_PLL_CTL3 0x50
+#define AML_ETH_PLL_CTL4 0x54
+#define AML_ETH_PLL_CTL5 0x58
+#define AML_ETH_PLL_CTL6 0x5C
+#define AML_ETH_PLL_CTL7 0x60
+
+#define AML_ETH_PHY_CNTL0 0x80
+#define AML_ETH_PHY_CNTL1 0x84
+#define AML_ETH_PHY_CNTL2 0x88
+
+enum {
+	/* chip num */
+	ETH_PHY		= 0x0,
+	ETH_PHY_C1	= 0x1,
+	ETH_PHY_C2	= 0x2,
+	ETH_PHY_SC2	= 0x3,
+};
 
 static int dw_mdio_read(struct mii_dev *bus, int addr, int devad, int reg)
 {
@@ -703,8 +722,9 @@ static void setup_internal_phy(struct udevice *dev)
 {
 	int phy_cntl1 = 0;
 	int mc_val = 0;
-	int pll_val[3] = {0};
-	int analog_val[3] = {0};
+	int chip_num = 0;
+	unsigned int pll_val[3] = {0};
+	unsigned int analog_val[3] = {0};
 	int rtn = 0;
 	struct resource eth_top, eth_cfg;
 
@@ -717,6 +737,13 @@ static void setup_internal_phy(struct udevice *dev)
 	if (mc_val < 0) {
 		printf("miss mc_val\n");
 	}
+
+	chip_num = dev_read_u32_default(dev, "chip_num", 4);
+	if (chip_num < 0) {
+		chip_num = 0;
+		printf("use 0 as default chip num\n");
+	}
+	printf("chip num %d\n", chip_num);
 
 	rtn = dev_read_u32_array(dev, "pll_val", pll_val, ARRAY_SIZE(pll_val));
 	if (rtn < 0) {
@@ -745,67 +772,122 @@ static void setup_internal_phy(struct udevice *dev)
 	if (rtn) {
 		printf("can't get eth_cfg resource(ret = %d)\n", rtn);
 	}
-	printf("wzh eth_top 0x%x eth_cfg 0x%x \n", eth_top.start, eth_cfg.start);
+//	printf("wzh eth_top 0x%x eth_cfg 0x%x \n", eth_top.start, eth_cfg.start);
 
 	setup_tx_amp(dev);
 	/*top*/
 //	setbits_le32(ETHTOP_CNTL0, mc_val);
 	setbits_le32(eth_top.start, mc_val);
 	/*pll*/
-	writel(pll_val[0] | 0x30000000, eth_cfg.start + ETH_PLL_CTL0);
-	writel(pll_val[1], eth_cfg.start + ETH_PLL_CTL1);
-	writel(pll_val[2], eth_cfg.start + ETH_PLL_CTL2);
-	writel(0x00000000, eth_cfg.start + ETH_PLL_CTL3);
+	writel(pll_val[0] | 0x30000000, eth_cfg.start + AML_ETH_PLL_CTL0);
+	writel(pll_val[1], eth_cfg.start + AML_ETH_PLL_CTL1);
+	writel(pll_val[2], eth_cfg.start + AML_ETH_PLL_CTL2);
+	writel(0x00000000, eth_cfg.start + AML_ETH_PLL_CTL3);
 	udelay(200);
-	writel(pll_val[0] | 0x10000000, eth_cfg.start + ETH_PLL_CTL0);
+	writel(pll_val[0] | 0x10000000, eth_cfg.start + AML_ETH_PLL_CTL0);
 
 	/*analog*/
-	writel(analog_val[0], eth_cfg.start + ETH_PLL_CTL5);
-	writel(analog_val[1], eth_cfg.start + ETH_PLL_CTL6);
-	writel(analog_val[2], eth_cfg.start + ETH_PLL_CTL7);
+	writel(analog_val[0], eth_cfg.start + AML_ETH_PLL_CTL5);
+	writel(analog_val[1], eth_cfg.start + AML_ETH_PLL_CTL6);
+	writel(analog_val[2], eth_cfg.start + AML_ETH_PLL_CTL7);
 
 	/*ctrl*/
 	/*config phyid should between  a 0~0xffffffff*/
 	/*please don't use 44000181, this has been used by internal phy*/
-	writel(0x33000180, eth_cfg.start + ETH_PHY_CNTL0);
+	writel(0x33000180, eth_cfg.start + AML_ETH_PHY_CNTL0);
 
 	/*use_phy_smi | use_phy_ip | co_clkin from eth_phy_top*/
-	writel(0x260, eth_cfg.start + ETH_PHY_CNTL2);
-	writel(phy_cntl1, eth_cfg.start + ETH_PHY_CNTL1);
-	writel(phy_cntl1 & (~0x40000), eth_cfg.start + ETH_PHY_CNTL1);
-	writel(phy_cntl1, eth_cfg.start + ETH_PHY_CNTL1);
+	writel(0x260, eth_cfg.start + AML_ETH_PHY_CNTL2);
+	writel(phy_cntl1, eth_cfg.start + AML_ETH_PHY_CNTL1);
+	writel(phy_cntl1 & (~0x40000), eth_cfg.start + AML_ETH_PHY_CNTL1);
+	writel(phy_cntl1, eth_cfg.start + AML_ETH_PHY_CNTL1);
 	udelay(200);
 
-
-	clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 6));
-	clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 7));
-	clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 19));
+	if (chip_num != ETH_PHY_SC2) {
+		clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 6));
+		clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 7));
+		clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 19));
+	}
 }
 
 static void setup_external_phy(struct udevice *dev)
 {
-#if 0
-	u32 mc_val;
+	int mc_val = 0;
+	int cali_val = 0;
+	int analog_ver = 0;
+	int chip_num = 0;
+	int rtn = 0;
+	struct resource eth_top, eth_cfg;
+	/*reset phy*/
+	struct gpio_desc desc;
+	int ret;
 
-	/*driver strength*/
-	writel(0xaaaaaaa5, P_PAD_DS_REG4A);
+	chip_num = dev_read_u32_default(dev, "chip_num", 4);
+	if (chip_num < 0) {
+		chip_num = 0;
+		printf("use 0 as default chip num\n");
+	}
+	printf("chip num %d\n", chip_num);
 
-	/*pinmux*/
-	writel(0x11111111, P_PERIPHS_PIN_MUX_6);
-	writel(0x111111, P_PERIPHS_PIN_MUX_7);
+	if (chip_num != ETH_PHY_SC2) {
+		ret = gpio_request_by_name(dev, "reset-gpios", 0, &desc, GPIOD_IS_OUT);
+		if (ret) {
+			printf("request gpio failed!\n");
+		//	return ret;
+		}
+		if (dm_gpio_is_valid(&desc)) {
+			dm_gpio_set_value(&desc, 1);
+			mdelay(100);
+		}
+		dm_gpio_free(dev, &desc);
+	}
 
-	/*top*/
 	mc_val = dev_read_u32_default(dev, "mc_val", 4);
-	debug("mc_val = 0x%x\n", mc_val);
-	setbits_le32(P_PREG_ETH_REG0, mc_val);
+	if (mc_val < 0) {
+		printf("miss mc_val\n");
+	}
 
-	/*switch to exphy*/
-	writel(0x0, P_ETH_PHY_CNTL2);
-	/*81*/
-	setbits_le32(HHI_GCLK_MPEG1, 0x1 << 3);
-	/* power on memory */
-	clrbits_le32(HHI_MEM_PD_REG0, (1 << 3) | (1<<2));
-#endif
+	cali_val = dev_read_u32_default(dev, "cali_val", 4);
+	if (mc_val < 0) {
+		printf("miss cali_val\n");
+	}
+
+	/*set rmii pinmux*/
+	if (mc_val & 0x4) {
+		pinctrl_select_state(dev, "external_eth_rmii_pins");
+		printf("set rmii\n");
+	}
+	/*set rgmii pinmux*/
+	if (mc_val & 0x1) {
+		pinctrl_select_state(dev, "external_eth_rgmii_pins");
+		printf("set rgmii\n");
+	}
+	rtn = dev_read_resource_byname(dev, "eth_top", &eth_top);
+	if (rtn) {
+		printf("can't get eth_top resource(ret = %d)\n", rtn);
+	}
+
+	rtn = dev_read_resource_byname(dev, "eth_cfg", &eth_cfg);
+	if (rtn) {
+		printf("can't get eth_cfg resource(ret = %d)\n", rtn);
+	}
+//	printf("eth_top 0x%x eth_cfg 0x%x \n", eth_top.start, eth_cfg.start);
+
+	setbits_le32(eth_top.start, mc_val);
+	setbits_le32(eth_top.start + 4, cali_val);
+
+	analog_ver = dev_read_u32_default(dev, "analog_ver", 4);
+	if (mc_val < 0) {
+		printf("miss analog_ver\n");
+	}
+	if (analog_ver != 2)
+		writel(0x0, eth_cfg.start + AML_ETH_PHY_CNTL2);
+
+	if (chip_num != ETH_PHY_SC2) {
+		clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 6));
+		clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 7));
+		clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 19));
+	}
 }
 
 #endif
@@ -827,6 +909,7 @@ static void __iomem *DM_network_interface_setup(struct udevice *dev)
 		setup_external_phy(dev);
 	}
 	udelay(1000);
+	return 0;
 }
 #endif
 /*parse dts end*/
@@ -924,6 +1007,9 @@ int designware_eth_probe(struct udevice *dev)
 	ret = dw_phy_init(priv, dev);
 	debug("%s, ret=%d\n", __func__, ret);
 
+#ifdef CONFIG_DM_ETH
+	priv_tool = priv;
+#endif
 	return ret;
 
 #ifdef CONFIG_CLK
@@ -951,6 +1037,63 @@ static int designware_eth_remove(struct udevice *dev)
 #endif
 }
 
+/* amlogic debug cmd start */
+/*********************ethernet debug function****************************/
+static int do_phyreg(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	unsigned int reg, value;
+	unsigned char *cmd = NULL;
+	unsigned int i;
+
+	if (argc < 2) {
+		return cmd_usage(cmdtp);
+	}
+
+	if (priv_tool == NULL || priv_tool->phydev == NULL) {
+		return -1;
+	}
+
+	cmd = (unsigned char *)argv[1];
+	switch (*cmd) {
+		case 'd':
+			printf("=== ethernet phy register dump:\n");
+			for (i = 0; i < 32; i++)
+				printf("[reg_%d] 0x%x\n", i, phy_read(priv_tool->phydev, MDIO_DEVAD_NONE, i));
+			break;
+		case 'r':
+			if (argc != 3) {
+				return cmd_usage(cmdtp);
+			}
+			printf("=== ethernet phy register read:\n");
+			reg = simple_strtoul(argv[2], NULL, 10);
+			printf("[reg_%d] 0x%x\n", reg, phy_read(priv_tool->phydev, MDIO_DEVAD_NONE, reg));
+
+			break;
+		case 'w':
+			if (argc != 4) {
+				return cmd_usage(cmdtp);
+			}
+			printf("=== ethernet phy register write:\n");
+			reg = simple_strtoul(argv[2], NULL, 10);
+			value = simple_strtoul(argv[3], NULL, 16);
+			phy_write(priv_tool->phydev, MDIO_DEVAD_NONE, reg, value);
+			printf("[reg_%d] 0x%x\n", reg, phy_read(priv_tool->phydev, MDIO_DEVAD_NONE, reg));
+			break;
+
+		default:
+			return cmd_usage(cmdtp);
+	}
+
+	return 0;
+}
+
+U_BOOT_CMD(
+		phyreg, 4, 1, do_phyreg,
+		"ethernet phy register read/write/dump",
+		"d            - dump phy registers\n"
+		"       r reg        - read phy register\n"
+		"       w reg val    - write phy register"
+);
 const struct eth_ops designware_eth_ops = {
 	.start			= designware_eth_start,
 	.send			= designware_eth_send,

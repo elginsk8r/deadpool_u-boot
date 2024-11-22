@@ -441,6 +441,7 @@ int gpt_fill_pte(struct blk_desc *dev_desc,
 			le64_to_cpu(gpt_h->last_usable_lba);
 	int i, k;
 	size_t efiname_len, dosname_len;
+#ifndef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
 #if CONFIG_IS_ENABLED(PARTITION_UUIDS)
 	char *str_uuid;
 	unsigned char *bin_uuid;
@@ -448,6 +449,7 @@ int gpt_fill_pte(struct blk_desc *dev_desc,
 #ifdef CONFIG_PARTITION_TYPE_GUID
 	char *str_type_guid;
 	unsigned char *bin_type_guid;
+#endif
 #endif
 	size_t hdr_start = gpt_h->my_lba;
 	size_t hdr_end = hdr_start + 1;
@@ -493,12 +495,11 @@ int gpt_fill_pte(struct blk_desc *dev_desc,
 			gpt_e[i].ending_lba = cpu_to_le64(offset - 1);
 
 #ifdef CONFIG_PARTITION_TYPE_GUID
+#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
+		memcpy(gpt_e[i].partition_type_guid.b, partitions[i].partition_type_guid.b, sizeof(efi_guid_t));
+#else
 		str_type_guid = partitions[i].type_guid;
 		bin_type_guid = gpt_e[i].partition_type_guid.b;
-/*Copy the unchanged data in the backup GPT to GPT ENTRY and GPT HEAD identically*/
-#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
-		memcpy(bin_type_guid, str_type_guid, sizeof(efi_guid_t));
-#else
 		if (strlen(str_type_guid)) {
 			if (uuid_str_to_bin(str_type_guid, bin_type_guid,
 					    UUID_STR_FORMAT_GUID)) {
@@ -526,12 +527,13 @@ int gpt_fill_pte(struct blk_desc *dev_desc,
 #endif
 
 #if CONFIG_IS_ENABLED(PARTITION_UUIDS)
+#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
+		memcpy(gpt_e[i].unique_partition_guid.b,
+				partitions[i].unique_partition_guid.b, sizeof(efi_guid_t));
+#else
 		str_uuid = partitions[i].uuid;
 		bin_uuid = gpt_e[i].unique_partition_guid.b;
 
-#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
-		memcpy(bin_uuid, str_uuid, sizeof(efi_guid_t));
-#else
 		if (uuid_str_to_bin(str_uuid, bin_uuid, UUID_STR_FORMAT_GUID)) {
 			printf("Partition no. %d: invalid guid: %s\n",
 				i, str_uuid);

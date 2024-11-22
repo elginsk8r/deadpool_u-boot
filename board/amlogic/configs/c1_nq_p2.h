@@ -1,7 +1,21 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- */
+ * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 
 #ifndef __BOARD_CFG_H__
 #define __BOARD_CFG_H__
@@ -39,35 +53,6 @@
 #define AML_ADC_POWER_KEY_CHAN   2  /*channel range: 0-7*/
 #define AML_ADC_POWER_KEY_VAL    0  /*sample value range: 0-1023*/
 
-#ifdef AML_ENABLE_PRODUCTION_MODE
-#define JUDGE_MODE "echo this is production mode;"
-#define CONFIG_AML_PRODUCT_MODE 1
-#ifdef CONFIG_MESON_SERIAL
-#define CONFIG_DISABLE_AML_SERIAL 1
-#endif //CONFIG_MESON_SERIAL
-#define USB_BURNING_OPTION "echo productmode"
-#else  //AML_ENABLE_PRODUCTION_MODE
-#define JUDGE_MODE "echo this is not production mode;"
-#define CONFIG_CMD_BOOTD 1
-#if (defined(CONFIG_ARM) && !defined(CONFIG_ARM64))
-#define CONFIG_CMD_BOOTZ 1
-#endif //defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
-#ifdef CONFIG_ARM64
-#define CONFIG_CMD_BOOTI 1
-#endif //CONFIG_ARM64
-#define CONFIG_CMD_MEMORY 1
-#define CONFIG_CMD_SOURCE 1
-#ifdef CONFIG_MISC
-#define CONFIG_CMD_JTAG 1
-#endif //CONFIG_MISC
-#ifdef CONFIG_CMD_BOOTI
-#define CONFIG_CMD_LZMADEC 1
-#define CONFIG_CMD_UNZIP 1
-#define CONFIG_LZMA 1
-#endif //CONFIG_CMD_BOOTI
-#define USB_BURNING_OPTION "adnl"
-#endif  //AML_ENABLE_PRODUCTION_MODE
-
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -78,9 +63,8 @@
         "loadaddr_rtos=0x00001000\0"\
         "loadaddr_kernel=0x07000000\0"\
         "loadaddr_dspa=0x06000000\0"\
-        "dspfw_size=0x200000\0"\
         "otg_device=1\0" \
-        "usb_burning=" USB_BURNING_OPTION "\0" \
+        "usb_burning=adnl\0" \
         "fdt_high=0x10000000\0"\
         "active_slot=_a\0"\
         "boot_part=boot_a\0"\
@@ -91,13 +75,12 @@
             "\0"\
         "run_dspa="\
             "unzip 0x6400000 ${loadaddr_dspa};"\
-            "dspset 0 1 1;dsprun 0 ${loadaddr_dspa} ${dspfw_size}; "\
+            "dspset 0 1 1;dsprun 0 ${loadaddr_dspa}; "\
             "\0"\
         "storeargs="\
             "get_rebootmode;"\
             "get_wake_args;"\
             "get_chiptype;"\
-            "get_cpu_rev;"\
             "if test ${reboot_mode} = fastboot; then "\
                 "setenv reboot_mode warm_reboot;"\
             "fi;"\
@@ -107,10 +90,8 @@
                 "hw_id=${hw_id} "\
                 "androidboot.reboot_mode=${reboot_mode} "\
                 "chip_type=${chip_type} "\
-                "cpu_rev=${cpu_rev} "\
                 "androidboot.hardware="__stringify(BOARD_NAME)" "\
                 "androidboot.slot_suffix=${active_slot} "\
-                "androidboot.bl2_boot_part=${bl2_part} "\
                 "androidboot.firstboot=${firstboot} "\
                 "${wake_args} "\
                 "jtag=${jtag};"\
@@ -132,7 +113,6 @@
             "fi;fi;fi;fi;"\
             "\0" \
         "storeboot="\
-            JUDGE_MODE \
             "setenv loadaddr ${loadaddr_kernel};"\
             "if imgread kernel ${boot_part} ${loadaddr}; then bootm ${loadaddr}; fi;"\
             "echo try upgrade as booting failure; run update;"\
@@ -144,7 +124,7 @@
             "\0"\
         "recovery_from_fat_dev="\
             "setenv loadaddr ${loadaddr_kernel};"\
-            "if fatload ${fatload_dev} 0 ${loadaddr} recovery.img 0x10000000 0; then "\
+            "if fatload ${fatload_dev} 0 ${loadaddr} recovery.img; then "\
                 "bootm ${loadaddr};fi;"\
             "\0"\
         "recovery_from_udisk="\
@@ -155,13 +135,13 @@
             "get_valid_slot;"\
             "\0"\
 	"get_hw_id=" \
-	    "get_board_hw_id;" \
+	    "get_nq_hw_id;" \
 	    "\0" \
         "oqc_check="\
             "setenv test_mode false;"\
             "setenv fatload_dev usb;"\
             "if usb start 0; then "\
-                "if fatload ${fatload_dev} 0 ${loadaddr} OQC.txt 0x100000 0; then "\
+                "if fatload ${fatload_dev} 0 ${loadaddr} OQC.txt; then "\
                     "setenv test_mode true;"\
                 "fi;"\
             "fi;"\
@@ -348,7 +328,6 @@
 #endif /* CONFIG_AML_SECURE_UBOOT */
 
 #define CONFIG_FIP_IMG_SUPPORT  1
-#define CONFIG_AML_KASLR_SEED
 
 #endif
 

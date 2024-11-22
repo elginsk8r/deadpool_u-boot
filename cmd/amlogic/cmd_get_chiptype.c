@@ -23,11 +23,11 @@
 #include <command.h>
 #include <asm/arch/bl31_apis.h>
 #include <amlogic/cpu_id.h>
-#include <asm/arch/register.h>
 
 int do_get_chiptype(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	char *type[] = {"SS", "SF", "TT", "FF"};
+	/* 0(unknow) - no vmin info */
+	char *type[] = {"dvfs_table0", "dvfs_table1", "dvfs_table2", "dvfs_table3"};
 	unsigned int dvfs_id = aml_get_dvfs_id();
 	pr_info("get dvfs_id:%d\n", dvfs_id);
 	if (dvfs_id > 3) {
@@ -40,30 +40,19 @@ int do_get_chiptype(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 U_BOOT_CMD(
 	get_chiptype, 1, 0, do_get_chiptype,
-	"get c328x chip type and env_set 'chip_type'\n",
+	"get c325x chip type and env_set 'chip_type'\n",
 	"get_chiptype"
 );
 
 int do_get_cpu_rev(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	cpu_id_t cpu_id = get_cpu_id();
-	char rev[4] = { 0 };
-	unsigned int reg_val = 0;
+	char rev[3] = { 0 };
 
-	if (cpu_id.family_id == MESON_CPU_MAJOR_ID_C1) {
+	if (cpu_id.family_id == MESON_CPU_MAJOR_ID_C2) {
 		snprintf(rev, sizeof(rev), "%x", cpu_id.chip_rev);
 	} else {
 		snprintf(rev, sizeof(rev), "%d", -1);
-	}
-
-	reg_val = readl(SYSCTRL_STICKY_REG5);
-	strcat(rev, "-");
-	if (reg_val == 1) {
-		/* ACRK key */
-		strcat(rev, "r");
-	} else {
-		/* DVUK key */
-		strcat(rev, "u");
 	}
 
 	env_set("cpu_rev", rev);

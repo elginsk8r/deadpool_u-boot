@@ -12,10 +12,13 @@
 #include <asm/arch/secure_apb.h>
 #include <amlogic/store_wrapper.h>
 #include <amlogic/aml_efuse.h>
-#ifdef CONFIG_MESON_C1
+#if defined(CONFIG_MESON_C1) || defined(CONFIG_MESON_C2)
 #include <asm/arch/register.h>
 #endif
 #include <time_logging.h>
+#ifdef CONFIG_G_AB_SYSTEM
+#include <asm/arch/secure_apb.h>
+#endif
 
 #ifndef IS_FEAT_BOOT_VERIFY
 #define IS_FEAT_BOOT_VERIFY() 0
@@ -101,7 +104,7 @@ typedef struct {
 
 static int is_secure_boot_enabled(void)
 {
-#ifdef CONFIG_MESON_C1
+#if defined(CONFIG_MESON_C1) || defined(CONFIG_MESON_C2)
     const unsigned long cfg10 = readl(SYSCTRL_SEC_STATUS_REG1);
     return ( cfg10 & (0x1 << 0) );
 #else
@@ -392,6 +395,9 @@ static int do_image_read_kernel(cmd_tbl_t *cmdtp, int flag, int argc, char * con
     uint64_t flashReadOff = 0;
     unsigned secureKernelImgSz = 0;
     uint32_t offset = 0;
+#ifdef CONFIG_G_AB_SYSTEM
+    uint32_t sticky_reg0_val;
+#endif
 
     if (2 < argc) {
         loadaddr = (unsigned char*)simple_strtoul(argv[2], NULL, 16);
@@ -423,7 +429,14 @@ static int do_image_read_kernel(cmd_tbl_t *cmdtp, int flag, int argc, char * con
     rc = store_logic_read(partName, flashReadOff, IMG_PRELOAD_SZ, loadaddr);
     if (rc) {
         errorP("Fail to read 0x%xB from part[%s] at offset 0\n", IMG_PRELOAD_SZ, partName);
+#ifdef CONFIG_G_AB_SYSTEM
+	/* In A/B system, force to reboot after loading failure */
+	sticky_reg0_val = readl(P_AO_RTI_STICKY_REG0);
+	sticky_reg0_val |= 0x1 << 26;
+	writel(sticky_reg0_val, P_AO_RTI_STICKY_REG0);
+#else
         return __LINE__;
+#endif
     }
     flashReadOff += IMG_PRELOAD_SZ;
 
@@ -433,7 +446,12 @@ static int do_image_read_kernel(cmd_tbl_t *cmdtp, int flag, int argc, char * con
         genFmt = genimg_get_format(hdr_addr);
         if (IMAGE_FORMAT_ANDROID != genFmt) {
             errorP("Fmt unsupported!genFmt 0x%x != 0x%x\n", genFmt, IMAGE_FORMAT_ANDROID);
-#ifndef CONFIG_G_AB_SYSTEM
+#ifdef CONFIG_G_AB_SYSTEM
+	/* In A/B system, force to reboot after loading failure */
+	sticky_reg0_val = readl(P_AO_RTI_STICKY_REG0);
+	sticky_reg0_val |= 0x1 << 26;
+	writel(sticky_reg0_val, P_AO_RTI_STICKY_REG0);
+#else
             return __LINE__;
 #endif
         } else {
@@ -737,6 +755,11 @@ static cmd_tbl_t cmd_imgread_sub[] = {
 
 static int do_image_read(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
+
+#ifdef CONFIG_PXP_EMULATOR
+	printf("\naml log : PXP image all use preload\n");
+	return 0;
+#else
 	cmd_tbl_t *c;
 
 	/* Strip off leading 'bmp' command argument */
@@ -751,6 +774,7 @@ static int do_image_read(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 		cmd_usage(cmdtp);
 		return 1;
 	}
+#endif //CONFIG_PXP_EMULATOR
 }
 
 U_BOOT_CMD(

@@ -261,8 +261,24 @@
 #error CONFIG_AML_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
-#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MESON_NFC)
-#error CONFIG_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
+#if (defined(CONFIG_AML_NAND) || defined(CONFIG_MESON_NFC)) && defined(CONFIG_MESON_FBOOT)
+#error CONFIG_AML_NAND/CONFIG_MESON_NFC CONFIG _MESON_FBOOT can not support at the sametime;
+#endif
+
+#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MTD_SPI_NAND) && defined(CONFIG_MESON_NFC)
+#error CONFIG_SPI_NAND/CONFIG_MTD_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
+#endif
+
+#if defined(CONFIG_SPI_NAND) || defined (CONFIG_MTD_SPI_NAND) || defined(CONFIG_MESON_NFC)
+	#define CONFIG_CMD_NAND 1
+	#define CONFIG_MTD_DEVICE 1
+	#define CONFIG_CMD_UBI 1
+	#define CONFIG_CMD_UBIFS 1
+	#define CONFIG_RBTREE 1
+	#define CONFIG_CMD_MTDPARTS   1
+	#define CONFIG_MTD_PARTITIONS 1
+	#define CONFIG_MTD_UBI_WL_THRESHOLD 4096
+	#define CONFIG_MTD_UBI_BEB_LIMIT 20
 #endif
 
 /* #define		CONFIG_AML_SD_EMMC 1 */
@@ -279,15 +295,8 @@
 #define 	CONFIG_SYS_NO_FLASH  1
 #endif
 
-#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND
-	#define CONFIG_CMD_NAND 1
-	#define CONFIG_MTD_DEVICE 1
-	/* #define CONFIG_RBTREE */
-	#define CONFIG_CMD_NAND_TORTURE 1
-	#define CONFIG_CMD_MTDPARTS   1
-	#define CONFIG_MTD_PARTITIONS 1
+#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND || defined CONFIG_MTD_SPI_NAND
 	#define CONFIG_SYS_MAX_NAND_DEVICE  2
-	#define CONFIG_SYS_NAND_BASE_LIST   {0}
 #endif
 
 /* vpu */
@@ -387,7 +396,7 @@
 
 /* unify build for generate encrypted bootloader "u-boot.bin.encrypt" */
 #define CONFIG_AML_CRYPTO_UBOOT   1
-
+//#define CONFIG_AML_SIGNED_UBOOT   1
 /* unify build for generate encrypted kernel image
    SRC : "board/amlogic/(board)/boot.img"
    DST : "fip/boot.img.encrypt" */

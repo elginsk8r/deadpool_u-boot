@@ -24,7 +24,8 @@ struct partitions *part_table = NULL;
 static int parts_total_num;
 int has_boot_slot = 0;
 int has_system_slot = 0;
-
+bool dynamic_partition = false;
+bool vendor_boot_partition = false;
 
 int get_partitions_table(struct partitions **table)
 {
@@ -108,6 +109,14 @@ int get_partition_from_dts(unsigned char *buffer)
 
 	if ( buffer == NULL)
 		goto _err;
+
+	ret = check_valid_dts(buffer);
+	pr_debug("%s() %d: ret %d\n",__func__, __LINE__, ret);
+	if ( ret < 0 )
+	{
+		printf("%s() %d: ret %d\n",__func__, __LINE__, ret);
+		goto _err;
+	}
 #ifdef CONFIG_MULTI_DTB
 	dt_addr = (char *)get_multi_dt_entry((unsigned long)buffer);
 #else
@@ -134,6 +143,10 @@ int get_partition_from_dts(unsigned char *buffer)
 		memset(part_table, 0, sizeof(struct partitions)*(be32_to_cpup((u32*)parts_num)));
 		parts_total_num = be32_to_cpup((u32*)parts_num);
 	}
+	dynamic_partition = false;
+	env_set("partiton_mode","normal");
+	vendor_boot_partition = false;
+	env_set("vendor_boot_mode","false");
 	for (index = 0; index < be32_to_cpup((u32*)parts_num); index++)
 	{
 		sprintf(propname,"part-%d", index);
@@ -176,6 +189,18 @@ int get_partition_from_dts(unsigned char *buffer)
 			has_system_slot = 1;
 		else if (strcmp(uname, "system") == 0)
 			has_system_slot = 0;
+
+		if (strcmp(uname, "super") == 0) {
+			dynamic_partition = true;
+			env_set("partiton_mode","dynamic");
+			printf("enable dynamic_partition\n");
+		}
+
+		if (strncmp(uname, "vendor_boot", 11) == 0) {
+			vendor_boot_partition = true;
+			env_set("vendor_boot_mode","true");
+			printf("enable vendor_boot\n");
+		}
 	}
 	return 0;
 

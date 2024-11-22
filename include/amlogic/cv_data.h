@@ -17,9 +17,6 @@ extern "C" {
 #define RTOS_STATUS_BASE_ADDR 0xfff62000
 #define RTOS_STATUS_MAGIC 0xABBACDDC
 
-#define STATUS_FOR_UBOOT_BASE_ADDR (0xFFF62400)
-#define STATUS_FOR_UBOOT_SIZE_BYTES (256)
-
 struct CvRodata {
 	u16 size;
 	u8 led[50];
@@ -35,8 +32,6 @@ struct CvRwdata {
 	u8 camera_vflip;
 	u8 led_mode;
 	u8 audio_enable;
-	u8 low_power_mode;
-	u32 reserved;
 	u8 crc8;
 } __packed;
 
@@ -44,7 +39,6 @@ struct CameraPara {
 	u8 is_exposure_valid;
 	u8 ir_mode_enabled;
 	u8 ir_power_setting;
-	u8 max_ir_power_in_percent;
 	u32 last_optimal_exposure_value;
 	u32 last_optimal_short_expo_lines;
 	u32 last_optimal_gain;
@@ -57,19 +51,12 @@ struct CameraPara {
 struct RtosStatus {
 	u32 magic;
 	u8 corrupted;
-	u32 wakeup_reasons;
+	u16 wakeup_reasons;
 	u8 day_night;
 	u32 first_frame_te;
 	struct CameraPara camera_data;
 	u8 crc8;
 } __packed;
-
-struct RtosStatusForUboot {
-	uint32_t magic;
-	uint32_t wakeup_reasons;
-	uint8_t crc8;
-} __attribute__((packed));
-
 
 #ifdef __cplusplus
 }

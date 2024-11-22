@@ -1,7 +1,23 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- */
+ * board/amlogic/c1_gq_p2/c1_gq_p2.c
+ *
+ * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 
 #include <common.h>
 #include <asm/io.h>
@@ -30,13 +46,10 @@
 #ifdef CONFIG_SECURE_POWER_CONTROL
 #include <asm/arch/pwr_ctrl.h>
 #endif
-#include <asm/arch/reboot.h>
-#include <linux/ctype.h>  /* isdigit define */
 
 DECLARE_GLOBAL_DATA_PTR;
 
 #define LED_ENABLE_PIN_NAME "gpiom_7"
-#define RING_LED_ENABLE_PIN_NAME "gpiom_6"
 
 int led_power_enable(char *name)
 {
@@ -141,7 +154,8 @@ void get_cal_settings(unsigned int *settings)
 		unsigned long value = simple_strtoul(p, &p_next, 10);
 
 		if (value > 255) {
-			pr_err("LED: value %d is too large: %lu\n", i, value);
+			pr_err("LED: value %d is too large: %lu\n",
+			       settings_[i]);
 			return;
 		}
 		settings_[map[i]] = value;
@@ -198,84 +212,8 @@ void sys_led_init(void)
 	mdelay(1);
 	dm_i2c_reg_write(led_devp, 0x1, 0x3f);
 	dm_i2c_reg_write(led_devp, 0x8, 0x61);
-	dm_i2c_reg_write(led_devp, 0x70, 0x0);
 	for (i = 0; i < N_CAL_SETTINGS; ++i)
 		dm_i2c_reg_write(led_devp, i + 2, cal_settings[i]);
-#endif  // CONFIG_SYS_I2C_MESON
-}
-
-void ring_led_init(void)
-{
-#ifdef CONFIG_SYS_I2C_MESON
-	int ret, i;
-	struct udevice *led_devp = NULL;
-
-	ret = led_power_enable(RING_LED_ENABLE_PIN_NAME);
-	if (ret) {
-		pr_err("LED: LED power enable fail\n");
-		return;
-	}
-
-	if (!i2c_get_chip_for_busnum(MESON_I2C_M3, 0x14, 1, &led_devp)) {
-		// zero out 9 bytes of colour channel data
-		uint8_t color[9] = {0};
-		ret = dm_i2c_write(led_devp, 0xb, &color, sizeof(color));
-		if (ret < 0) {
-			pr_err("LED: i2c write failed with error %d\n", ret);
-		}
-
-		uint8_t enable[] = {0x40, 0x1c};
-		ret = dm_i2c_write(led_devp, 0x0, &enable, sizeof(enable));
-		if (ret < 0) {
-			pr_err("LED: i2c write failed with error %d\n", ret);
-		}
-	} else if (!i2c_get_chip_for_busnum(MESON_I2C_M3, 0x20, 1, &led_devp)) {
-		uint8_t data[1];
-
-		/* Global Control Register
-		 * [0]: Chip enabled
-		 * [1-2]: 9 bits + 3 bits dither brightness resolution
-		 * [3]: Reserved
-		 * [4-6]: 16 MHz OSC frequency for 32 kHz PWM frequency
-		 * [7]: Auto power save enabled */
-		data[0] = 0x87;
-		ret = dm_i2c_write(led_devp, 0x20, &data, sizeof(data));
-		if (ret < 0) {
-			pr_err("LED: i2c write failed with error %d\n", ret);
-		}
-
-		/* Group Configure Register
-		 * [0-2]: Group mode disabled
-		 * [3-5]: Reserved
-		 * [6]: Group SL disabled. Color parameter of each LED is
-		 *      configured by their respective register SL
-		 * [7]: Reserved */
-		data[0] = 0x40;
-		ret = dm_i2c_write(led_devp, 0x8b, &data, sizeof(data));
-		if (ret < 0) {
-			pr_err("LED: i2c write failed with error %d\n", ret);
-		}
-
-		/* Global Current Register
-		 * [0-7]: 8 bit global current */
-		data[0] = 0xff;
-		ret = dm_i2c_write(led_devp, 0x58, &data, sizeof(data));
-		if (ret < 0) {
-			pr_err("LED: i2c write failed with error %d\n", ret);
-		}
-
-		/* Under Voltage Lock Out Control Register
-		 * [0]: UVLO detect disabled
-		 * [1]: UVLO protect disabled */
-		data[0] = 0x03;
-		ret = dm_i2c_write(led_devp, 0x60, &data, sizeof(data));
-		if (ret < 0) {
-			pr_err("LED: i2c write failed with error %d\n", ret);
-		}
-	} else {
-		pr_err("LED: i2c get bus fail\n");
-		return;
-	}
 #endif  // CONFIG_SYS_I2C_MESON
 }
 
@@ -347,10 +285,8 @@ int board_init(void)
 	pinctrl_devices_active(PIN_CONTROLLER_NUM);
 	active_clk();
 
-	if (!oobe_complete()) {
+	if (!oobe_complete())
 		sys_led_init();
-		ring_led_init();
-	}
 
 	/* Disable PM_ETH */
 #ifdef CONFIG_SECURE_POWER_CONTROL
@@ -424,7 +360,7 @@ int ft_board_setup(void *blob, bd_t *bd)
 	return 0;
 }
 
-int do_get_board_hw_id(cmd_tbl_t *cmdtp, int flag, int argc,
+int do_get_gq_hw_id(cmd_tbl_t *cmdtp, int flag, int argc,
 		char * const argv[])
 {
 	unsigned int hw_id = 0, ret = 0;
@@ -462,42 +398,38 @@ int do_get_board_hw_id(cmd_tbl_t *cmdtp, int flag, int argc,
 }
 
 U_BOOT_CMD(
-	get_board_hw_id, 1, 0, do_get_board_hw_id,
-	"get GQ/NQ HW_ID and env_set 'hw_id'\n",
-	"get_board_hw_id"
+	get_gq_hw_id, 1, 0, do_get_gq_hw_id,
+	"get GQ HW_ID and env_set 'hw_id'\n",
+	"get_gq_hw_id"
 );
 
 int do_get_wake_args(cmd_tbl_t *cmdtp, int flag, int argc,
 		     char * const argv[])
 {
-	const volatile struct RtosStatusForUboot * const rtos_uboot_status =
-		STATUS_FOR_UBOOT_BASE_ADDR;
+	const volatile struct RtosStatus * const rtos_status =
+		RTOS_STATUS_BASE_ADDR;
 	char wake_args_str[150] = {0};
 
-	u32 wake_reasons;
-	if ((rtos_uboot_status->magic == RTOS_STATUS_MAGIC) &&
-		(rtos_uboot_status->crc8 == crc8(0, rtos_uboot_status, sizeof(struct RtosStatusForUboot) - 1)) &&
-		oobe_complete()) {
-		wake_reasons = rtos_uboot_status->wakeup_reasons;
+	u16 wake_reasons;
+	if ((rtos_status->crc8 ==
+	    crc8(0, rtos_status, sizeof(struct RtosStatus) - 1)) &&
+	    oobe_complete()) {
+		wake_reasons = rtos_status->wakeup_reasons;
 	} else {
 		wake_reasons = 0;
 	}
 
-	/* SCHEDULED (4), MCU_RESET (5), SOC_HANG_DETECTED (16), LIMITED_SYS_RESET_DONE (18) */
-	const u8 slow_reason = (wake_reasons & 0x50030) != 0;
+	/* MCU_RESET (5) */
+	const u8 mcu_reset = (wake_reasons & 0x20) != 0;
 	/* PIR (0), WiFi (1), doorbell (2), tamper (7), low battery (9),
 	 *  charger fault (12)
 	 */
 	const u8 fast_reason = (wake_reasons & 0x1287) != 0;
 
-	u32 reboot_mode_val = ((readl(SYSCTRL_SEC_STATUS_REG2 ) >> 12) & 0xf);
-	u8 error_boot = ((reboot_mode_val == AMLOGIC_KERNEL_PANIC) ||
-		(reboot_mode_val == AMLOGIC_WATCHDOG_REBOOT));
-
-	const u8 fastpath = !slow_reason && !error_boot && fast_reason;
+	const u8 fastpath = !mcu_reset && fast_reason;
 
 	char *mode;
-	if (wake_reasons == 0 || slow_reason)
+	if (wake_reasons == 0 || mcu_reset)
 		mode = "cold";
 	else if (wake_reasons == 0x1)
 		mode = "partial_warm";
@@ -516,7 +448,7 @@ int do_get_wake_args(cmd_tbl_t *cmdtp, int flag, int argc,
 	}
 
 	snprintf(wake_args_str, sizeof(wake_args_str),
-		 "androidboot.wake_reasons=0x%08x androidboot.bootpath=%s "
+		 "androidboot.wake_reasons=0x%04x androidboot.bootpath=%s "
 		 "androidboot.eventpath=%s dhd.load_mode=%s",
 		 wake_reasons, fastpath ? "fast" : "slow", event_path, mode);
 	env_set("wake_args", wake_args_str);
@@ -528,7 +460,7 @@ U_BOOT_CMD(get_wake_args, 1, 0, do_get_wake_args,
 	   "Get wake_reasons and bootpath, envset wake_args\n",
 	   "Parses CV status from RTOS extract wake_reasons and bootpath.\n"\
 	   "envsets |wake_args| to add to kernel command line, contains:\n"\
-	   "  androidboot.wake_reason=0x08x: wake_reasons from RTOS\n"\
+	   "  androidboot.wake_reason=0x04x: wake_reasons from RTOS\n"\
 	   "  androidboot.bootpath=(fast|slow): boot quickly or check RW FS\n"
 	   "  androidboot.eventpath=:(event string) specify type of fast boot\n"
 	   "  dhd.load_mode=(cold|partial_warm|warm) specify load mode for wifi driver\n"

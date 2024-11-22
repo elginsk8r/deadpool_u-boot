@@ -13,6 +13,14 @@
  */
 
 #define AML_VDDCORE_INIT_VOLTAGE    805     // VCCK power up voltage
+/* If AML_VDDCORE_INIT_VOLTAGE_SEL is 1, the voltage of vddee
+ * will be controlled by efuse. if 0, it is controlled by
+ * AML_VDDCORE_INIT_VOLTAGE
+ */
+#define AML_VDDCORE_INIT_VOLTAGE_SEL 			1
+#define AML_VDDCORE_INIT_EFUSE_MARGIN			30
+#define AML_VDDCORE_INIT_EFUSE_OFFSET			0xc8
+#define AML_VDDCORE_INIT_EFUSE_BASE_V0LT		680
 
 /* SMP Definitinos */
 #define CPU_RELEASE_ADDR		secondary_boot_func
@@ -20,10 +28,6 @@
 /* Bootloader Control Block function
    That is used for recovery and the bootloader to talk to each other
   */
-#if 0
-#define CONFIG_BOOTLOADER_CONTROL_BLOCK
-#endif
-
 /* Serial config */
 #define CONFIG_CONS_INDEX 2
 #define CONFIG_BAUDRATE  115200
@@ -206,7 +210,7 @@
 
 /* running in sram */
 #define UBOOT_RUN_IN_SRAM
-#ifdef UBOOT_RUN_IN_SRAM
+#ifdef CONFIG_UBOOT_RUN_IN_SRAM
 #define CONFIG_SYS_INIT_SP_ADDR				(0x00200000)
 /* Size of malloc() pool */
 #define CONFIG_SYS_MALLOC_LEN				(256*1024)
@@ -250,8 +254,8 @@
 #error CONFIG_AML_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
-#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MESON_NFC)
-#error CONFIG_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
+#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MTD_SPI_NAND) && defined(CONFIG_MESON_NFC)
+#error CONFIG_SPI_NAND/CONFIG_MTD_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
 /* #define		CONFIG_AML_SD_EMMC 1 */
@@ -268,15 +272,8 @@
 #define 	CONFIG_SYS_NO_FLASH  1
 #endif
 
-#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND
-	#define CONFIG_CMD_NAND 1
-	#define CONFIG_MTD_DEVICE 1
-	/* #define CONFIG_RBTREE */
-	#define CONFIG_CMD_NAND_TORTURE 1
-	#define CONFIG_CMD_MTDPARTS   1
-	#define CONFIG_MTD_PARTITIONS 1
+#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND || defined CONFIG_MTD_SPI_NAND
 	#define CONFIG_SYS_MAX_NAND_DEVICE  2
-	#define CONFIG_SYS_NAND_BASE_LIST   {0}
 #endif
 
 /* vpu */

@@ -28,6 +28,11 @@
 
 static int amlmmc_init = 0;
 
+struct aml_pattern aml_pattern_table[] = {
+	AML_PATTERN_ELEMENT(MMC_PATTERN_NAME, CALI_PATTERN),
+	AML_PATTERN_ELEMENT(MMC_MAGIC_NAME, MAGIC_PATTERN),
+	AML_PATTERN_ELEMENT(MMC_RANDOM_NAME, RANDOM_PATTERN),
+};
 static int mmc_set_signal_voltage(struct mmc *mmc, uint signal_voltage);
 static int mmc_power_cycle(struct mmc *mmc);
 #if !CONFIG_IS_ENABLED(MMC_TINY)
@@ -1886,6 +1891,9 @@ static const struct mode_width_tuning mmc_modes_by_pref[] = {
 	{
 		.mode = MMC_HS_52,
 		.widths = MMC_MODE_8BIT | MMC_MODE_4BIT | MMC_MODE_1BIT,
+#ifdef MMC_SUPPORTS_TUNING
+		.tuning = MMC_SD_HS_TUNING
+#endif
 	},
 	{
 		.mode = MMC_HS,
@@ -1991,8 +1999,6 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 		pr_debug("No ext_csd found!\n"); /* this should enver happen */
 		return -ENOTSUPP;
 	}
-
-	mmc_set_clock(mmc, mmc->legacy_speed, MMC_CLK_ENABLE);
 
 	for_each_mmc_mode_by_pref(card_caps, mwt) {
 		for_each_supported_width(card_caps & mwt->widths,
@@ -2306,6 +2312,7 @@ static int mmc_startup(struct mmc *mmc)
 	}
 #endif
 
+#ifdef CONFIG_MMC_FBOOT
 	if (emmc_boot_chk(mmc)) {
 		mmc_switch_part(mmc, 0);
 
@@ -2331,6 +2338,7 @@ static int mmc_startup(struct mmc *mmc)
 
 		memcpy(mmc->cid, cmd.response, 16);
 	} else {
+#endif
 		/* Put the Card in Identify Mode */
 		cmd.cmdidx = mmc_host_is_spi(mmc) ? MMC_CMD_SEND_CID :
 			MMC_CMD_ALL_SEND_CID; /* cmd not supported in spi */
@@ -2377,7 +2385,9 @@ static int mmc_startup(struct mmc *mmc)
 			if (IS_SD(mmc))
 				mmc->rca = (cmd.response[0] >> 16) & 0xffff;
 		}
+#ifdef CONFIG_MMC_FBOOT
 	}
+#endif
 
 	/* Get the Card-Specific Data */
 	cmd.cmdidx = MMC_CMD_SEND_CSD;
@@ -2793,11 +2803,13 @@ int mmc_start_init(struct mmc *mmc)
 		return -ENOMEDIUM;
 	}
 
+#ifdef CONFIG_MMC_FBOOT
 	if (emmc_boot_chk(mmc)) {
 		mmc->high_capacity = 1;
 		mmc->rca = 1;
 		mmc->version = MMC_VERSION_UNKNOWN;
 	} else
+#endif
 		err = mmc_get_op_cond(mmc);
 
 	if (!err)
@@ -2861,9 +2873,68 @@ int enable_vendor_erase(struct mmc *mmc)
 	return mmc_set_ext_csd(mmc, 16, 57);
 }
 
+void mmc_write_cali_mattern(void *addr, struct aml_pattern *table)
+{
+	int i = 0;
+	unsigned int s = 10;
+	u32 *mattern = (u32 *)addr;
+	struct virtual_partition *vpart =
+		aml_get_virtual_partition_by_name(table->name);
+	for (i = 0;i < (vpart->size)/4 - 1;i++) {
+		if (!strcmp(table->name, "random"))
+			mattern[i] = rand_r(&s);
+		else
+			mattern[i] = table->pattern;
+	}
+	mattern[i] = crc32(0, (u8 *)addr, (vpart->size - 4));
+	return;
+}
+
+int mmc_pattern_check(struct mmc *mmc, struct aml_pattern *table)
+{
+	void *addr = NULL;
+	u64 cnt = 0, n = 0, blk = 0;
+	u32 *buf = NULL;
+	u32 crc32_s = 0;
+	struct partitions *part = NULL;
+	struct virtual_partition *vpart = NULL;
+
+	vpart = aml_get_virtual_partition_by_name(table->name);
+
+	addr = (void *)malloc(vpart->size);
+	if (!addr) {
+		printf("%s malloc failed\n", table->name);
+		return 1;
+	}
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	blk = (part->offset + vpart->offset) / mmc->read_bl_len;
+	cnt = vpart->size / mmc->read_bl_len;
+	n = blk_dread(mmc_get_blk_desc(mmc), blk, cnt, addr);
+	if (n != cnt) {
+		printf("read pattern failed\n");
+		free(addr);
+		return 1;
+	} else {
+		buf = (u32 *)addr;
+		crc32_s = crc32(0, (u8 *)addr, (vpart->size - 4));
+		if (crc32_s != buf[vpart->size/4 - 1]) {
+			printf("check %s failed,need to write\n",
+						table->name);
+			mmc_write_cali_mattern(addr, table);
+			n = blk_dwrite(mmc_get_blk_desc(mmc), blk, cnt, addr);
+			printf("several 0x%x pattern blocks write %s\n",
+				table->pattern, (n == cnt) ? "OK" : "ERROR");
+		}
+		printf("crc32_s:0x%x == storage crc_pattern:0x%x!!!\n",
+				crc32_s, buf[vpart->size/4 - 1]);
+	}
+	free(addr);
+	return (n == cnt) ? 0 : 1;
+}
+
 int mmc_init(struct mmc *mmc)
 {
-	int err = 0;
+	int err = 0, i;
 	__maybe_unused ulong start;
 #if CONFIG_IS_ENABLED(DM_MMC)
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(mmc->dev);
@@ -2886,8 +2957,10 @@ int mmc_init(struct mmc *mmc)
 	if (IS_MMC(mmc)) {
 		if (!is_partition_checked) {
 			if (mmc_device_init(mmc) == 0) {
-			is_partition_checked = true;
-			pr_info("eMMC/TSD partition table have been checked OK!\n");
+				is_partition_checked = true;
+				pr_info("eMMC/TSD partition table have been checked OK!\n");
+				for (i = 0; i < ARRAY_SIZE(aml_pattern_table); i++)
+					mmc_pattern_check(mmc, &aml_pattern_table[i]);
 			}
 		}
 
@@ -2969,6 +3042,8 @@ int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt)
 		ffu_addr = SAMSUNG_FFU_ADDR;
 	} else if ((mmc->cid[0] >> 24) == KINGSTON_MID) {
 		ffu_addr = KINGSTON_FFU_ADDR;
+	} else if ((mmc->cid[0] >> 24) == BIWIN_MID) {
+		ffu_addr = BIWIN_FFU_ADDR;
 	} else {
 		pr_info("FFU update for this manufacturer not support yet\n");
 		return -1;
@@ -2986,8 +3061,13 @@ int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt)
 
 	supported_modes = ext_csd_ffu[EXT_CSD_SUPPORTED_MODES] & 0x1;
 	fw_cfg = ext_csd_ffu[EXT_CSD_FW_CFG] & 0x1;
-	for (i = 0; i < 8; i++)
-		fw_ver |= (ext_csd_ffu[EXT_CSD_FW_VERSION + i] << (i * 8));
+	for (i = 0; i < 8; i++) {
+		fw_ver |= ext_csd_ffu[EXT_CSD_FW_VERSION + 7 - i];
+		if (i < 7)
+			fw_ver <<= 8;
+	}
+	if ((mmc->cid[0] >> 24) == BIWIN_MID)
+		fw_ver = ((fw_ver >> 16) & 0xffffffff);
 	pr_info("old fw_ver = %llx\n", fw_ver);
 	if (!supported_modes || fw_cfg || (fw_ver >= ffu_ver))
 		return -1;
@@ -3011,8 +3091,13 @@ int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt)
 	if (err)
 		return err;
 
-	for (i = 0; i < 8; i++)
-		fw_ver |= (ext_csd_ffu[EXT_CSD_FW_VERSION + i] << (i * 8));
+	for (i = 0; i < 8; i++) {
+		fw_ver |= ext_csd_ffu[EXT_CSD_FW_VERSION + 7 - i];
+		if (i < 7)
+			fw_ver <<= 8;
+	}
+	if ((mmc->cid[0] >> 24) == BIWIN_MID)
+		fw_ver = ((fw_ver >> 16) & 0xffffffff);
 	pr_info("new fw_ver = %llx\n", fw_ver);
 	if ((mmc->cid[0] >> 24) == SAMSUNG_MID) {
 		/* Set Normal Mode */
@@ -3039,8 +3124,13 @@ int mmc_ffu_op(int dev, u64 ffu_ver, void *addr, u64 cnt)
 		return err;
 	ffu_status = ext_csd_ffu[EXT_CSD_FFU_STATUS] & 0xff;
 	fw_ver = 0;
-	for (i = 0; i < 8; i++)
-		fw_ver |= (ext_csd_ffu[EXT_CSD_FW_VERSION + i] << (i * 8));
+	for (i = 0; i < 8; i++) {
+		fw_ver |= ext_csd_ffu[EXT_CSD_FW_VERSION + 7 - i];
+		if (i < 7)
+			fw_ver <<= 8;
+	}
+	if ((mmc->cid[0] >> 24) == BIWIN_MID)
+		fw_ver = ((fw_ver >> 16) & 0xffffffff);
 	pr_info("new fw_ver = %llx\n", fw_ver);
 	if (ffu_status || (fw_ver != ffu_ver))
 		return ffu_status;
@@ -3261,5 +3351,6 @@ int mmc_key_read(unsigned char *buf, unsigned int size, uint32_t *actual_lenth)
 	}
 	return 0;
 }
+
 
 

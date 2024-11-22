@@ -5,6 +5,7 @@
 
 #include "include/v3_tool_def.h"
 #include <mmc.h>
+#include <amlogic/cpu_id.h>
 #ifndef BOOT_DEVICE_USB
 #define BOOT_DEVICE_SD                  4
 #define BOOT_DEVICE_USB                 5
@@ -13,10 +14,28 @@ extern void serial_initialize(void);
 
 extern void board_init_mem(void);
 
-static unsigned _get_romcode_boot_id(void)
+unsigned _get_romcode_boot_id(void)
 {
-	FB_DBG("cfg0 0x%08x\n", readl(P_AO_SEC_GP_CFG0));
-    const unsigned boot_id = readl(P_AO_SEC_GP_CFG0) & 0xf;
+	const cpu_id_t cpuid = get_cpu_id();
+	const int familyId	 = cpuid.family_id;
+
+    unsigned boot_id = 0;
+#ifdef SYSCTRL_SEC_STATUS_REG2
+	if (MESON_CPU_MAJOR_ID_SC2 <= familyId && MESON_CPU_MAJOR_ID_C2 != familyId) {
+		boot_id = readl(SYSCTRL_SEC_STATUS_REG2);
+        FB_DBG("boot_id 0x%x\n", boot_id);
+		boot_id = (boot_id>>4) & 0xf;
+	}
+	FB_DBG("boot_id 1x%x\n", boot_id);
+#endif// #ifdef SYSCTRL_SEC_STATUS_REG2
+
+#if defined(P_AO_SEC_GP_CFG0)
+    if (MESON_CPU_MAJOR_ID_C2 >= familyId &&
+			MESON_CPU_MAJOR_ID_SC2 != familyId) {
+		FB_DBG("cfg0 0x%08x\n", readl(P_AO_SEC_GP_CFG0));
+		boot_id = readl(P_AO_SEC_GP_CFG0) & 0xf;
+	}
+#endif// #if defined(P_AO_SEC_GP_CFG0)
 
     return boot_id;
 }

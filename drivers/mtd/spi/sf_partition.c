@@ -16,11 +16,24 @@
 #include <linux/errno.h>
 #include <mtd.h>
 #include <amlogic/aml_mtd.h>
+#include <amlogic/storage.h>
 
-#define SPINOR_BOOTLOADER_SIZE (SZ_1M)
+/* Hard code, all partitions are aligned in block size, fast erasing */
+#define SPINOR_ALIGNED_SIZE		(64 * 1024)
+extern struct storage_startup_parameter g_ssp;
+
+/* do not use default value, rewrite this function in the board file */
+uint64_t __weak spiflash_bootloader_size(void)
+{
+	return SZ_2M;
+}
+
+uint32_t __weak spiflash_rsv_block_num(void)
+{
+	return 0;
+}
+
 /* The size of the partition must be block aligned */
-#define SPINOR_RSV_BLOCK_NUM	(32) //128k
-
 static int _spinor_add_partitions(struct mtd_info *mtd,
 				  const struct mtd_partition *parts,
 				  int nbparts)
@@ -28,32 +41,58 @@ static int _spinor_add_partitions(struct mtd_info *mtd,
 	int part_num = 0, i = 0;
 	struct mtd_partition *temp, *parts_nm;
 	loff_t off;
+
 #ifdef CONFIG_DISCRETE_BOOTLOADER
-	part_num = nbparts + 2;
+	/* spinor add discrete mode for advanced */
+	part_num = nbparts + 5;
 #else
 	part_num = nbparts + 1;
 #endif/* CONFIG_DISCRETE_BOOTLOADER */
 	temp = kzalloc(sizeof(*temp) * part_num, GFP_KERNEL);
 	memset(temp, 0, sizeof(*temp) * part_num);
+#ifdef CONFIG_DISCRETE_BOOTLOADER
+	temp[BOOT_AREA_BB1ST].name = BOOT_LOADER;
+	temp[BOOT_AREA_BB1ST].offset = g_ssp.boot_entry[BOOT_AREA_BB1ST].offset;
+	temp[BOOT_AREA_BB1ST].size = g_ssp.boot_entry[BOOT_AREA_BB1ST].size * g_ssp.boot_bakups;
+	if (temp[BOOT_AREA_BB1ST].size % SPINOR_ALIGNED_SIZE)
+		WARN_ON(1);
+
+	temp[BOOT_AREA_BL2E].name = BOOT_BL2E;
+	temp[BOOT_AREA_BL2E].offset = g_ssp.boot_entry[BOOT_AREA_BL2E].offset;
+	temp[BOOT_AREA_BL2E].size = g_ssp.boot_entry[BOOT_AREA_BL2E].size * g_ssp.boot_bakups;
+	if (temp[0].size % SPINOR_ALIGNED_SIZE)
+		WARN_ON(1);
+
+	temp[BOOT_AREA_BL2X].name = BOOT_BL2X;
+	temp[BOOT_AREA_BL2X].offset = g_ssp.boot_entry[BOOT_AREA_BL2X].offset;
+	temp[BOOT_AREA_BL2X].size = g_ssp.boot_entry[BOOT_AREA_BL2X].size * g_ssp.boot_bakups;
+	if (temp[0].size % SPINOR_ALIGNED_SIZE)
+		WARN_ON(1);
+
+	temp[BOOT_AREA_DDRFIP].name = BOOT_DDRFIP;
+	temp[BOOT_AREA_DDRFIP].offset = g_ssp.boot_entry[BOOT_AREA_DDRFIP].offset;
+	temp[BOOT_AREA_DDRFIP].size = g_ssp.boot_entry[BOOT_AREA_DDRFIP].size * g_ssp.boot_bakups;
+	if (temp[0].size % SPINOR_ALIGNED_SIZE)
+		WARN_ON(1);
+
+	temp[BOOT_AREA_DEVFIP].name = BOOT_DEVFIP;
+	temp[BOOT_AREA_DEVFIP].offset = g_ssp.boot_entry[BOOT_AREA_DEVFIP].offset;
+	temp[BOOT_AREA_DEVFIP].size = g_ssp.boot_entry[BOOT_AREA_DEVFIP].size * CONFIG_TPL_COPY_NUM;
+	if (temp[0].size % SPINOR_ALIGNED_SIZE)
+		WARN_ON(1);
+	off = temp[BOOT_AREA_DEVFIP].offset + temp[BOOT_AREA_DEVFIP].size;
+	parts_nm = &temp[5];
+#else
 	temp[0].name = BOOT_LOADER;
 	temp[0].offset = 0;
-	/* fixme, yyh */
-	temp[0].size = SPINOR_BOOTLOADER_SIZE;
-	if (temp[0].size % mtd->erasesize)
+	temp[0].size = spiflash_bootloader_size();
+	if (temp[0].size % SPINOR_ALIGNED_SIZE)
 		WARN_ON(1);
-	off = temp[0].size + SPINOR_RSV_BLOCK_NUM * mtd->erasesize;
-#ifdef CONFIG_DISCRETE_BOOTLOADER
-	temp[1].name = BOOT_TPL;
-	temp[1].offset = off;
-	temp[1].size = CONFIG_TPL_SIZE_PER_COPY * CONFIG_TPL_COPY_NUM;
-	if (temp[1].size % mtd->erasesize)
-		WARN_ON(1);
-	parts_nm = &temp[2];
-	off += temp[1].size;
-#else
+	/* rsv size is aligned with blocksize(64K) */
+	off = temp[0].size + spiflash_rsv_block_num() * SPINOR_ALIGNED_SIZE;
 	parts_nm = &temp[1];
 #endif/* CONFIG_DISCRETE_BOOTLOADER */
-	for (; i < nbparts; i++) {
+	for (i = 0; i < nbparts; i++) {
 		if (!parts[i].name) {
 			pr_err("name can't be null! ");
 			pr_err("please check your %d th partition name!\n",
@@ -67,10 +106,10 @@ static int _spinor_add_partitions(struct mtd_info *mtd,
 		}
 		parts_nm[i].name = parts[i].name;
 		parts_nm[i].offset = off;
-		if (parts[i].size % mtd->erasesize) {
+		if (parts[i].size % SPINOR_ALIGNED_SIZE) {
 			pr_err("%s %d \"%s\" size auto align to block size\n",
 				__func__, __LINE__, parts[i].name);
-			parts_nm[i].size += parts[i].size % mtd->erasesize;
+			parts_nm[i].size += parts[i].size % SPINOR_ALIGNED_SIZE;
 		}
 		/* it's ok "+=" here because size has been set to 0 */
 		parts_nm[i].size += parts[i].size;
@@ -78,6 +117,7 @@ static int _spinor_add_partitions(struct mtd_info *mtd,
 		if (i == (nbparts - 1))
 			parts_nm[i].size = mtd->size - off;
 	}
+
 	return add_mtd_partitions(mtd, temp, part_num);
 }
 

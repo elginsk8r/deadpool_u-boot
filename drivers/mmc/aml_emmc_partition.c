@@ -32,7 +32,12 @@ DECLARE_GLOBAL_DATA_PTR;
 #endif
 /* debug info*/
 #define CONFIG_MPT_DEBUG 	(0)
+
+#ifdef AML_ENABLE_PRODUCTION_MODE
 #define GPT_PRIORITY             (1)
+#else
+#define GPT_PRIORITY             (0)
+#endif
 
 #ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
 #define FALSE 0
@@ -129,6 +134,8 @@ struct virtual_partition virtual_partition_table[] = {
 #endif
 	VIRTUAL_PARTITION_ELEMENT(MMC_KEY_NAME, EMMCKEY_RESERVE_OFFSET, MMC_KEY_SIZE),
 	VIRTUAL_PARTITION_ELEMENT(MMC_PATTERN_NAME, CALI_PATTERN_OFFSET, CALI_PATTERN_SIZE),
+	VIRTUAL_PARTITION_ELEMENT(MMC_MAGIC_NAME, MAGIC_OFFSET, MAGIC_SIZE),
+	VIRTUAL_PARTITION_ELEMENT(MMC_RANDOM_NAME, RANDOM_OFFSET, RANDOM_SIZE),
 #ifndef DTB_BIND_KERNEL
 	VIRTUAL_PARTITION_ELEMENT(MMC_DTB_NAME, DTB_OFFSET, DTB_SIZE),
 #endif
@@ -1189,8 +1196,8 @@ int fill_ept_by_gpt(struct mmc *mmc, struct _iptbl *p_iptbl_ept)
 		partitions[i].mask_flags = (uint32_t)le64_to_cpu(gpt_pte[i].attributes.fields.reserved);
 
 		#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
-		memcpy(partitions[i].type_guid, gpt_pte[i].partition_type_guid.b, sizeof(efi_guid_t));
-		memcpy(partitions[i].uuid, gpt_pte[i].unique_partition_guid.b, sizeof(efi_guid_t));
+		memcpy(partitions[i].type_guid.b, gpt_pte[i].partition_type_guid.b, sizeof(efi_guid_t));
+		memcpy(partitions[i].uuid.b, gpt_pte[i].unique_partition_guid.b, sizeof(efi_guid_t));
 		memcpy(&(partitions[i].attributes), &(gpt_pte[i].attributes), sizeof(gpt_entry_attributes));
 		#endif
 		/* partition name */
@@ -1220,25 +1227,64 @@ void trans_ept_to_diskpart(struct _iptbl *ept, disk_partition_t *disk_part) {
 		strcpy((char *)disk_part[i].name, part[i].name);
 		/* store maskflag into type, 8bits ONLY! */
 		disk_part[i].type[0] = (uchar)part[i].mask_flags;
-	#ifdef CONFIG_PARTITION_TYPE_GUID
 #ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
 	#ifdef CONFIG_ARCH_MESON
 		if (disk_part[i].type[0])
 			disk_part[i].attributes.fields.reserved = disk_part[i].type[0];
 	#endif /* CONFIG_ARCH_MESON */
 	if (gpt_broken_status) {
-		memcpy(disk_part[i].type_guid, part[i].type_guid, sizeof(efi_guid_t));
-		memcpy(disk_part[i].uuid, part[i].uuid, sizeof(efi_guid_t));
+		memcpy(disk_part[i].partition_type_guid.b, part[i].type_guid.b, sizeof(efi_guid_t));
+		memcpy(disk_part[i].unique_partition_guid.b, part[i].uuid.b, sizeof(efi_guid_t));
 		memcpy(&(disk_part[i].attributes), &(part[i].attributes), sizeof(gpt_entry_attributes));
 	} else {
+#if CONFIG_IS_ENABLED(PARTITION_UUIDS)
+	char *str_uuid;
+	unsigned char *bin_uuid;
 #endif
+#ifdef CONFIG_PARTITION_TYPE_GUID
+	char *str_type_guid;
+	unsigned char *bin_type_guid;
+#endif
+#ifdef CONFIG_PARTITION_TYPE_GUID
+	str_type_guid = part[i].name;
+	bin_type_guid = disk_part[i].partition_type_guid.b;
+#endif
+#if CONFIG_IS_ENABLED(PARTITION_UUIDS)
+	gen_rand_uuid_str(disk_part[i].uuid, UUID_STR_FORMAT_STD);
+	str_uuid = disk_part[i].uuid;
+	bin_uuid = disk_part[i].unique_partition_guid.b;
+#endif
+#ifdef CONFIG_PARTITION_TYPE_GUID
+		if (strlen(str_type_guid)) {
+			if (uuid_str_to_bin(str_type_guid, bin_type_guid,
+						UUID_STR_FORMAT_GUID)) {
+#ifdef CONFIG_AML_GPT
+				char str[8] = {"default"};
+				uuid_str_to_bin(str, bin_type_guid,
+						UUID_STR_FORMAT_GUID);
+			}
+		}
+#else
+				printf("Partition no. %d: invalid type guid: %s\n",
+						i, str_type_guid);
+				return;
+			}
+		}
+#endif
+#endif
+#if CONFIG_IS_ENABLED(PARTITION_UUIDS)
+		if (uuid_str_to_bin(str_uuid, bin_uuid, UUID_STR_FORMAT_GUID)) {
+			printf("Partition no. %d: invalid guid: %s\n",
+					i, str_uuid);
+			return;
+		}
+#endif
+	}
+#else
 		strcpy((char *)disk_part[i].type_guid, part[i].name);
-	#endif
 	#ifdef CONFIG_RANDOM_UUID
 		gen_rand_uuid_str(disk_part[i].uuid, UUID_STR_FORMAT_STD);
 	#endif
-#ifdef CONFIG_AML_GPT_SYNC_ENTIRE_ENTRY
-	}
 #endif
 		disk_part[i].bootable = 0;
 		if ( i == (count - 1))
@@ -1248,9 +1294,6 @@ void trans_ept_to_diskpart(struct _iptbl *ept, disk_partition_t *disk_part) {
 	}
 	return;
 }
-
-
-
 
 #endif
 

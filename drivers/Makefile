@@ -30,6 +30,7 @@ obj-$(CONFIG_AML_NAND) += nand/
 obj-$(CONFIG_AML_DRIVER) += amlogic/
 obj-$(CONFIG_SPI_NAND) += mtd/nand/spi-nand/
 obj-$(CONFIG_MESON_NFC) += mtd/nand/raw/aml_nand/
+obj-$(CONFIG_SCHUMACHER_SSR) += ssr/
 
 ifndef CONFIG_TPL_BUILD
 ifdef CONFIG_SPL_BUILD

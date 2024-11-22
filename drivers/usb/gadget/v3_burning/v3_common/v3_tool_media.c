@@ -6,6 +6,7 @@
 #include "../include/v3_tool_def.h"
 #include <fdtdec.h>
 #include <asm/arch/cpu_config.h>
+#include <u-boot/sha256.h>
 #define DWN_ERR FB_ERR
 #define BOOTLOADER_MAX_SZ   (0x2<<20)
 #define DTB_MAX_SZ          (256<<10)
@@ -61,13 +62,8 @@ static int bootloader_copy_sz(void)
 	if (is_bootloader_discrte(&discreteMode)) {
 		return 0;
 	}
-	if (discreteMode) {
-		return BL2_SIZE/*store_boot_copy_size("bl2")*/ + store_boot_copy_size("tpl");
-	} else {
-		return store_boot_copy_size("bootloader");
-	}
 
-	return 0;
+	return store_boot_copy_size("bootloader");
 }
 
 static int _bootloader_write(u8* dataBuf, unsigned off, unsigned binSz, const char* bootName)
@@ -91,17 +87,95 @@ static int _bootloader_write(u8* dataBuf, unsigned off, unsigned binSz, const ch
 	return 0;
 }
 
+static p_payload_info_t _bl2x_mode_detect(u8* dataBuf)
+{
+	p_payload_info_t pInfo      = (p_payload_info_t)(dataBuf + BL2_SIZE);
+
+	if (AML_MAGIC_HDR_L == pInfo->hdr.nMagicL && AML_MAGIC_HDR_R == pInfo->hdr.nMagicR) {
+		FB_MSG("aml log : bootloader blxx mode!\n");
+		return pInfo;
+	}
+	return NULL;
+}
+
+#ifdef CONFIG_SHA256
+static int _bl2x_mode_check_header(p_payload_info_t pInfo)
+{
+	p_payload_info_hdr_t hdr    = &pInfo->hdr;
+	uint8_t gensum[SHA256_SUM_LEN];
+	const int nItemNum = hdr->byItemNum;
+
+	printf("\naml log : info parse...\n");
+	printf("\tsztimes : %s\n",hdr->szTimeStamp);
+	printf("\tversion : %d\n",hdr->byVersion);
+	printf("\tItemNum : %d\n",nItemNum);
+	printf("\tSize    : %d(0x%x)\n",    hdr->nSize, hdr->nSize);
+	if (nItemNum > 8 || nItemNum < 3) { FBS_EXIT(_ACK, "illegal nitem num %d\n", nItemNum); }
+
+	const int nsz = sizeof(payload_info_hdr_t) + nItemNum * sizeof(payload_info_item_t) - SHA256_SUM_LEN;
+	FB_MSG("nsz 0x%x\n", nsz);
+	sha256_context ctx;
+	sha256_starts(&ctx);
+	sha256_update(&ctx, (u8*)&(hdr->nMagicL), nsz);
+	sha256_finish(&ctx, gensum);
+	int ret = memcmp(gensum, hdr->szSHA2, SHA256_SUM_LEN);
+	if (ret) { FBS_EXIT(_ACK, "hdr info sha256sum not matched\n"); }
+	FB_MSG("hdr info sha256sum DO matched\n");
+
+	return 0;
+}
+#else
+#define _bl2x_mode_check_header(...) 0
+#endif// #ifdef CONFIG_SHA256
+
+static const char* _flashPayload[] = {"bl2",  "bl2e", "bl2x", "ddrfip", "devfip"};
+static p_payload_info_t _blxPayloadInf = NULL;
+static int _payloadInfoSz = 0;
 static int _discrete_bootloader_write(u8* dataBuf, unsigned off, unsigned binSz)
 {
 	int bl2CopySz  = BL2_SIZE/*(int)store_boot_copy_size("bl2")*/;
 	FB_MSG("bl2CopySz 0x%x, binSz 0x%x\n", bl2CopySz, binSz);
+	int ret = 0;
 
-	int ret = _bootloader_write(dataBuf, 0, bl2CopySz, "bl2");
+	if (binSz > bl2CopySz)
+	{
+		_blxPayloadInf = NULL;
+		p_payload_info_t pInfo = _bl2x_mode_detect(dataBuf);
+		if (!pInfo) {
+			ret = _bootloader_write(dataBuf + bl2CopySz, 0, binSz - bl2CopySz, "tpl");
+			if (ret) FBS_EXIT(_ACK, "Fail in burn tpl\n");
+		} else
+		{
+			if (_bl2x_mode_check_header(pInfo)) {
+				FBS_EXIT(_ACK, "Fail in check bl2x info\n");
+			}
+			char name[8];
+			int nIndex = 0;
+			p_payload_info_hdr_t hdr    = &pInfo->hdr;
+			p_payload_info_item_t pItem = pInfo->arrItems;
+
+			int offPayload = 0, szPayload = 0;
+
+			memset(name, 0, 8);
+			for (nIndex = 1, pItem += 1; nIndex < hdr->byItemNum; ++nIndex, ++pItem)
+			{
+				memcpy(name, &pItem->nMagic, sizeof(unsigned int));
+				offPayload = pItem->nOffset;
+				szPayload  = pItem->nPayLoadSize;
+				FB_MSG("Item[%d]%4s offset 0x%08x sz 0x%x\n", nIndex, name, offPayload, szPayload);
+				if (!szPayload) continue;
+				ret = _bootloader_write(dataBuf + offPayload, 0, szPayload, _flashPayload[nIndex]);
+				if (ret) FBS_EXIT(_ACK, "Fail in flash payload %s\n", name);
+			}
+			_blxPayloadInf = (p_payload_info_t)V3_DOWNLOAD_VERIFY_INFO;
+			_payloadInfoSz = sizeof(payload_info_hdr_t) + pInfo->hdr.byItemNum * sizeof(payload_info_item_t);
+			memcpy(_blxPayloadInf, pInfo, _payloadInfoSz);
+		}
+	}
+
+	ret = _bootloader_write(dataBuf, 0, bl2CopySz, "bl2");
 	if (ret) FBS_EXIT(_ACK, "Fail in program bl2\n");
-	if (binSz <= bl2CopySz) return 0;
 
-	ret = _bootloader_write(dataBuf + bl2CopySz, 0, binSz - bl2CopySz, "tpl");
-	if (ret) FBS_EXIT(_ACK, "Fail in burn tpl\n");
 	return 0;
 }
 
@@ -150,11 +224,38 @@ static int _discrete_bootloader_read(u8* dataBuf, unsigned off, unsigned binSz)
 	FB_MSG("bl2CopySz 0x%x, binSz 0x%x\n", bl2CopySz, binSz);
 
 	int ret = _bootloader_read(dataBuf, 0, bl2CopySz, "bl2");
-	if (ret) FBS_EXIT(_ACK, "Fail in program bl2\n");
+	if (ret) FBS_EXIT(_ACK, "Fail in read bl2\n");
 	if (binSz <= bl2CopySz) return 0;
+	memset(dataBuf + bl2CopySz, 0, bl2CopySz);//clear 2k after bl2_size
 
-	ret = _bootloader_read(dataBuf + bl2CopySz, 0, binSz - bl2CopySz, "tpl");
-	if (ret) FBS_EXIT(_ACK, "Fail in burn tpl\n");
+	if (!_blxPayloadInf) {
+		ret = _bootloader_read(dataBuf + bl2CopySz, 0, binSz - bl2CopySz, "tpl");
+		if (ret) FBS_EXIT(_ACK, "Fail in read tpl\n");
+	} else {
+		char name[8];
+		int nIndex = 0;
+		if (!_blxPayloadInf) FBS_EXIT(_ACK, "exception, _blxPayloadInf null\n");
+
+		p_payload_info_t pInfo      = _blxPayloadInf;
+		p_payload_info_hdr_t hdr    = &pInfo->hdr;
+		p_payload_info_item_t pItem = pInfo->arrItems;
+
+		int offPayload = 0, szPayload = 0;
+
+		memset(name, 0, 8);
+		for (nIndex = 1, pItem +=1; nIndex < hdr->byItemNum; ++nIndex, ++pItem)
+		{
+			memcpy(name, &pItem->nMagic, sizeof(unsigned int));
+			offPayload = pItem->nOffset;
+			szPayload  = pItem->nPayLoadSize;
+			FB_MSG("Item[%d]%4s offset 0x%08x sz 0x%x\n", nIndex, name, offPayload, szPayload);
+			if (!szPayload) continue;
+			ret = _bootloader_read(dataBuf + offPayload, 0, szPayload, _flashPayload[nIndex]);
+			if (ret) FBS_EXIT(_ACK, "Fail in read payload %s\n", name);
+		}
+		memcpy(dataBuf + BL2_SIZE, _blxPayloadInf, _payloadInfoSz);
+	}
+
 	return 0;
 }
 
@@ -286,6 +387,11 @@ static int initr_env(void)
 struct mtd_partition* __attribute__((weak)) get_partition_table(int *partitions)
 { FB_WRN("get_partition_table undefined\n"); return NULL;}
 
+#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
+const char* BackupPart = (const char*)(CONFIG_BACKUP_PART_NORMAL_ERASE);
+char* BackupPartAddr = (char*)(V3_DOWNLOAD_MEM_BASE);
+#endif// #ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
+
 int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz)
 {
 	int ret = 0;
@@ -315,6 +421,9 @@ int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz)
 	if (ret <= 0)
 		FBS_EXIT(_ACK, "Fail in store init %d, ret %d\n", 1, ret);
 
+#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
+	u32 backupPartSz = 0;
+#endif//#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
 	int initFlag = 0;
 	switch (eraseFlash) {
 		case 0://NO erase
@@ -323,12 +432,21 @@ int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz)
 			break;
 
 		case 3://erase all(with key)
-			{
-				if (store_rsv_protect("key", false))
-					FBS_EXIT(_ACK, "Fail in disprotect key\n");
-			}
 		case 1://normal erase, store init 3
 			initFlag = 3;
+			if (3 == eraseFlash) {
+				if (store_rsv_protect("key", false))
+					FBS_EXIT(_ACK, "Fail in disprotect key\n");
+			} else {
+#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
+				//backup env to memory
+				backupPartSz = (u32)store_part_size(BackupPart);
+				FB_MSG("BackupPart %s sz 0x%x\n", BackupPart, backupPartSz);
+				if (!backupPartSz) { FBS_EXIT(_ACK, " FAil in find BackupPart %s\n", BackupPart);}
+				ret = store_read(BackupPart, 0, backupPartSz, BackupPartAddr);
+				if (ret) { FBS_EXIT(_ACK, "FAil in backup important part %s to mem\n", BackupPart);}
+#endif//#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
+			}
 			break;
 
 		case 4: {//force erase all
@@ -350,6 +468,12 @@ int v3tool_storage_init(const int eraseFlash, unsigned dtbImgSz)
 	} else if (initFlag > 1) {
 		ret = store_erase(NULL, 0, 0, 0);
 		if (ret) FBS_EXIT(_ACK, "Fail in erase flash, ret[%d]\n", ret);
+#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
+		if (backupPartSz) {
+			FB_MSG("restore BackupPart %s from mem\n", BackupPart);
+			store_write(BackupPart, 0, backupPartSz, BackupPartAddr);
+		}
+#endif//#ifdef CONFIG_BACKUP_PART_NORMAL_ERASE
 	}
 
 	if (V3TOOL_WORK_MODE_USB_PRODUCE == v3tool_work_mode_get()) {

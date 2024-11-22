@@ -96,7 +96,7 @@
         "firstboot=1\0"\
         "upgrade_step=0\0"\
         "jtag=disable\0"\
-        "loadaddr=1080000\0"\
+        "loadaddr=3080000\0"\
         "panel_type=lcd_1\0" \
         "outputmode=1080p60hz\0" \
         "hdmimode=1080p60hz\0" \
@@ -133,7 +133,7 @@
         "Irq_check_en=0\0"\
         "fs_type=""rootfstype=ramfs""\0"\
         "initargs="\
-            "init=/init console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 "\
+            "init=/init console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 "\
             "\0"\
         "upgrade_check="\
             "echo upgrade_step=${upgrade_step}; "\
@@ -175,7 +175,11 @@
             "fi;fi;fi;fi;fi;fi;"\
             "\0" \
         "storeboot="\
-            "boot_cooling;"\
+            "if test ${reboot_mode} = normal; then "\
+            "else if test ${reboot_mode} = cold_boot; then "\
+            "else "\
+                "boot_cooling;"\
+            "fi;fi;"\
             "get_system_as_root_mode;"\
             "echo system_mode: ${system_mode};"\
             "if test ${system_mode} = 1; then "\
@@ -391,60 +395,12 @@
 #error CONFIG_AML_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
+#if (defined(CONFIG_AML_NAND) || defined(CONFIG_MESON_NFC)) && defined(CONFIG_MESON_FBOOT)
+#error CONFIG_AML_NAND/CONFIG_MESON_NFC CONFIG _MESON_FBOOT can not support at the sametime;
+#endif
+
 #if defined(CONFIG_SPI_NAND) && defined(CONFIG_MESON_NFC)
 #error CONFIG_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
-#endif
-
-#if 0
-#ifdef CONFIG_MESON_NFC
-
-/* bootlaoder is construct by bl2 and fip
- * when DISCRETE_BOOTLOADER is enabled, bl2 & fip
- * will not be stored continuously, and nand layout
- * would be bl2|rsv|fip|normal, but not
- * bl2|fip|rsv|noraml anymore
- */
-#if 0
-#define CONFIG_DISCRETE_BOOTLOADER
-#endif
-
-#ifdef  CONFIG_DISCRETE_BOOTLOADER
-#if 0
-#define CONFIG_TPL_SIZE_PER_COPY          0x200000
-#define CONFIG_TPL_COPY_NUM               4
-#define CONFIG_TPL_PART_NAME              "tpl"
-/* for bl2, restricted by romboot */
-/* SKT 1024 pages only support 4 block, so 4 copies */
-#define CONFIG_BL2_COPY_NUM               4
-#endif
-#endif /* CONFIG_DISCRETE_BOOTLOADER */
-
-/* #define CONFIG_CMD_NAND 1 */
-#define CONFIG_MTD_DEVICE 1
-/* mtd parts of ourown.*/
-#define CONFIG_AML_MTDPART	1
-/* mtd parts by env default way.*/
-/*
-#define MTDIDS_NAME_STR		"aml_nand.0"
-#define MTDIDS_DEFAULT		"nand1=" MTDIDS_NAME_STR
-#define MTDPARTS_DEFAULT	"mtdparts=" MTDIDS_NAME_STR ":" \
-					"3M@8192K(logo),"	\
-					"10M(recovery),"	\
-					"8M(kernel),"	\
-					"40M(rootfs),"	\
-					"-(data)"
-*/
-#define CONFIG_CMD_UBI
-#define CONFIG_CMD_UBIFS
-#define CONFIG_MTD_UBI_WL_THRESHOLD 4096
-#define CONFIG_MTD_UBI_BEB_LIMIT 20
-#define CONFIG_RBTREE
-#define CONFIG_CMD_NAND_TORTURE 1
-#define CONFIG_CMD_MTDPARTS   1
-#define CONFIG_MTD_PARTITIONS 1
-#define CONFIG_SYS_MAX_NAND_DEVICE  2
-#define CONFIG_SYS_NAND_BASE_LIST   {0}
-#endif
 #endif
 
 /* #define		CONFIG_AML_SD_EMMC 1 */
@@ -462,14 +418,7 @@
 #endif
 
 #if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND
-	#define CONFIG_CMD_NAND 1
-	#define CONFIG_MTD_DEVICE 1
-	/* #define CONFIG_RBTREE */
-	#define CONFIG_CMD_NAND_TORTURE 1
-	#define CONFIG_CMD_MTDPARTS   1
-	#define CONFIG_MTD_PARTITIONS 1
 	#define CONFIG_SYS_MAX_NAND_DEVICE  2
-	#define CONFIG_SYS_NAND_BASE_LIST   {0}
 #endif
 
 /* vpu */

@@ -442,6 +442,18 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 		0,
 		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE )},
 
+	{"Slc NAND 4Gib MX30LF4G28AD ",
+		{NAND_MFR_MACRONIX, 0xdc, 0x90, 0xA2, 0x57, 0x03},
+		4096,
+		512,
+		0x40000,
+		256,
+		1,
+		16,
+		15,
+		0,
+		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE )},
+
 	{"A revision NAND 128MB TC58NVG0S3HTA00 ",
 		{NAND_MFR_TOSHIBA, 0xf1, 0x80, 0x15, 0x72},
 		2048,
@@ -1053,9 +1065,6 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 	printk("NAND device id: %x %x %x %x %x %x \n",
 	dev_id[0], dev_id[1], dev_id[2], dev_id[3], dev_id[4], dev_id[5]);
 
-#if 0
-	test_timing(mtd, chip);
-#endif
 	/* Lookup the flash id */
 	for (i = 0; aml_nand_flash_ids[i].name != NULL; i++) {
 		if (!strncmp((char*) aml_nand_flash_ids[i].id,
@@ -1065,16 +1074,6 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 		}
 	}
 
-	if (pre_scan->pre_scan_flag) {
-		if (type) {
-			/*printk(KERN_INFO "NAND device: Manufacturer ID:"
-	       " 0x%02x, Chip ID: 0x%02x (%s %s)\n", *maf_id, dev_id[0],
-	       nand_manuf_ids[maf_idx].name, type->name);*/
-			pre_scan->is_nand = 1;
-		}
-		return type;
-	}
-
 	if (!type) {
 		if (plat->nand_flash_dev) {
 			if (!strncmp((char*) plat->nand_flash_dev->id,
@@ -1082,14 +1081,19 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 				type = plat->nand_flash_dev;
 		}
 
-		if (!type)
-			return ERR_PTR(-ENODEV);
+		if (!type) {
+			pre_scan->is_nand = 0;
+			return type;
+		}
 	}
 	aml_nand_check_fbb_issue(dev_id);
 
-	/**fixme**/
-	if (plat->nand_flash_dev) {
-		plat->nand_flash_dev = type;
+	plat->nand_flash_dev = type;
+
+	if (pre_scan->pre_scan_flag) {
+		if (type)
+			pre_scan->is_nand = 1;
+		return type;
 	}
 #ifdef CONFIG_MTD_DEVICE
 		mtd->name = type->name;
@@ -1207,8 +1211,8 @@ static int aml_nand_scan_ident(struct mtd_info *mtd, int maxchips)
 	aml_type = aml_nand_get_flash_type(mtd, chip, busw, &nand_maf_id);
 	if (pre_scan->pre_scan_flag) {
 		if (!aml_type) {
-		chip->select_chip(mtd, -1);
-		return PTR_ERR(aml_type);
+			chip->select_chip(mtd, -1);
+			return -ENODEV;
 		}
 		return 0;
 	}

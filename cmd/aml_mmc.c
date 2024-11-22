@@ -325,7 +325,7 @@ int amlmmc_write_bootloader(int dev, int map, unsigned int size, const void *src
 	/* erase bootloader in user/boot0/boot1 */
 	for (i = mmc_part_nonius; i < count; i++) {
 		if (map & (0x1 << i)) {
-			if (!blk_select_hwpart(mmc->dev,i)) {
+			if (!blk_select_hwpart_devnum(IF_TYPE_MMC, 1, i)) {
 /* some customer may use boot1 higher 2M as private data. */
 #ifdef CONFIG_EMMC_BOOT1_TOUCH_REGION
 				if (2 == i && CONFIG_EMMC_BOOT1_TOUCH_REGION <= size) {
@@ -1464,7 +1464,6 @@ static int do_amlmmc_key(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[
 }
 #endif
 
-#ifdef CONFIG_WRITE_PROTECT
 static int set_write_prot(struct mmc *mmc, u64 start)
 {
 	struct mmc_cmd cmd;
@@ -1646,9 +1645,9 @@ static int compute_write_protect_range(struct mmc *mmc, char *name,
 	int blk_shift;
 	struct partitions *part_info;
 	u64 cnt;
-	u64 start = 0;
-	u64 align_start = 0;
-	u64 wp_grp_size = 0;
+	u64 start = *start_addr;
+	u64 align_start = *start_addr;
+	u64 wp_grp_size = *wp_grp_size_addr;
 	u64 group_num ;
 	u64 partition_end;
 
@@ -2514,7 +2513,6 @@ static int do_amlmmc_send_wp_type(cmd_tbl_t *cmdtp,
 
 	return ret;
 }
-#endif
 
 static int set_driver_strength(struct mmc *mmc, int strength)
 {
@@ -2669,12 +2667,10 @@ static cmd_tbl_t cmd_amlmmc[] = {
 	U_BOOT_CMD_MKENT(controller,    3, 0, do_amlmmc_controller,    "", ""),
 	U_BOOT_CMD_MKENT(size,          4, 0, do_amlmmc_size,          "", ""),
 	U_BOOT_CMD_MKENT(env,           2, 0, do_amlmmc_env,           "", ""),
-#ifdef CONFIG_WRITE_PROTECT
 	U_BOOT_CMD_MKENT(write_protect, 5, 0, do_amlmmc_write_protect,  "", ""),
 	U_BOOT_CMD_MKENT(send_wp_status, 4, 0, do_amlmmc_send_wp_status, "", ""),
 	U_BOOT_CMD_MKENT(send_wp_type,   4, 0, do_amlmmc_send_wp_type, "", ""),
 	U_BOOT_CMD_MKENT(clear_wp,      4, 0, do_amlmmc_clear_wp,      "", ""),
-#endif
 	U_BOOT_CMD_MKENT(ds,            4, 0, do_amlmmc_driver_strength, "", ""),
 #ifdef CONFIG_SECURITYKEY
 	U_BOOT_CMD_MKENT(key,           2, 0, do_amlmmc_key,           "", ""),
@@ -2713,7 +2709,6 @@ U_BOOT_CMD(
 	"amlmmc ext_csd <device_num> <byte> <value> - write sd/emmc device EXT_CSD [byte] value\n"
 	"amlmmc response <device_num> - read sd/emmc last command response\n"
 	"amlmmc controller <device_num> - read sd/emmc controller register\n"
-#ifdef CONFIG_WRITE_PROTECT
 	"amlmmc write_protect <partition_name> <write_protect_type>\n"
 	"        - set write protect on partition through power_on or temporary\n"
 	"amlmmc write_protect <addr_base16> <cnt_base10> <write_protect_type>\n"
@@ -2724,7 +2719,6 @@ U_BOOT_CMD(
 	"amlmmc send_wp_type <addr_base16> <cnt_base10> send protect type on specified address\n"
 	"amlmmc clear_wp <partition_name> clear write protect of partition\n"
 	"amlmmc clear_wp <addr_base16> <cnt_base10> clear write protect on specified addresst\n"
-#endif
 	"amlmmc ds <dev_num> <val> set driver strength\n"
 #ifdef CONFIG_SECURITYKEY
 	"amlmmc key - disprotect key partition\n"
@@ -3203,6 +3197,34 @@ __weak int emmc_update_mbr(unsigned char *buffer)
 	printf("%s: update mbr %s\n", __func__, ret?"Fail":"Success");
 _out:
 	return ret;
+}
+
+int emmc_erase_rsv(struct mmc *mmc, char *rsv_part)
+{
+	u64 cnt = 0, n = 0, blk = 0;
+	struct partitions *part = NULL;
+	struct virtual_partition *vpart = NULL;
+
+	if (rsv_part == NULL)
+		return -1;
+
+	vpart = aml_get_virtual_partition_by_name(MMC_DTB_NAME);
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	if (strcmp(rsv_part, "dtb") == 0) {
+		blk = (part->offset + vpart->offset) / mmc->read_bl_len;
+		cnt = (vpart->size * 2) / mmc->read_bl_len;
+		if (cnt != 0)
+			n = blk_derase(mmc_get_blk_desc(mmc), blk, cnt);
+		printf("%s is erased %s\n",
+				rsv_part, (n == 0) ? "OK" : "ERROR");
+		return (n == 0) ? 0 : 1;
+	} else if (strcmp(rsv_part, "key") == 0) {
+		n = mmc_key_erase();
+		printf("%s is erased %s\n",
+				rsv_part, (n == 0) ? "OK" : "ERROR");
+		return (n == 0) ? 0 : 1;
+	}
+	return 1;
 }
 
 int do_emmc_erase(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])

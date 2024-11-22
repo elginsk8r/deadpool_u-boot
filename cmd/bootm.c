@@ -25,7 +25,7 @@
 #include <anti-rollback.h>
 #endif
 #include <asm/arch/secure_apb.h>
-#ifdef CONFIG_MESON_C1
+#if defined(CONFIG_MESON_C1) || defined(CONFIG_MESON_C2)
 #include <asm/arch/register.h>
 #endif
 #include <time_logging.h>
@@ -96,7 +96,7 @@ static int do_bootm_subcommand(cmd_tbl_t *cmdtp, int flag, int argc,
 
 static int is_secure_boot_enabled(void)
 {
-#ifdef CONFIG_MESON_C1
+#if defined(CONFIG_MESON_C1) || defined(CONFIG_MESON_C2)
 	const unsigned long cfg10 = readl(SYSCTRL_SEC_STATUS_REG1);
 	return ( cfg10 & (0x1 << 0) );
 #else
@@ -180,6 +180,21 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		pr_info("GXB_IMG_SIZE: 0x%x\n", GXB_IMG_SIZE);
 		pr_info("GXB_IMG_DEC_ALL: 0x%x\n", GXB_IMG_DEC_ALL);
 	}
+
+#ifdef CONFIG_G_AB_SYSTEM
+	/* for unsigned boot.img, the aml_sec_boot_check don't verify it's integrity and reliability,
+	 * check the loading status, which we stored to stick register on the loading stage(imgread.c).
+	 * */
+	if (!nRet) {
+		unsigned int load_fail;
+		load_fail = (readl(P_AO_RTI_STICKY_REG0) >> 26) & 0x1;
+		if (load_fail) {
+			writel(readl(P_AO_RTI_STICKY_REG0) & ~(1 << 26), P_AO_RTI_STICKY_REG0);
+			nRet = -1;
+		}
+	}
+#endif
+
 	if (nRet)
 	{
 		pr_info("\naml log : Sig Check %d\n",nRet);
@@ -233,6 +248,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		argv = (char**)&argv_new;
 	}
 
+#ifndef CONFIG_G_AB_SYSTEM
 #ifdef CONFIG_CMD_BOOTCTOL_AVB
 	char *avb_s = env_get("avb2");
 	if (avb_s == NULL) {
@@ -280,20 +296,43 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		if (!bootargs) {
 			bootargs = "\0";
 		}
-		if (is_device_unlocked())
-			bootstate = bootstate_o;
-		else
-			bootstate = bootstate_g;
-		newbootargs = malloc(strlen(bootargs) + strlen(out_data->cmdline) + strlen(bootstate) + 1 + 1 + 1);
-		if (!newbootargs) {
-			printf("failed to allocate buffer for bootarg\n");
-			return -1;
+
+		if (out_data) {
+			keymaster_boot_params boot_params;
+			const int is_dev_unlocked = is_device_unlocked();
+
+			boot_params.device_locked = is_dev_unlocked? 0: 1;
+			if (is_dev_unlocked) {
+				bootstate = bootstate_o;
+				boot_params.verified_boot_state = 2;
+			}
+			else {
+				bootstate = bootstate_g;
+				boot_params.verified_boot_state = 0;
+			}
+			memcpy(boot_params.verified_boot_key, out_data->boot_key_hash,
+					sizeof(boot_params.verified_boot_key));
+			memcpy(boot_params.verified_boot_hash, out_data->vbmeta_digest,
+					sizeof(boot_params.verified_boot_hash));
+
+			if (set_boot_params(&boot_params) < 0) {
+				printf("failed to set boot params.\n");
+			}
+
+			newbootargs = malloc(strlen(bootargs) + strlen(out_data->cmdline) + strlen(bootstate) + 1 + 1 + 1);
+			if (!newbootargs) {
+				printf("failed to allocate buffer for bootarg\n");
+				return -1;
+			}
+			sprintf(newbootargs, "%s %s %s", bootargs, out_data->cmdline, bootstate);
+			env_set("bootargs", newbootargs);
+			free(newbootargs);
+			newbootargs = NULL;
+			avb_slot_verify_data_free(out_data);
 		}
-		sprintf(newbootargs, "%s %s %s", bootargs, out_data->cmdline, bootstate);
-		env_set("bootargs", newbootargs);
-		avb_slot_verify_data_free(out_data);
 	}
 #endif//CONFIG_CMD_BOOTCTOL_AVB
+#endif
 	return do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START |
 		BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER |
 		BOOTM_STATE_LOADOS |

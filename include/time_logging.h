@@ -15,12 +15,12 @@
 
 static inline void logging_set_num(uint32_t num)
 {
-	*(uint32_t *)LOG_UBOOT_NUM = num;
+	//*(uint32_t *)LOG_UBOOT_NUM = num;
 }
 
 static inline void logging_set_entry(uint64_t entry)
 {
-	*(uint32_t *)entry = get_time();
+	//*(uint32_t *)entry = get_time();
 }
 
 #endif /* __TIME_LOGGING_H_ */

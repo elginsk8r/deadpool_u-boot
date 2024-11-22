@@ -430,7 +430,7 @@ int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 }
 
 #ifndef CONFIG_AML_SPIFCV2
-static int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
+int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 		size_t len, const void *buf)
 #else
 static int _spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
@@ -1402,8 +1402,8 @@ int spi_flash_scan(struct spi_flash *flash)
 	print_size(flash->size, "");
 	if (flash->memory_map)
 		printf(", mapped at %p", flash->memory_map);
-		printf(" erase_cmd = 0x%x read_cmd = 0x%x write_cmd = 0x%x\n",
-			flash->erase_cmd, flash->read_cmd, flash->write_cmd);
+	printf(" erase_cmd = 0x%x read_cmd = 0x%x write_cmd = 0x%x\n",
+	       flash->erase_cmd, flash->read_cmd, flash->write_cmd);
 	puts("\n");
 #endif
 

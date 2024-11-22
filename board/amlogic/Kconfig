@@ -35,6 +35,12 @@ config AML_CRYPTO_UBOOT
 	help
 		"Support U-boot encrypt function"
 
+config UBOOT_RUN_IN_SRAM
+	bool "Amlogic U-boot run in sram"
+	default n
+	help
+		"Support Amlogic U-boot run in SRAM"
+
 config AML_TSENSOR
 	bool "Amlogic Temp Sensor"
 	help
@@ -137,7 +143,8 @@ config A1_AD401_NOR_RTOS
 config A1_AD401_NAND_RTOS
 	bool "A1_AD401_NAND_RTOS"
 	select TARGET_A1_AD401
-	select SPI_NAND
+	#select SPI_NAND
+	select MTD_SPI_NAND
 	select SYSTEM_RTOS
 	help
 	  Select A1 AD401 NOR RTOS board config
@@ -145,7 +152,8 @@ config A1_AD401_NAND_RTOS
 config A1_AD401_NAND_LINUX
 	bool "A1_AD401_NAND_LINUX"
 	select TARGET_A1_AD401
-	select SPI_NAND
+	#select SPI_NAND
+	select MTD_SPI_NAND
 	help
 	  Select A1 AD401 NOR RTOS board config
 
@@ -160,7 +168,8 @@ config A1_AD402_NOR_RTOS
 config A1_AD402_NAND_RTOS
 	bool "A1_AD402_NAND_RTOS"
 	select TARGET_A1_AD402
-	select SPI_NAND
+	#select SPI_NAND
+	select MTD_SPI_NAND
 	select SYSTEM_RTOS
 	help
 	  Select A1 AD402 NOR RTOS board config
@@ -168,7 +177,8 @@ config A1_AD402_NAND_RTOS
 config A1_AD402_NAND_LINUX
 	bool "A1_AD402_NAND_LINUX"
 	select TARGET_A1_AD402
-	select SPI_NAND
+	#select SPI_NAND
+	select MTD_SPI_NAND
 	help
 	  Select A1 AD402 NOR RTOS board config
 
@@ -183,7 +193,8 @@ config A1_AD409_NOR_RTOS
 config A1_AD409_NAND_RTOS
 	bool "A1_AD409_NAND_RTOS"
 	select TARGET_A1_AD409
-	select SPI_NAND
+	#select SPI_NAND
+	select MTD_SPI_NAND
 	select SYSTEM_RTOS
 	help
 	  Select A1 AD409 NOR RTOS board config
@@ -191,7 +202,8 @@ config A1_AD409_NAND_RTOS
 config A1_AD409_NAND_LINUX
 	bool "A1_AD409_NAND_LINUX"
 	select TARGET_A1_AD409
-	select SPI_NAND
+	#select SPI_NAND
+	select MTD_SPI_NAND
 	help
 	  Select A1 AD409 NOR RTOS board config
 
@@ -285,6 +297,12 @@ config C1_AE401
 	help
 	  Select C1 AE401 config
 
+config C1_AE402
+	bool "C1_AE402"
+	select TARGET_C1_AE402
+	help
+	  Select C1 AE402 config
+
 endchoice
 
 config TARGET_C1_AE409
@@ -322,6 +340,313 @@ config TARGET_C1_GQ_BX
 config TARGET_C1_AE401
 	bool "C1 AE401 board"
 	depends on C1_AE401
+
+config TARGET_C1_AE402
+	bool "C1 AE402 board"
+	depends on C1_AE402
+
+endif
+
+if MESON_SC2
+
+config SYS_SOC
+	default "sc2"
+
+config DDRFW_TYPE
+	string "SC2 DDR FW Type"
+	default "ddr4"
+
+config BL30_SELECT
+	string "SC2 BL30 board config"
+	default "sc2_ah219"
+
+choice
+	prompt "SC2 Board"
+
+config SC2_SKT
+	bool "SC2_SKT"
+	select TARGET_SC2_SKT
+	help
+	  Select SC2 SKT(XXXX) config
+
+config SC2_AH219
+	bool "SC2_AH219"
+	select TARGET_SC2_AH219
+	help
+	  Select SC2 AH219 config
+
+config SC2_AH212
+	bool "SC2_AH212"
+	select TARGET_SC2_AH212
+	help
+	  Select SC2 AH212 config
+
+config SC2_AH212_DDR3
+	bool "SC2_AH212_DDR3"
+	select TARGET_SC2_AH212_DDR3
+	help
+	  Select SC2 AH212 DDR3 config
+
+config SC2_AH212_LPDDR3
+	bool "SC2_AH212_LPDDR3"
+	select TARGET_SC2_AH212_LPDDR3
+	help
+	  Select SC2 AH212 LPDDR3 config
+
+config SC2_AH212_LPDDR4
+	bool "SC2_AH212_LPDDR4"
+	select TARGET_SC2_AH212_LPDDR4
+	help
+	  Select SC2 AH212 LPDDR4 config
+
+endchoice
+
+config TARGET_SC2_SKT
+	bool "SC2 SKT board"
+	depends on SC2_SKT
+
+config TARGET_SC2_AH219
+	bool "SC2 AH219 board"
+	depends on SC2_AH219
+
+config TARGET_SC2_AH212
+	bool "SC2 AH212 board"
+	depends on SC2_AH212
+
+config TARGET_SC2_AH212_DDR3
+	bool "SC2 AH212 ddr3 board"
+	depends on SC2_AH212_DDR3
+
+config TARGET_SC2_AH212_LPDDR3
+	bool "SC2 AH212 lpddr3 board"
+	depends on SC2_AH212_LPDDR3
+
+config TARGET_SC2_AH212_LPDDR4
+	bool "SC2 AH212 lpddr4 board"
+	depends on SC2_AH212_LPDDR4
+
+endif
+
+if MESON_C2
+
+config SYS_SOC
+	default "c2"
+
+choice
+	prompt "C2 Board"
+
+config C2_SKT
+	bool "C2_SKT"
+	select TARGET_C2_SKT
+	help
+	  Select C2 SKT config mainly for pxp
+
+config C2_AF409
+	bool "C2_AF409"
+	select TARGET_C2_AF409
+	help
+	  Select C2_AF409 (SKT) config
+
+config C2_AF400
+	bool "C2_AF400"
+	select TARGET_C2_AF400
+	help
+	  Select C2_AF400 config
+
+config C2_AF401
+	bool "C2_AF401"
+	select TARGET_C2_AF401
+	help
+	  Select C2_AF401 config
+
+config C2_AF419
+	bool "C2_AF419"
+	select TARGET_C2_AF419
+	help
+	  Select C2_AF419 config
+
+config C2_A049_P0
+	bool "C2_A049_P0"
+	select TARGET_C2_A049_P0
+	help
+	  Select C2 A049 P0 config
+
+config C2_BSV3_P1
+	bool "C2_BSV3_P1"
+	select TARGET_C2_BSV3_P1
+	help
+	  Select C2 BSV3 P1 config
+
+config C2_SPENCER_P1
+	bool "C2_SPENCER_P1"
+	select TARGET_C2_SPENCER_P1
+	help
+	  Select C2 SPENCER P1 config
+
+config C2_SPENCER_P2
+	bool "C2_SPENCER_P2"
+	select TARGET_C2_SPENCER_P2
+	help
+	  Select C2 SPENCER P2 config
+
+config C2_SPENCER_BX
+	bool "C2_SPENCER_BX"
+	select TARGET_C2_SPENCER_BX
+	help
+	  Select C2 SPENCER BX config
+
+config C2_VENUS_P1
+	bool "C2_VENUS_P1"
+	select TARGET_C2_VENUS_P1
+	help
+	  Select C2 VENUS P1 config
+
+config C2_VENUS_P2
+	bool "C2_VENUS_P2"
+	select TARGET_C2_VENUS_P2
+	help
+	  Select C2 VENUS P2 config
+
+config C2_VENUS_BX
+	bool "C2_VENUS_BX"
+	select TARGET_C2_VENUS_BX
+	help
+	  Select C2 VENUS BX config
+
+config C2_BLA4_P0
+	bool "C2_BLA4_P0"
+	select TARGET_C2_BLA4_P0
+	help
+	  Select C2 BLA4 P0 config
+
+config C2_BLA4_P1
+	bool "C2_BLA4_P1"
+	select TARGET_C2_BLA4_P1
+	help
+	  Select C2 BLA4 P1 config
+
+config C2_BLA4_P2
+	bool "C2_BLA4_P2"
+	select TARGET_C2_BLA4_P2
+	help
+	  Select C2 BLA4 P2 config
+
+config C2_BLA4_BX
+	bool "C2_BLA4_BX"
+	select TARGET_C2_BLA4_BX
+	help
+	  Select C2 BLA4 BX config
+
+config C2_2RS4_P1
+	bool "C2_2RS4_P1"
+	select TARGET_C2_2RS4_P1
+	help
+	  Select C2 2RS4 P1 config
+
+config C2_2RS4_P2
+	bool "C2_2RS4_P2"
+	select TARGET_C2_2RS4_P2
+	help
+	  Select C2 2RS4 P2 config
+
+config C2_XUA4_P1
+	bool "C2_XUA4_P1"
+	select TARGET_C2_XUA4_P1
+	help
+	  Select C2 XUA4 P1 config
+
+config C2_XUA4_BX
+	bool "C2_XUA4_BX"
+	select TARGET_C2_XUA4_BX
+	help
+	  Select C2 XUA4 BX config
+
+endchoice
+
+config TARGET_C2_SKT
+	bool "C2 SKT board"
+	depends on C2_SKT
+
+config TARGET_C2_AF409
+	bool "C2 AF409 board"
+	depends on C2_AF409
+
+
+config TARGET_C2_AF400
+	bool "C2 AF400 board"
+	depends on C2_AF400
+
+config TARGET_C2_AF401
+	bool "C2 AF401 board"
+	depends on C2_AF401
+
+config TARGET_C2_AF419
+	bool "C2 AF419 board"
+	depends on C2_AF419
+
+config TARGET_C2_A049_P0
+	bool "C2 A049 P0 board"
+	depends on C2_A049_P0
+
+config TARGET_C2_BSV3_P1
+	bool "C2 BSV3 P1 board"
+	depends on C2_BSV3_P1
+
+config TARGET_C2_SPENCER_P1
+	bool "C2 SPENCER P1 board"
+	depends on C2_SPENCER_P1
+
+config TARGET_C2_SPENCER_P2
+	bool "C2 SPENCER P2 board"
+	depends on C2_SPENCER_P2
+
+config TARGET_C2_SPENCER_BX
+	bool "C2 SPENCER BX board"
+	depends on C2_SPENCER_BX
+
+config TARGET_C2_VENUS_P1
+	bool "C2 VENUS P1 board"
+	depends on C2_VENUS_P1
+
+config TARGET_C2_VENUS_P2
+	bool "C2 VENUS P2 board"
+	depends on C2_VENUS_P2
+
+config TARGET_C2_VENUS_BX
+	bool "C2 VENUS BX board"
+	depends on C2_VENUS_BX
+
+config TARGET_C2_BLA4_P0
+	bool "C2 BLA4 P0 board"
+	depends on C2_BLA4_P0
+
+config TARGET_C2_BLA4_P1
+	bool "C2 BLA4 P1 board"
+	depends on C2_BLA4_P1
+
+config TARGET_C2_BLA4_P2
+	bool "C2 BLA4 P2 board"
+	depends on C2_BLA4_P2
+
+config TARGET_C2_BLA4_BX
+	bool "C2 BLA4 BX board"
+	depends on C2_BLA4_BX
+
+config TARGET_C2_2RS4_P1
+	bool "C2 2RS4 P1 board"
+	depends on C2_2RS4_P1
+
+config TARGET_C2_2RS4_P2
+	bool "C2 2RS4 P2 board"
+	depends on C2_2RS4_P2
+
+config TARGET_C2_XUA4_P1
+	bool "C2 XUA4 P1 board"
+	depends on C2_XUA4_P1
+
+config TARGET_C2_XUA4_BX
+	bool "C2 XUA4 BX board"
+	depends on C2_XUA4_BX
 
 endif
 
@@ -363,6 +688,8 @@ source "board/amlogic/c1_ae400/Kconfig"
 
 source "board/amlogic/c1_ae401/Kconfig"
 
+source "board/amlogic/c1_ae402/Kconfig"
+
 source "board/amlogic/c1_ae409/Kconfig"
 
 source "board/amlogic/c1_nq_p2/Kconfig"
@@ -372,6 +699,60 @@ source "board/amlogic/c1_nq_bx/Kconfig"
 source "board/amlogic/c1_gq_p2/Kconfig"
 
 source "board/amlogic/c1_gq_bx/Kconfig"
+
+source "board/amlogic/sc2_skt/Kconfig"
+
+source "board/amlogic/sc2_ah219/Kconfig"
+
+source "board/amlogic/sc2_ah212/Kconfig"
+
+source "board/amlogic/sc2_ah212_ddr3/Kconfig"
+
+source "board/amlogic/sc2_ah212_lpddr3/Kconfig"
+
+source "board/amlogic/sc2_ah212_lpddr4/Kconfig"
+
+source "board/amlogic/c2_skt/Kconfig"
+
+source "board/amlogic/c2_af409/Kconfig"
+
+source "board/amlogic/c2_af400/Kconfig"
+
+source "board/amlogic/c2_af401/Kconfig"
+
+source "board/amlogic/c2_af419/Kconfig"
+
+source "board/amlogic/c2_a049_p0/Kconfig"
+
+source "board/amlogic/c2_bsv3_p1/Kconfig"
+
+source "board/amlogic/c2_spencer_p1/Kconfig"
+
+source "board/amlogic/c2_spencer_p2/Kconfig"
+
+source "board/amlogic/c2_spencer_bx/Kconfig"
+
+source "board/amlogic/c2_venus_p1/Kconfig"
+
+source "board/amlogic/c2_venus_p2/Kconfig"
+
+source "board/amlogic/c2_venus_bx/Kconfig"
+
+source "board/amlogic/c2_bla4_p0/Kconfig"
+
+source "board/amlogic/c2_bla4_p1/Kconfig"
+
+source "board/amlogic/c2_bla4_p2/Kconfig"
+
+source "board/amlogic/c2_bla4_bx/Kconfig"
+
+source "board/amlogic/c2_2rs4_p1/Kconfig"
+
+source "board/amlogic/c2_2rs4_p2/Kconfig"
+
+source "board/amlogic/c2_xua4_p1/Kconfig"
+
+source "board/amlogic/c2_xua4_bx/Kconfig"
 
 source "board/amlogic/g12a_u200_v1/Kconfig"
 

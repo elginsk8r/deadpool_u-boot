@@ -142,6 +142,7 @@
 struct spinand_info {
 	struct nand_hw_control controller;
 	struct nand_chip chip;
+	unsigned int planes_per_lun;
 #ifndef	__UBOOT__
 	struct spi_device *pdev;
 #else
@@ -174,7 +175,8 @@ struct info_page {
 #define SPINAND_INFO_VER    1
 			u8 rd_max; /* spi nand max read io */
 			u8 oob_offset; /* user bytes offset */
-			u8 reserved[2];
+			u8 planes_per_lun;
+			u8 reserved;
 			u32 fip_start; /* start pages */
 			u32 fip_pages; /* pages per fip */
 			u32 page_size; /* spi nand page size (bytes) */
@@ -377,10 +379,28 @@ struct nand_flash_dev spi_nand_ids[] = {
 		.id_len = 2,
 		.oobsize = 64
 	},
+	{"SPI NAND TC58CVG1S3HRAIG 256MiB 3.3V",
+		{ .id = {0x98, 0xcb} },
+		.pagesize = SZ_2K,
+		.chipsize = SZ_256M,
+		.erasesize = SZ_128K,
+		.options = SPI_RX_QUAD,
+		.id_len = 2,
+		.oobsize = 64
+	},
 	{"SPI NAND ZD35Q1GA 128MiB 3.3V",
 		{ .id = {0xba, 0x71} },
 		.pagesize = SZ_2K,
 		.chipsize = SZ_128M,
+		.erasesize = SZ_128K,
+		.options = SPI_TX_QUAD | SPI_RX_DUAL | SPI_RX_QUAD,
+		.id_len = 2,
+		.oobsize = 64
+	},
+	{"SPI NAND ZD35Q2GA 256MiB 3.3V",
+		{ .id = {0xba, 0x72} },
+		.pagesize = SZ_2K,
+		.chipsize = SZ_256M,
 		.erasesize = SZ_128K,
 		.options = SPI_TX_QUAD | SPI_RX_DUAL | SPI_RX_QUAD,
 		.id_len = 2,
@@ -404,9 +424,24 @@ struct nand_flash_dev spi_nand_ids[] = {
 		.id_len = 2,
 		.oobsize = 64
 	},
+	{"MT29F2G01ABAGD/F50L2G41XA 256MiB 3.3V",
+		{ .id = {0x2c, 0x24} },
+		.pagesize = SZ_2K,
+		.chipsize = SZ_256M,
+		.erasesize = SZ_128K,
+		.options = SPI_TX_QUAD | SPI_RX_DUAL | SPI_RX_QUAD,
+		.id_len = 2,
+		.oobsize = 64
+	},
 
 	{NULL}
 };
+
+static int chip_plane_ids[][3] = {
+	{ 0xba, 0x72, 2 },	/* ZD35Q2GA */
+	{ 0x2c, 0x24, 2 },	/* MT29F2G01ABAGD/F50L2G41XA */
+};
+
 
 #ifdef CONFIG_AML_STORAGE
 extern int spinand_fit_storage(struct nand_chip *chip, char *name, u8 *id);
@@ -562,11 +597,23 @@ static u8 *transfer_oob(struct nand_chip *chip, u8 *oob,
 	return NULL;
 }
 
+static unsigned int plane_of_page_addr(struct mtd_info *mtd,
+					u32 page_addr)
+{
+	struct spinand_info *info = mtd_to_spinand(mtd);
+	struct nand_chip *chip = mtd->priv;
+
+	return ((page_addr >> (chip->phys_erase_shift - chip->page_shift))
+		% info->planes_per_lun);
+}
+
 static void spinand_cmdfunc(struct mtd_info *mtd,
 			    unsigned int command,
 			    int column, int page_addr)
 {
 	struct spinand_info *info = mtd_to_spinand(mtd);
+	struct nand_chip *chip = mtd->priv;
+	unsigned int plane;
 
 	memset(info->cmd, 0, MAX_CMD_SIZE);
 	info->cmd[0] = command;
@@ -606,6 +653,10 @@ static void spinand_cmdfunc(struct mtd_info *mtd,
 
 	case SPINAND_CMD_PLOAD:
 	case SPINAND_CMD_QUAD_PLOAD:
+		if (info->planes_per_lun > 1) {
+			plane = plane_of_page_addr(mtd, page_addr);
+			column |= plane << (chip->page_shift + 1);
+		}
 		info->cmd[1] = (u8)(column >> 8);
 		info->cmd[2] = (u8)(column);
 		info->cmd_len = 3;
@@ -615,6 +666,10 @@ static void spinand_cmdfunc(struct mtd_info *mtd,
 	case SPINAND_CMD_FAST_READ:
 	case SPINAND_CMD_DUAL_READ:
 	case SPINAND_CMD_QUAD_READ:
+		if (info->planes_per_lun > 1) {
+			plane = plane_of_page_addr(mtd, page_addr);
+			column |= plane << (chip->page_shift + 1);
+		}
 		if (info->chip_ver != GIGA_SPINAND_CHIP_VER_C) {
 			info->cmd[1] = (u8)(column >> 8);
 			info->cmd[2] = (u8)(column);
@@ -805,7 +860,7 @@ int erase_nand(struct mtd_info *mtd, struct erase_info *instr, int allowbbt)
 
 	if (meson_rsv_erase_protect(info->rsv, instr->addr / mtd->erasesize)) {
 		printf("%s blk 0x%x is protected\n", __func__,
-			instr->addr / mtd->erasesize);
+		       (unsigned int)instr->addr / mtd->erasesize);
 		goto erase_exit;
 	}
 
@@ -1035,7 +1090,7 @@ static int spinand_do_read_ops(struct mtd_info *mtd,
 			    (info->id[0] == NAND_MFR_MACRONIX) ||
 			    (info->id[0] == NAND_MFR_ZETTA)))
 				spinand_set_qeb(mtd, chip);
-			chip->cmdfunc(mtd, info->read_cmd, 0, -1);
+			chip->cmdfunc(mtd, info->read_cmd, 0, page);
 			if (unlikely(ops->mode == MTD_OPS_RAW))
 				ret = chip->ecc.read_page_raw(mtd, chip, bufpoi,
 							oob_required, page);
@@ -1178,6 +1233,7 @@ static int spinand_set_infopage(struct mtd_info *mtd,
 	info_page->dev.s.page_size = mtd->writesize;
 	info_page->dev.s.page_per_blk = page_per_blk;
 	info_page->dev.s.oob_size = mtd->oobsize;
+	info_page->dev.s.planes_per_lun = spinand->planes_per_lun;
 	info_page->dev.s.oob_offset = mtd->ecclayout->oobfree[0].offset;
 	if (spinand->rsv->bbt->valid) {
 		info_page->dev.s.bbt_start =
@@ -1239,7 +1295,7 @@ static int spinand_do_read_oob(struct mtd_info *mtd,
 		    (info->id[0] == NAND_MFR_MACRONIX) ||
 		    (info->id[0] == NAND_MFR_ZETTA)))
 			spinand_set_qeb(mtd, chip);
-		chip->cmdfunc(mtd, info->read_cmd, mtd->writesize, -1);
+		chip->cmdfunc(mtd, info->read_cmd, mtd->writesize, page);
 
 		if (ops->mode == MTD_OPS_RAW)
 			ret = chip->ecc.read_oob_raw(mtd, chip, page);
@@ -1414,7 +1470,7 @@ static int spinand_write_page_raw(struct mtd_info *mtd,
 		pr_debug("%s %d write info page to page %d\n",
 			 __func__, __LINE__, (page + 1));
 		chip->cmdfunc(mtd, SPINAND_CMD_WREN, -1, -1);
-		chip->cmdfunc(mtd, info->pload_cmd, 0x00, -1);
+		chip->cmdfunc(mtd, info->pload_cmd, 0x00, page + 1);
 		chip->write_buf(mtd, (u8 *)info_buf, mtd->writesize);
 
 		if (info->status < 0)
@@ -1455,7 +1511,7 @@ static int spinand_write_page(struct mtd_info *mtd,
 	    (info->id[0] == NAND_MFR_ZETTA)))
 		spinand_set_qeb(mtd, chip);
 	chip->cmdfunc(mtd, SPINAND_CMD_WREN, -1, -1);
-	chip->cmdfunc(mtd, info->pload_cmd, 0x00, -1);
+	chip->cmdfunc(mtd, info->pload_cmd, 0x00, page);
 
 	if (unlikely(raw))
 		status = chip->ecc.write_page_raw(mtd, chip, buf,
@@ -1616,7 +1672,7 @@ static int spinand_write_oob_std(struct mtd_info *mtd,
 	    (info->id[0] == NAND_MFR_ZETTA)))
 		spinand_set_qeb(mtd, chip);
 	chip->cmdfunc(mtd, SPINAND_CMD_WREN, -1, -1);
-	chip->cmdfunc(mtd, info->pload_cmd, mtd->writesize, -1);
+	chip->cmdfunc(mtd, info->pload_cmd, mtd->writesize, page);
 
 	info->oob_required = 1;
 	chip->write_buf(mtd, NULL, 0);
@@ -1759,7 +1815,7 @@ static int spinand_block_bad(struct mtd_info *mtd, loff_t offs)
 		    (info->id[0] == NAND_MFR_ZETTA)))
 			spinand_set_qeb(mtd, chip);
 		chip->cmdfunc(mtd, info->read_cmd,
-				mtd->writesize + chip->badblockpos, -1);
+				mtd->writesize + chip->badblockpos, page);
 		bad = chip->read_byte(mtd);
 
 		if (likely(chip->badblockbits == 8))
@@ -2181,7 +2237,7 @@ static int spinand_add_partitions(struct mtd_info *mtd,
 		do {
 			if (mtd->_block_isbad(mtd, offset)) {
 				printf("%s %d found bad block in 0x%llx\n",
-					__func__, __LINE__, off);
+					__func__, __LINE__, offset);
 				end += mtd->erasesize;
 			}
 			offset += mtd->erasesize;
@@ -2248,6 +2304,15 @@ int spinand_scan_ident(struct mtd_info *mtd, int maxchips,
 	info->pdev->mode = mode;
 	mtd->size = chip->chipsize;
 	info->name = type->name;
+
+	info->planes_per_lun = 1;
+	for (int i=0; i<ARRAY_SIZE(chip_plane_ids); i++)
+		if ((maf_id == chip_plane_ids[i][0]) &&
+		    (dev_id == chip_plane_ids[i][1])) {
+		    info->planes_per_lun = chip_plane_ids[i][2];
+		    break;
+		}
+
 	memset(info->id, 0, NAND_MAX_ID_LEN);
 	memcpy(info->id, type->id, type->id_len);
 	return 0;

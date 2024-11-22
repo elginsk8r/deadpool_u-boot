@@ -9,7 +9,7 @@
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/timer.h>
 #include <asm/arch/bl31_apis.h>
-#include <asm/arch/p_register.h>
+#include <asm/arch/register.h>
 #include <serial.h>
 
 
@@ -74,11 +74,17 @@ void clk_util_set_dsp_clk(uint32_t id, uint32_t freq_sel)
 }
 
 void dsp_clk_init(unsigned int dspid,  uint32_t freq_sel) {
-	clk_util_set_dsp_clk(dspid,freq_sel);
+	clk_util_set_dsp_clk(dspid, freq_sel);
 }
 
 void dsp_power_set(unsigned int dspid,  uint32_t powerflag) {
-	power_set_dsp(dspid,powerflag);
+	pr_info("power DSP, Audio \n");
+	power_set_dsp(dspid, powerflag);
+	if (powerflag) {
+		power_set_ctl(PDID_ACODEC, powerflag);//audio
+		power_set_ctl(PDID_AUDIO, powerflag);//audio
+		power_set_ctl(PDID_PDM, powerflag);//pdm
+	}
 }
 
 
@@ -107,8 +113,8 @@ static int do_dspset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 //	printf("CLKTREE_SYS_CLK_EN0  value 0x%x \n",readl(CLKTREE_SYS_CLK_EN0));
 
 	dsp_clk_init(dspid, freq_sel);
-	udelay(10);
-	dsp_power_set(dspid,  powerflag) ;
+	udelay(20);
+	dsp_power_set(dspid,  powerflag);
 	pr_info("dsp init CLK, power over! \n");
 
 	return ret;

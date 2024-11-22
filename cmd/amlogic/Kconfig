@@ -1,8 +1,9 @@
 menu "Amlogic commands"
 
-config AML_RPMB_DISABLE
+config AML_RPMB
+	depends on OPTEE
 	bool "support RPMB set in bootargs"
-	default n
+	default y
 	help
 	  Support RPMB set in bootargs.
 
@@ -112,7 +113,27 @@ config G_AB_SYSTEM
 
 config CMD_GET_CHIPTYPE
 	bool "get chip type in u-boot"
-	default y
+	default n
 	help
 	  get chip type and save to command line
+
+config CMD_AML_MISC
+	bool "classify amlogic misc command"
+	default y
+	help
+	  classify amlogic misc command to the fixed file
+
+config ENABLE_CHARGER_DETECTION
+	bool "enable and disable charger detection"
+	default n
+	help
+	   only allow booting when charger is detected as DCP
+
+config AML_ROBUST
+	bool "envs for robust upgrade"
+	depends on AML_STORAGE
+	default y
+	help
+		"envs for robust upgrade like defendkey"
+
 endmenu

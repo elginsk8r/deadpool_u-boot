@@ -143,29 +143,22 @@ static void lcd_power_ctrl(int status)
 		LCDPR("%s: %d\n", __func__, status);
 }
 
-static void lcd_module_enable(char *mode)
+static void lcd_encl_on(void)
 {
-	unsigned int sync_duration;
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
-	struct lcd_config_s *pconf = lcd_drv->lcd_config;
-	int ret;
-
-	ret = lcd_drv->config_check(mode);
-	if (ret) {
-		LCDERR("init exit\n");
-		return;
-	}
-
-	sync_duration = pconf->lcd_timing.sync_duration_num;
-	sync_duration = (sync_duration * 10 / pconf->lcd_timing.sync_duration_den);
-	LCDPR("enable: %s, %s, %ux%u@%u.%uHz\n", pconf->lcd_basic.model_name,
-		lcd_type_type_to_str(pconf->lcd_basic.lcd_type),
-		pconf->lcd_basic.h_active, pconf->lcd_basic.v_active,
-		(sync_duration / 10), (sync_duration % 10));
 
 	lcd_drv->driver_init_pre();
-	lcd_power_ctrl(1);
 
+	lcd_vcbus_write(VENC_INTCTRL, 0x200);
+	lcd_drv->lcd_status |= LCD_STATUS_ENCL_ON;
+}
+
+static void lcd_interface_on(void)
+{
+	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
+	struct lcd_config_s *pconf = lcd_drv->lcd_config;
+
+	lcd_power_ctrl(1);
 	pconf->retry_enable_cnt = 0;
 	while (pconf->retry_enable_flag) {
 		if (pconf->retry_enable_cnt++ >= LCD_ENABLE_RETRY_MAX)
@@ -176,16 +169,55 @@ static void lcd_module_enable(char *mode)
 		lcd_power_ctrl(1);
 	}
 	pconf->retry_enable_cnt = 0;
+	lcd_drv->lcd_status |= LCD_STATUS_IF_ON;
+}
 
-	lcd_vcbus_write(VPP_POSTBLEND_H_SIZE, pconf->lcd_basic.h_active);
-	lcd_vcbus_write(VENC_INTCTRL, 0x200);
+static void lcd_backlight_enable(void)
+{
+	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
 
 	bl_pwm_config_update(lcd_drv->bl_config);
 	bl_set_level(lcd_drv->bl_config->level_default);
 	bl_power_ctrl(1);
-	lcd_mute_setting(0);
+}
 
-	lcd_drv->lcd_status = 1;
+static void lcd_module_enable(char *mode, unsigned int frac)
+{
+	unsigned int sync_duration;
+	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
+	struct lcd_config_s *pconf = lcd_drv->lcd_config;
+	int ret;
+
+	ret = lcd_drv->config_check(mode, frac);
+	if (ret) {
+		LCDERR("init exit\n");
+		return;
+	}
+
+	sync_duration = pconf->lcd_timing.sync_duration_num;
+	sync_duration = (sync_duration * 100 / pconf->lcd_timing.sync_duration_den);
+	LCDPR("enable: %s, %s, %ux%u@%u.%2uHz\n", pconf->lcd_basic.model_name,
+		lcd_type_type_to_str(pconf->lcd_basic.lcd_type),
+		pconf->lcd_basic.h_active, pconf->lcd_basic.v_active,
+		(sync_duration / 100), (sync_duration % 100));
+
+	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0)
+		lcd_encl_on();
+	if ((lcd_drv->lcd_status & LCD_STATUS_IF_ON) == 0) {
+		lcd_interface_on();
+		lcd_backlight_enable();
+	}
+
+	pconf->retry_enable_cnt = 0;
+	while (pconf->retry_enable_flag) {
+		if (pconf->retry_enable_cnt++ >= LCD_ENABLE_RETRY_MAX)
+			break;
+		LCDPR("retry enable...%d\n", pconf->retry_enable_cnt);
+		lcd_power_ctrl(0);
+		mdelay(1000);
+		lcd_power_ctrl(1);
+	}
+	lcd_mute_setting(0);
 }
 
 static void lcd_module_disable(void)
@@ -195,11 +227,27 @@ static void lcd_module_disable(void)
 	LCDPR("disable: %s\n", lcd_drv->lcd_config->lcd_basic.model_name);
 
 	lcd_mute_setting(1);
-	bl_power_ctrl(0);
-
-	lcd_power_ctrl(0);
+	if (lcd_drv->lcd_status & LCD_STATUS_IF_ON) {
+		bl_power_ctrl(0);
+		lcd_power_ctrl(0);
+	}
 
 	lcd_drv->lcd_status = 0;
+}
+
+static void lcd_module_prepare(char *mode, unsigned int frac)
+{
+	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
+	int ret;
+
+	ret = lcd_drv->config_check(mode, frac);
+	if (ret) {
+		LCDERR("prepare exit\n");
+		return;
+	}
+
+	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0)
+		lcd_encl_on();
 }
 
 static void lcd_vbyone_filter_flag_print(struct lcd_config_s *pconf)
@@ -626,30 +674,40 @@ void lcd_wait_vsync(void)
 /* ********************************************** *
   lcd driver API
  * ********************************************** */
-static int lcd_outputmode_check(char *mode)
+static int lcd_outputmode_check(char *mode, unsigned int frac)
 {
 	if (aml_lcd_driver.outputmode_check)
-		return aml_lcd_driver.outputmode_check(mode);
+		return aml_lcd_driver.outputmode_check(mode, frac);
 
 	LCDERR("invalid lcd config\n");
 	return -1;
 }
 
-static void lcd_enable(char *mode)
+static void lcd_prepare(char *mode, unsigned int frac)
 {
 	if (lcd_check_valid())
 		return;
-	if (aml_lcd_driver.lcd_status)
+	if (aml_lcd_driver.lcd_status & LCD_STATUS_ENCL_ON)
 		LCDPR("already enabled\n");
 	else
-		lcd_module_enable(mode);
+		lcd_module_prepare(mode, frac);
+}
+
+static void lcd_enable(char *mode, unsigned int frac)
+{
+	if (lcd_check_valid())
+		return;
+	if (aml_lcd_driver.lcd_status & LCD_STATUS_IF_ON)
+		LCDPR("already enabled\n");
+	else
+		lcd_module_enable(mode, frac);
 }
 
 static void lcd_disable(void)
 {
 	if (lcd_check_valid())
 		return;
-	if (aml_lcd_driver.lcd_status)
+	if (aml_lcd_driver.lcd_status & LCD_STATUS_ENCL_ON)
 		lcd_module_disable();
 	else
 		LCDPR("already disabled\n");
@@ -783,6 +841,7 @@ static struct aml_lcd_drv_s aml_lcd_driver = {
 	.config_check = NULL,
 	.lcd_probe = lcd_probe,
 	.lcd_outputmode_check = lcd_outputmode_check,
+	.lcd_prepare = lcd_prepare,
 	.lcd_enable = lcd_enable,
 	.lcd_disable = lcd_disable,
 	.lcd_set_ss = lcd_set_ss,

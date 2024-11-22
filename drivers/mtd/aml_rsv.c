@@ -71,7 +71,6 @@ static inline void menson_rsv_protect(void)
 
 }
 
-
 int meson_rsv_erase_protect(struct meson_rsv_handler_t *handler,
 			    u32 block_addr)
 {
@@ -689,8 +688,14 @@ int meson_rsv_init(struct mtd_info *mtd,
 		/* reduce memory usage in sram */
 		handler->dtb->size = mtd->erasesize >> 1;
 	} else {
+		#ifdef CONFIG_MTD_SPI_NAND
+		/* Reduce space use, malloc may fail */
+		handler->key->size = mtd->erasesize >> 2;
+		handler->dtb->size = mtd->erasesize >> 1;
+		#else
 		handler->key->size = 0x40000;
 		handler->dtb->size = 0x40000;
+		#endif
 	}
 
 	if ((vernier - start) > NAND_RSV_BLOCK_NUM) {
@@ -757,7 +762,7 @@ int meson_rsv_bbt_read(u_char *dest, size_t size)
 	len = rsv_handler->bbt->size;
 	temp = kzalloc(len, GFP_KERNEL);
 	if (!temp) {
-		pr_err("%s %d kzalloc fail size = 0x%x\n",
+		pr_err("%s %d kzalloc fail size = %ld\n",
 			__func__, __LINE__, len);
 		return -ENOMEM;
 	}
@@ -798,7 +803,7 @@ int meson_rsv_key_read(u_char *dest, size_t size)
 	len = rsv_handler->key->size;
 	temp = kzalloc(len, GFP_KERNEL);
 	if (!temp) {
-		pr_err("%s %d kzalloc fail size = 0x%x\n",
+		pr_err("%s %d kzalloc fail size = 0x%lx\n",
 			__func__, __LINE__, len);
 		return -ENOMEM;
 	}
@@ -838,7 +843,7 @@ int meson_rsv_env_read(u_char *dest, size_t size)
 	len = rsv_handler->env->size;
 	temp = kzalloc(len, GFP_KERNEL);
 	if (!temp) {
-		pr_err("%s %d kzalloc fail size = 0x%x\n",
+		pr_err("%s %d kzalloc fail size = 0x%lx\n",
 			__func__, __LINE__, len);
 		return -ENOMEM;
 	}
@@ -859,7 +864,7 @@ int meson_rsv_dtb_read(u_char *dest, size_t size)
 
 	if (!rsv_handler ||
 	    !rsv_handler->dtb) {
-		pr_info("%s %d rsv info not inited yet!\n",
+		pr_info("%s %d rsv info %s not inited yet!\n",
 			__func__, __LINE__,
 			rsv_handler->dtb->name);
 		return 1;
@@ -878,7 +883,7 @@ int meson_rsv_dtb_read(u_char *dest, size_t size)
 	len = rsv_handler->dtb->size;
 	temp = kzalloc(len, GFP_KERNEL);
 	if (!temp) {
-		pr_err("%s %d kzalloc fail size = 0x%x\n",
+		pr_err("%s %d kzalloc fail size = 0x%lx\n",
 			__func__, __LINE__, len);
 		return -ENOMEM;
 	}
@@ -912,7 +917,7 @@ int meson_rsv_bbt_write(u_char *source, size_t size)
 	len = rsv_handler->bbt->size;
 	temp = kzalloc(len, GFP_KERNEL);
 	if (!temp) {
-		pr_err("%s %d kzalloc fail size = 0x%x\n",
+		pr_err("%s %d kzalloc fail size = 0x%lx\n",
 			__func__, __LINE__, len);
 		return -ENOMEM;
 	}
@@ -945,7 +950,7 @@ int meson_rsv_key_write(u_char *source, size_t size)
 	len = rsv_handler->key->size;
 	temp = kzalloc(len, GFP_KERNEL);
 	if (!temp) {
-		pr_err("%s %d kzalloc fail size = 0x%x\n",
+		pr_err("%s %d kzalloc fail size = 0x%lx\n",
 			__func__, __LINE__, len);
 		return -ENOMEM;
 	}
@@ -978,7 +983,7 @@ int meson_rsv_env_write(u_char *source, size_t size)
 	len = rsv_handler->env->size;
 	temp = kzalloc(len, GFP_KERNEL);
 	if (!temp) {
-		pr_err("%s %d kzalloc fail size = 0x%x\n",
+		pr_err("%s %d kzalloc fail size = 0x%lx\n",
 			__func__, __LINE__, len);
 		return -ENOMEM;
 	}
@@ -1011,7 +1016,7 @@ int meson_rsv_dtb_write(u_char *source, size_t size)
 	len = rsv_handler->dtb->size;
 	temp = kzalloc(len, GFP_KERNEL);
 	if (!temp) {
-		pr_err("%s %d kzalloc fail size = 0x%x\n",
+		pr_err("%s %d kzalloc fail size = 0x%lx\n",
 			__func__, __LINE__, len);
 		return -ENOMEM;
 	}

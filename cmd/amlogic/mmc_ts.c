@@ -334,6 +334,9 @@ int mmc_ts_set(const char *key, const char *value)
 		 */
 		size_t cur_len = strlen(p) + 1;
 		size_t new_len = vlen ? klen + 1 + vlen + 1 : 0;
+		size_t move_len = 0;
+
+		move_len = ts->cache.len - (p - ts->cache.data + cur_len) - 1;
 
 		if (cur_len != new_len) {
 			/* we need to move stuff around */
@@ -342,10 +345,14 @@ int mmc_ts_set(const char *key, const char *value)
 			     sizeof(ts->cache.data))
 				goto no_space;
 
-			memmove(p + new_len, p + cur_len,
-				ts->cache.len - (p - ts->cache.data + cur_len));
-
+			memmove(p + new_len, p + cur_len, move_len);
+			if (cur_len > new_len) {
+				/*Clean up the excess bytes*/
+				memset(p + new_len + move_len, 0, cur_len - new_len);
+			}
 			ts->cache.len = (ts->cache.len - cur_len) + new_len;
+			/*The last character needs to be set to 0*/
+			*(ts->cache.data + ts->cache.len - 1) = '\0';
 		} else if (!strcmp(p + klen + 1, value)) {
 			/* skip update if new value is the same as the old one */
 			res = 0;

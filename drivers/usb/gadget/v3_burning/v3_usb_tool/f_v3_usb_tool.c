@@ -18,7 +18,7 @@
 #include <partition_table.h>
 #include <android_image.h>
 #include <image.h>
-/*#include <emmc_partitions.h>*/
+#include <amlogic/cpu_id.h>
 #include "../include/v3_tool_def.h"
 DECLARE_GLOBAL_DATA_PTR;
 static void cb_aml_media_write(struct usb_ep *ep, struct usb_request *req);
@@ -489,7 +489,7 @@ static int strcmp_l1(const char *s1, const char *s2)
 }
 
 static const char* getvar_list[] = {
-	"version", "serialno", "product", "erase-block-size", "secure", "HW_ID",
+	"version", "serialno", "product", "erase-block-size", "secure",
 };
 static const char* getvar_list_ab[] = {
 	"version", "serialno", "product", "erase-block-size",
@@ -549,7 +549,9 @@ static void cb_getvar(struct usb_ep *ep, struct usb_request *req)
 		return;
 	} else if (!strcmp_l1("identify", cmd)) {
 		const int identifyLen = 8;
-		const char fwVer[] = {5, 0, 0, 16, 0, 0, 0, 0};
+		char fwVer[] = {5, 0, 0, 16, 0, 0, 0, 0};
+		cpu_id_t cpuid = get_cpu_id();
+		if (cpuid.family_id >= MESON_CPU_MAJOR_ID_SC2) fwVer[0] = 6;
 		memcpy(response + 4, fwVer, identifyLen);
 		replyLen = 4 + identifyLen;
 		adnl_identify_timeout = 0;
@@ -567,6 +569,12 @@ static void cb_getvar(struct usb_ep *ep, struct usb_request *req)
 		const char* usid = get_usid_string();
 		if (usid) strncat(response, usid, chars_left);
 		else strncat(response, DEVICE_SERIAL, chars_left);
+	} else if (!strcmp_l1("soctype", cmd)) {
+		cpu_id_t cpuid = get_cpu_id();
+		*(unsigned*)(response+4) = cpuid.family_id;
+		*(unsigned*)(response+8) = cpuid.chip_rev;
+		FB_DBG("soctype 0x%08x, %08x\n", cpuid.family_id, cpuid.chip_rev);
+		replyLen = 4 + 8;
 	} else if (!strcmp_l1("product", cmd)) {
 		char* s1 = DEVICE_PRODUCT;
 		strncat(response, s1, chars_left);
@@ -574,11 +582,6 @@ static void cb_getvar(struct usb_ep *ep, struct usb_request *req)
 		strncat(response, "2", chars_left);
 	} else if (!strcmp_l1("erase-block-size", cmd)) {
 		strncat(response, "2000", chars_left);
-	} else if (!strcmp_l1("HW_ID", cmd)) {
-		char *hw_id;
-		run_command("get_board_hw_id", 0);
-		hw_id = env_get("hw_id");
-		strncat(response, hw_id, chars_left);
 	} else {
 		FB_ERR("unknown variable: %s\n", cmd);
 		strcpy(response, "FAILVariable not implemented");
@@ -1121,7 +1124,7 @@ static void cb_oem_cmd(struct usb_ep *ep, struct usb_request *req)
 }
 
 const char* _imgFmt[] = {"normal", "sparse", "ubifs"};
-const char* _mediatype[] = {"store", "mem", "key"};
+const char* _mediatype[] = {"store", "mem", "key", "mmc"};
 
 static int _verify_partition_img(const int argc, char* argv[], char* ack)
 {
@@ -1224,9 +1227,8 @@ static int _mwrite_cmd_parser(const int argc, char* argv[], char* ack)
 				FB_MSG("mem base %llx\n", commonInf->partStartOff);
 			} break;
 		case V3TOOL_MEDIA_TYPE_STORE:
-			{
-				//TODO: add part sz check (assert imgsz <= part cap)
-			}break;
+		case V3TOOL_MEDIA_TYPE_MMC:
+			{ }break;
 		case V3TOOL_MEDIA_TYPE_UNIFYKEY:
 			{
 				if ( imgSize >= _UNIFYKEY_MAX_SZ ) {
@@ -1243,7 +1245,7 @@ static int _mwrite_cmd_parser(const int argc, char* argv[], char* ack)
 		FB_ERR("Fail in buffman init, ret %d\n", ret);
 		return -__LINE__;
 	}
-	printf("Flash 0x%08llx Bytes %s img to %s:%s\n", imgSize, imgFmt, media, partition);
+	printf("Flash 0x%08llx Bytes %s img to %s:%s at off 0x%llx\n", imgSize, imgFmt, media, partition, partOff);
 
 	return ret;
 }
@@ -1302,6 +1304,7 @@ static int _mread_cmd_parser(const int argc, char* argv[], char* ack)
 			} break;
 		case V3TOOL_MEDIA_TYPE_STORE:
 		case V3TOOL_MEDIA_TYPE_UNIFYKEY:
+		case V3TOOL_MEDIA_TYPE_MMC:
 			{
 				strncpy(commonInf->partName, partition,V3_PART_NAME_LEN);
 			}break;

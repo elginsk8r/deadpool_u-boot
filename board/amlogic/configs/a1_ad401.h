@@ -210,7 +210,7 @@
 
 /* running in sram */
 #define UBOOT_RUN_IN_SRAM
-#ifdef UBOOT_RUN_IN_SRAM
+#ifdef CONFIG_UBOOT_RUN_IN_SRAM
 #define CONFIG_SYS_INIT_SP_ADDR				(0x00200000)
 /* Size of malloc() pool */
 #define CONFIG_SYS_MALLOC_LEN				(256*1024)
@@ -253,8 +253,8 @@
 #error CONFIG_AML_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
-#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MESON_NFC)
-#error CONFIG_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
+#if defined(CONFIG_SPI_NAND) && defined(CONFIG_MTD_SPI_NAND) && defined(CONFIG_MESON_NFC)
+#error CONFIG_SPI_NAND/CONFIG_MTD_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
 /* #define		CONFIG_AML_SD_EMMC 1 */
@@ -268,15 +268,8 @@
 #endif
 #define		CONFIG_PARTITIONS 1
 
-#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND
-	#define CONFIG_CMD_NAND 1
-	#define CONFIG_MTD_DEVICE 1
-	/* #define CONFIG_RBTREE */
-	#define CONFIG_CMD_NAND_TORTURE 1
-	#define CONFIG_CMD_MTDPARTS   1
-	#define CONFIG_MTD_PARTITIONS 1
+#if defined CONFIG_MESON_NFC || defined CONFIG_SPI_NAND || defined CONFIG_MTD_SPI_NAND
 	#define CONFIG_SYS_MAX_NAND_DEVICE  2
-	#define CONFIG_SYS_NAND_BASE_LIST   {0}
 #endif
 
 /* vpu */
@@ -344,9 +337,7 @@
 /*file system*/
 #define CONFIG_DOS_PARTITION 1
 #define CONFIG_EFI_PARTITION 1
-#if 0
-#define CONFIG_AML_PARTITION 1
-#endif
+
 /* #define CONFIG_MMC 1 */
 #define CONFIG_FS_FAT 1
 #define CONFIG_FS_EXT4 1

@@ -12,6 +12,8 @@
 #include <asm/arch/p_register.h>
 #include <serial.h>
 
+#define DSP_FW_LEN 0x800000
+
 void dsp_reset(uint32_t id,uint32_t reset_addr)
 {
 	uint32_t StatVectorSel;
@@ -29,14 +31,13 @@ void dsp_reset(uint32_t id,uint32_t reset_addr)
 		pr_info("\n *P_DSP_CFG0 : ADDR_0X%p, value_0x%8x \n",P_DSP_CFG0,*P_DSP_CFG0);
 		*P_DSP_CFG0 = (*P_DSP_CFG0 & ~(0xffff <<0)) | (0x2018 << 0) | (1<<29) | (0<<0) ;      //irq_clken
 		udelay(10);
+
+		*P_DSP_CFG0 = *P_DSP_CFG0 | (1<<31);     //Dreset deassert
+		*P_DSP_CFG0 = *P_DSP_CFG0 | (1<<30);    //Breset deassert
+		udelay(20);
+
 		*P_DSP_CFG0 = *P_DSP_CFG0 & ~(1<<31);     //Dreset assert
-		udelay(10);
-		// *P_DSP_CFG0 = *P_DSP_CFG0 | (1<<31);     //Dreset deassert
-		// _udelay(10);
 		*P_DSP_CFG0 = *P_DSP_CFG0 & ~(1<<30);    //Breset
-		udelay(10);
-		// *P_DSP_CFG0 = *P_DSP_CFG0 | (1<<30);    //Breset deassert
-		// _udelay(10);
 		pr_info("\n *P_DSP_CFG0 : ADDR_0X%p, value_0x%8x \n",P_DSP_CFG0,*P_DSP_CFG0);
 	} else {
 		init_dsp(id,reset_addr, (0x1 | StatVectorSel<<1 | strobe<<2));
@@ -44,9 +45,9 @@ void dsp_reset(uint32_t id,uint32_t reset_addr)
 		pr_info("\n *P_DSPB_CFG0 : ADDR_0X%p, value_0x%8x \n",P_DSPB_CFG0,*P_DSPB_CFG0);
 		*P_DSPB_CFG0 = (*P_DSPB_CFG0 & ~(0xffff <<0)) | (0x2019 << 0) | (1<<29) | (0<<0) ;      //irq_clken
 		udelay(10);
-		*P_DSPB_CFG0 = *P_DSPB_CFG0 & ~(1<<31);     //Dreset
+		writel(readl(DSPB_CFG0) & ~(1<<31), DSPB_CFG0); //Dreset
 		udelay(10);
-		*P_DSPB_CFG0 = *P_DSPB_CFG0 & ~(1<<30);    //Breset
+		writel(readl(DSPB_CFG0) & ~(1<<30), DSPB_CFG0); //Breset
 		udelay(10);
 		pr_info("\n *P_DSPB_CFG0 : ADDR_0X%p, value_0x%8x \n",P_DSPB_CFG0,*P_DSPB_CFG0);
 	}
@@ -56,20 +57,18 @@ static int do_dsprun(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	unsigned long addr;
 	unsigned int dspid;
-	unsigned long dspfw_size;
-
+	uint32_t freq_sel;
 	int ret=0;
-	if (argc < 4) {
-		pr_err("please input dsp boot args: id, address, fw size!\n");
+	if (argc <= 1) {
+		pr_err("plese input dsp boot args:id, addrss, clk!\n");
 		return CMD_RET_USAGE;
 	}
-
 	dspid = simple_strtoul(argv[1], NULL, 16);
 	addr = simple_strtoul(argv[2], NULL, 16);
-	dspfw_size = simple_strtoul(argv[3], NULL, 16);
-	pr_info("dsp%d boot address:0x%lx size:0x%lx", dspid, addr, dspfw_size);
+	pr_info("dsp%d boot \n",dspid);
+	pr_info("dspboot start address:0x%lx\n",addr);
 
-	flush_cache(addr, dspfw_size);
+	flush_cache(addr, DSP_FW_LEN);
 
 	dsp_reset(dspid, addr);
 	pr_info("dsp init over! \n");
@@ -78,41 +77,9 @@ static int do_dsprun(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 
 U_BOOT_CMD(
-	dsprun,	4,	1,	do_dsprun,
+	dsprun,	3,	1,	do_dsprun,
 	"load dspboot.bin from ddr address",
 	"arg[0]: cmd\n"
 	"arg[1]: dspid \n"
 	"arg[2]: dspboot.bin load address!"
-	"arg[3]: dsp firmware size\n"
 );
-
-
-static int do_flushmemory(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-	unsigned long addr;
-	unsigned long size;
-
-	int ret=0;
-	if (argc < 3) {
-		pr_err("please input bootpackage args: address, fw size!\n");
-		return CMD_RET_USAGE;
-	}
-
-	addr = simple_strtoul(argv[1], NULL, 16);
-	size = simple_strtoul(argv[2], NULL, 16);
-	pr_info("%s address:0x%lx size:0x%lx\n", argv[0], addr, size);
-	flush_cache(addr, size);
-	return ret;
-}
-
-
-U_BOOT_CMD(
-	flushmemory,	3,	1,	do_flushmemory,
-	"flush cache",
-	"arg[0]: cmd\n"
-	"arg[1]: address \n"
-	"arg[2]: size \n"
-);
-
-
-

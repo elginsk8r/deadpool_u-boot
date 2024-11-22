@@ -4078,6 +4078,6 @@
 //
 // Closing file:  ./REG_LIST_RTL.h
 //
-
+#include "soc_def.h"
 #endif // REGISTER_H
 
