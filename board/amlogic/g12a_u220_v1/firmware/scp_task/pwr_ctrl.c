@@ -123,6 +123,7 @@ static unsigned int detect_key(unsigned int suspend_from)
 {
 	int exit_reason = 0;
 	unsigned *irq = (unsigned *)WAKEUP_SRC_IRQ_ADDR_BASE;
+	backuremote_register();
 	init_remote();
 #ifdef CONFIG_CEC_WAKEUP
 	cec_start_config();
@@ -175,6 +176,8 @@ static unsigned int detect_key(unsigned int suspend_from)
 		else
 			__switch_idle_task();
 	} while (1);
+
+	resume_remote_register();
 
 	return exit_reason;
 }
