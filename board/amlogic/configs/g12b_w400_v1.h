@@ -555,7 +555,7 @@
 #define CONFIG_AML_HDMITX20 1
 
 #if defined(CONFIG_AML_HDMITX20)
-#define CONFIG_AML_DOLBY 1
+#undef CONFIG_AML_DOLBY
 #define CONFIG_CMD_INI 1
 #endif
 
