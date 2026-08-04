@@ -64,13 +64,13 @@ extern const size_t avb2_kpub_vendor_external_len[];
 extern const size_t avb2_kpub_vendor_external_num;
 #else
 extern const uint8_t avb2_kpub_vendor[];
-extern const size_t avb2_kpub_vendor_len;
+extern const int avb2_kpub_vendor_len;
 #endif /* CONFIG_AVB2_KPUB_VENDOR_MULTIPLE */
 #endif /* CONFIG_AVB_KPUB_VENDOR */
 
 #if defined(CONFIG_AVB2_KPUB_DEFAULT) || defined(CONFIG_AVB2_KPUB_DEFAULT_VENDOR)
 extern const uint8_t avb2_kpub_default[];
-extern const size_t avb2_kpub_default_len;
+extern const int avb2_kpub_default_len;
 #endif /* CONFIG_AVB_KPUB_DEFAULT || CONFIG_AVB2_KPUB_DEFAULT_VENDOR */
 
 AvbOps avb_ops_;
